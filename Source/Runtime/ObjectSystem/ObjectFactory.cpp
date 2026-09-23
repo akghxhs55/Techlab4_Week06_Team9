@@ -35,36 +35,11 @@ FName FObjectFactory::MakeUniqueObjectName(const UClass* Class, UObject* Outer, 
         BaseName = FName(Class->Name);
     }
 
-    FString BaseNameString = BaseName.ToString();
+    // 전체 UObject를 뒤지지 않고 Outer별 카운터로 번호를 매긴다.
+    static TMap<FString, int32> RootNameCounters;   // Outer가 없는 오브젝트용
+    TMap<FString, int32>& Counters = Outer ? Outer->ChildNameCounters : RootNameCounters;
 
-    int32 Number = 0;
-
-    while (true)
-    {
-        FString CandidateName =  BaseNameString + "_" + std::to_string(Number);
-
-        bool bNameExists = false;
-
-        for (UObject* Object : GUObjectArray)
-        {
-            if (!Object)
-                continue;
-
-            if (Object->GetOuter() != Outer)
-                continue;
-
-            if (Object->GetName() == CandidateName)
-            {
-                bNameExists = true;
-                break;
-            }
-        }
-
-        if (!bNameExists)
-        {
-            return FName(CandidateName);
-        }
-
-        ++Number;
-    }
+    const FString Base = BaseName.ToString();
+    int32& Next = Counters[Base];
+    return FName(Base + "_" + std::to_string(Next++));
 }

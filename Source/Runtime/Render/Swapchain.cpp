@@ -76,7 +76,7 @@ void FSwapchain::Resize(int32 InWidth, int32 InHeight)
 
 void FSwapchain::SwapBuffers(uint32 SyncInterval, uint32 Flags)
 {
-	Swapchain->Present(1, 0);
+	Swapchain->Present(SyncInterval, Flags);
 }
 
 void FSwapchain::ValidateRenderingInfo()

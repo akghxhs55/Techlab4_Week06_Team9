@@ -123,6 +123,9 @@ private:
 	EObjectFlags Flags = EObjectFlags::RF_NoFlags;
 
 	bool bIsRegistered = true;
+
+	TMap<FString, int32> ChildNameCounters;
+	friend class FObjectFactory;
 };
 
 extern TArray<UObject*> GUObjectArray;

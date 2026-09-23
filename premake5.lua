@@ -7,6 +7,8 @@ workspace "Hitori"
 		"Debug",
 		"Release",
 		"ObjViewer",
+		"Benchmark",
+		"Benchmark_Debug",
 	}
 
 	multiprocessorcompile "On"
@@ -65,6 +67,19 @@ function CommonSettings()
 		runtime  "Release"
 		optimize "on"
 		symbols  "on"
+
+	filter "configurations:Benchmark_Debug"
+		defines  { "ENGINE_DEBUG", "_DEBUG", "BENCHMARK" }
+		runtime  "Debug"
+		symbols  "on"
+
+	filter "configurations:Benchmark"
+		defines  { "ENGINE_RELEASE", "NDEBUG", "BENCHMARK" }
+		runtime  "Release"
+		optimize "on"
+		symbols  "on"
+
+
 
 	filter {}
 end
@@ -174,5 +189,11 @@ project "HitoriEditor"
 
 	filter "configurations:ObjViewer"
 		targetname "ObjViewer"
+
+	filter "configurations:Benchmark"
+		targetname "Benchmark"
+
+	filter "configurations:Benchmark_Debug"
+		targetname "Benchmark_Debug"
 
 	filter {}
