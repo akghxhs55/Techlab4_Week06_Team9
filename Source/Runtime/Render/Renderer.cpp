@@ -13,7 +13,7 @@
 
 bool FRenderer::Init()
 {
-	Temp = RenderCommand::CreateConstantBuffer(sizeof(FPerObjectConstants));
+	PerObjectCB = RenderCommand::CreateConstantBuffer(sizeof(FPerObjectConstants));
 
 	return true;
 }
@@ -159,6 +159,6 @@ void FRenderer::UpdatePerObjectConstants(const FRenderPacket& RenderPacket, cons
 	Constants.MVP = (RenderPacket.model * ViewProjection).GetTransposed();
 	Constants.World = RenderPacket.model.GetTransposed();
 
-	RenderCommand::UpdateBufferData(Temp.get(), &Constants);
-	RenderCommand::BindConstantBuffer(0, Temp.get(), EShaderBindFlagBits::Vertex);
+	RenderCommand::UpdateBufferData(PerObjectCB.get(), &Constants);
+	RenderCommand::BindConstantBuffer(0, PerObjectCB.get(), EShaderBindFlagBits::Vertex);
 }

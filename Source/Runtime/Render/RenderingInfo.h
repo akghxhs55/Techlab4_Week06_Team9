@@ -31,15 +31,15 @@ struct FViewportSettings
 struct FClearValue
 {
 	FVector4 ColorClearValue = { 0.3f, 0.3f, 0.3f, 1.0f };
-	float depthClearValue = 1.0f;
-	uint8 stencilClearValue = 0;
+	float DepthClearValue = 1.0f;
+	uint8 StencilClearValue = 0;
 };
 
 struct FRenderingDesc
 {
 	FTexture2D* Texture = nullptr;
 	ERenderTargetLoadOp  LoadOp = ERenderTargetLoadOp::Clear;
-	ERenderTargetStoreOp storeOp = ERenderTargetStoreOp::Store;
+	ERenderTargetStoreOp StoreOp = ERenderTargetStoreOp::Store;
 	FClearValue ClearValue = FClearValue();
 };
 
@@ -48,5 +48,5 @@ struct FRenderingInfo
 	FViewportSettings ViewportSetting;
 
 	TArray<FRenderingDesc> ColorRenderTargets;
-	FRenderingDesc DepthSteincil;
+	FRenderingDesc DepthStencil;
 };

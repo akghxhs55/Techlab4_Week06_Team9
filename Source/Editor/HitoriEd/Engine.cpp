@@ -462,7 +462,7 @@ void FEditorApplication::RenderFrame(const int32 ViewIndex, const FRenderingInfo
 
 		FBox box = Target->CalcBounds();
 
-		RenderCommand::ClearDepthStencil(ViewRenderingInfo.DepthSteincil.Texture);
+		RenderCommand::ClearDepthStencil(ViewRenderingInfo.DepthStencil.Texture);
 
 		GizmoRenderer->OnRender(
 			*Gizmo,
@@ -471,7 +471,7 @@ void FEditorApplication::RenderFrame(const int32 ViewIndex, const FRenderingInfo
 			MultipleViewportsAdapter.IsOrthographic(ViewIndex));
 	}
 
-	RenderCommand::ClearDepthStencil(ViewRenderingInfo.DepthSteincil.Texture);
+	RenderCommand::ClearDepthStencil(ViewRenderingInfo.DepthStencil.Texture);
 
 	if (SettingsPanel->GetSettings().bShowUUID)
 	{

@@ -15,7 +15,6 @@ UObject::UObject()
 	ObjectUUID = FEngineStatics::GetUUID();
 	InternalIndex = GUObjectArray.Num();
 	GUObjectArray.Add(this);
-	LOG(Info, "UUID : {}", ObjectUUID);
 }
 
 UObject::UObject(bool bRegister)

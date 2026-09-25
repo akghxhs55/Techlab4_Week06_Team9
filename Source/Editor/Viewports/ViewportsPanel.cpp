@@ -345,5 +345,5 @@ void FViewportsPanel::ResizeSlot(FViewSlot& Slot, const uint32 Width, const uint
 	FRenderingDesc ColorDesc{};
 	ColorDesc.Texture = Slot.ColorTarget.get();
 	Slot.RenderingInfo.ColorRenderTargets.Add(ColorDesc);
-	Slot.RenderingInfo.DepthSteincil.Texture = Slot.DepthTarget.get();
+	Slot.RenderingInfo.DepthStencil.Texture = Slot.DepthTarget.get();
 }

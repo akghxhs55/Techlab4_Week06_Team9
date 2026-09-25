@@ -3,53 +3,9 @@
 
 #include "Engine/World.h"
 #include "Engine/Level.h"
-#include "Core/EngineStatics.h"
 #include "Component/PrimitiveComponent.h"
 #include "GameFramework/Actor.h"
-#include "GameFramework/Actor/StaticMeshActor.h"
 #include "UObject/UObjectHash.h"
-
-namespace
-{
-	FString PrimitiveTypeToString(EPrimitiveType Type)
-	{
-		switch (Type)
-		{
-		case EPrimitiveType::Sphere:
-			return "Sphere";
-
-		case EPrimitiveType::Cube:
-			return "Cube";
-
-		case EPrimitiveType::Cone:
-			return "Cone";
-
-		case EPrimitiveType::Plane:
-			return "Plane";
-
-		default:
-			return "";
-		}
-	}
-
-	EPrimitiveType FStringToPrimitiveType(const FString& String)
-	{
-		if (String == "Sphere")
-			return EPrimitiveType::Sphere;
-
-		if (String == "Cube")
-			return EPrimitiveType::Cube;
-
-		if (String == "Cone")
-			return EPrimitiveType::Cone;
-
-		if (String == "Plane")
-			return EPrimitiveType::Plane;
-
-		return EPrimitiveType::Cube;
-	}
-
-}
 
 bool FJsonArchive::SaveWorld(UWorld* World, const FString& Path)
 {

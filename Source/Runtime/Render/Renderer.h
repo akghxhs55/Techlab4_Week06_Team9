@@ -17,9 +17,7 @@ class UCameraComponent;
 
 class FRenderer
 {
-	friend class UTexture2D;
 public:
-
 	bool Init();
 
 	// 기존 단일 카메라의 ViewProjection으로 렌더 큐 전체를 그린다.
@@ -39,15 +37,7 @@ private:
 	TArray<FRenderPacket> RenderPackets;
 	// 정렬된 RenderPackets에서 반투명 패킷이 시작되는 위치
 	uint32 FirstTranslucentIndex = 0;
-	TUniquePtr<FConstantBuffer> CB;
-	TUniquePtr<FConstantBuffer> Temp;
-
-	D3D11_VIEWPORT ViewportInfo;
-
-	uint32 Width;
-	uint32 Height;
-
-	FLOAT ClearColor[4] = { 0.3f, 0.3f, 0.3f, 1.0f };
+	TUniquePtr<FConstantBuffer> PerObjectCB;
 
 	void DrawPackets(uint32 Begin, uint32 End, const FMatrix& ViewProjection);
 	void BindMaterial(UMaterial* material);

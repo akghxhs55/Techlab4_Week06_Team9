@@ -219,7 +219,7 @@ void FObjViewerApp::RenderFrame()
 	BuildRenderQueue(RenderQueue);
 
 	FRenderingInfo Info = Swapchain->GetRenderingInfo();
-	Info.DepthSteincil.Texture = DepthBuffer.get();
+	Info.DepthStencil.Texture = DepthBuffer.get();
 
 	RenderCommand::BeginRenderPass(Info);
 

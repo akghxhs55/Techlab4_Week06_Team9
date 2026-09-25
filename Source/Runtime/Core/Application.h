@@ -4,9 +4,10 @@
 class FApplication
 {
 public:
+    FApplication();
     virtual ~FApplication() = default;
 
-    virtual bool Init(HINSTANCE hInstance) = 0;
-    virtual void Run() = 0;
-    virtual void Shutdown() = 0;
+    virtual bool Init(HINSTANCE hInstance);
+    virtual void Run();
+    virtual void Shutdown();
 };
