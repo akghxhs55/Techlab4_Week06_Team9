@@ -42,6 +42,8 @@ namespace
 	DECLARE_CYCLE_STAT("ImGui", STAT_ImGui);
 }
 
+#include "Core/SplashScreen.h"
+
 FEngineConfig UEditorEngine::GetConfig() const
 {
 	FEngineConfig Desc;
@@ -49,10 +51,12 @@ FEngineConfig UEditorEngine::GetConfig() const
 	Desc.Width = 1920;
 	Desc.Height = 1080;
 	Desc.bBorderless = false;
-	Desc.SyncInterval = 1;
+	Desc.SyncInterval = 0;
 	// View는 각자 깊이 버퍼를 쓰고 백버퍼에는 ImGui만 그린다.
 	Desc.bCreateDepthBuffer = false;
 	Desc.bExitOnEscape = false;
+	// 파일이 없으면 검은 배경에 상태 텍스트만 표시된다.
+	Desc.SplashImage = "Resources/Splash.png";
 	return Desc;
 }
 

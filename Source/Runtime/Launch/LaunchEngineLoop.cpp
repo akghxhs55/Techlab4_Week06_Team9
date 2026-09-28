@@ -15,6 +15,7 @@
 #include "Render/Renderer.h"
 #include "Render/Swapchain.h"
 #include "Render/Texture2D.h"
+#include "Core/SplashScreen.h"
 
 namespace
 {
@@ -46,6 +47,14 @@ bool FEngineLoop::PreInit(HINSTANCE hInstance, UClass* EngineClass)
 	GEngine->EngineLoop = this;
 	Config = GEngine->GetConfig();
 
+	if (Config.SplashImage)
+	{
+		FSplashScreen::Show(hInstance, Config.SplashImage);
+	}
+
+	FSplashScreen::SetText(L"Initializing Renderer...");
+	FSplashScreen::SetProgress(0.1f);
+
 	// 0이면 주 모니터 해상도
 	const uint32 Width = Config.Width != 0 ? Config.Width : static_cast<uint32>(GetSystemMetrics(SM_CXSCREEN));
 	const uint32 Height = Config.Height != 0 ? Config.Height : static_cast<uint32>(GetSystemMetrics(SM_CYSCREEN));
@@ -59,6 +68,7 @@ bool FEngineLoop::PreInit(HINSTANCE hInstance, UClass* EngineClass)
 	MainWindow = MakeUnique<FWindow>();
 	if (!MainWindow->Create(hInstance, Width, Height, Config.Title, Config.bBorderless))
 	{
+		FSplashScreen::Hide();
 		return false;
 	}
 
@@ -68,13 +78,24 @@ bool FEngineLoop::PreInit(HINSTANCE hInstance, UClass* EngineClass)
 		CreateDepthBuffer(MainWindow->GetWidth(), MainWindow->GetHeight());
 	}
 
+	FSplashScreen::SetText(L"Loading Assets...");
+	FSplashScreen::SetProgress(0.3f);
 	FRenderResourceManager::Init();
 	UAssetManager::Init();
 
+	FSplashScreen::SetText(L"Initializing Engine...");
+	FSplashScreen::SetProgress(0.8f);
 	if (!GEngine->Init())
 	{
+		FSplashScreen::Hide();
 		return false;
 	}
+
+	FSplashScreen::SetProgress(1.0f);
+	FSplashScreen::Hide();
+
+	// 초기화 동안 숨겨 두었던 메인 창을 스플래시가 닫힌 뒤에 띄운다.
+	MainWindow->Show();
 
 	EngineTimer::Init();
 	PrevFrameCycles = FPlatformTime::GetCycles64();

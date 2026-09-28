@@ -23,6 +23,7 @@ struct FEngineConfig
 	uint32 SyncInterval = 0;   // 0 = VSync 끔 (FPS 측정용)
 	bool bCreateDepthBuffer = true;   // 백버퍼에 3D를 직접 그리지 않는 엔진(에디터)은 끈다.
 	bool bExitOnEscape = true;        // 테두리 없는 창에는 닫기 버튼이 없다.
+	const char* SplashImage = nullptr;
 };
 
 // 모든 엔진 모드의 베이스. 플랫폼·루프·Present는 FEngineLoop가 맡고,

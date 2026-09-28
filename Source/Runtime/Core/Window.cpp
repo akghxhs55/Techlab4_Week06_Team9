@@ -71,10 +71,15 @@ bool FWindow::Create(HINSTANCE hInstance, int InWidth, int InHeight, const wchar
 	if (hWnd == nullptr)
 		return false;
 
-	ShowWindow(hWnd, SW_SHOW);
-
-
+	// 초기화(스플래시)가 끝난 뒤 Show()로 띄운다.
 	return true;
+}
+
+void FWindow::Show()
+{
+	ShowWindow(hWnd, SW_SHOW);
+	UpdateWindow(hWnd);
+	SetForegroundWindow(hWnd);
 }
 
 void FWindow::ProcessMessage(bool& bIsRunning)
