@@ -26,7 +26,7 @@ DECLARE_CYCLE_STAT("ImGui Render", STAT_ImGuiRender);
 
 FEngineConfig UBenchmarkEngine::GetConfig() const
 {
-	FEngineConfig Desc;
+	FEngineConfig Desc = Super::GetConfig();
 	Desc.Title = L"Benchmarker";
 	return Desc;
 }
@@ -136,6 +136,8 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 
 void UBenchmarkEngine::PreExit()
 {
+	Super::PreExit();
+
 	ImGuiRenderer->Shutdown();
 }
 

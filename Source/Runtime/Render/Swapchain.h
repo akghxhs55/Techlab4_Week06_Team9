@@ -19,10 +19,14 @@ public:
 	void SwapBuffers(uint32 SyncInterval = 1, uint32 Flags = 0);
 
 	const FRenderingInfo& GetRenderingInfo() const { return RenderingInfo; }
+	// Tearing을 허용하면 보더리스 창에서도 주사율 상한 없이 Present한다.
+	bool IsTearingAllowed() const { return bAllowTearing; }
 private:
 	void ValidateRenderingInfo();
-	
+
 	FRenderDevice* RenderDevice;
+
+	bool bAllowTearing = false;
 
 	DXGI_SWAP_CHAIN_DESC Desc;
 	ComPtr<IDXGISwapChain> Swapchain;

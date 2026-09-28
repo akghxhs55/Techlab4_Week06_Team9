@@ -128,7 +128,7 @@ bool FEngineLoop::Tick()
 	}
 
 	GEngine->Tick(EngineTimer::GetDeltaTime());
-	Swapchain->SwapBuffers(Config.SyncInterval, 0);
+	Swapchain->SwapBuffers(Config.SyncInterval);
 
 	// EngineTimer는 DeltaTime을 0.1초로 자르므로 표시용 시간은 사이클로 따로 잰다.
 	const uint64 CurrentCycles = FPlatformTime::GetCycles64();
