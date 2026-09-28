@@ -27,8 +27,11 @@ public:
 	virtual FString GetMaterialSlotName(int32 SlotIndex) const override;
 	virtual UMaterial* GetDefaultMaterial(int32 SlotIndex) const override;
 
+	void SubmitToRenderQueue(TQueue<FRenderPacket>& Queue) override;
+	void SubmitToRenderQueue(TQueue<FRenderPacket>& Queue, uint32 LODIndex);
+
 private:
 	UStaticMesh* StaticMesh = nullptr;
 	// Mesh의 Section별 Material과 Texture를 보존해 각각의 렌더 패킷으로 제출한다.
-	virtual void SubmitToRenderQueue(TQueue<FRenderPacket>& RenderQueue) override;
+	//virtual void SubmitToRenderQueue(TQueue<FRenderPacket>& RenderQueue) override;
 };

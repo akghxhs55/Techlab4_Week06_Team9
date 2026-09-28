@@ -5,6 +5,7 @@
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
 #include "Component/PrimitiveComponent.h"
+#include "Component/StaticMeshComponent.h"
 #include "Component/BillboardComponent.h"
 #include "Component/ParticleSubUVComponent.h"
 #include "Editor/Outliner/OutlinerPanel.h"
@@ -12,6 +13,7 @@
 #include "Engine/World.h"
 #include "Input/InputSystem.h"
 #include "UObject/UObjectIterator.h"
+#include "Asset/LOD/StaticMeshLODSelector.h"
 
 #include <algorithm>
 #include <cassert>
@@ -688,6 +690,25 @@ void FMultipleViewportsAdapter::BuildRenderQueue(const int32 ViewIndex, TQueue<F
             Billboard->SubmitToRenderQueue(
                 OutQueue,
                 BuildEngineBillboardMatrix(ViewIndex, Billboard->GetWorldLocation(), Scale.Y, Scale.Z));
+        }
+        else if (auto* StaticComponent = Cast<UStaticMeshComponent>(Primitive))
+        {
+            UStaticMesh* Mesh = StaticComponent->GetStaticMesh();
+            if (!Mesh)
+                continue;
+
+            const FRect& Rect = GetViewRect(ViewIndex);
+            const FLODViewContext Context{ GetEngineViewProjection(ViewIndex),
+                static_cast<uint32>(Rect.Width),
+                static_cast<uint32>(Rect.Height)
+            };
+
+            const uint32 LOD = SelectStaticMeshLOD(
+                *Mesh,
+                StaticComponent->GetWorldMatrix(),
+                Context);
+
+            StaticComponent->SubmitToRenderQueue(OutQueue, LOD);
         }
         else
         {

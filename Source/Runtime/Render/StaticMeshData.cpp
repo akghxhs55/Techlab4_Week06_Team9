@@ -44,5 +44,12 @@ bool FStaticMeshData::Validate(FString& OutError) const
 		return false;
 	}
 
+	if (!LODSourceVertices.IsEmpty() &&
+		LODSourceVertices.Num() != Vertices.Num())
+	{
+		OutError = "LOD source vertex count does not match vertex count";
+		return false;
+	}
+
 	return true;
 }

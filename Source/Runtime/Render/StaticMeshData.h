@@ -40,6 +40,13 @@ struct FStaticMaterialSlot
 	FString DiffuseTexturePath;
 };
 
+struct FLODSourceVertex
+{
+	int32 PositionIndex = -1;
+	int32 UVIndex = -1;
+	int32 NormalIndex = -1;
+};
+
 struct FStaticMeshData
 {
 	TArray<FVertexPNCT> Vertices;
@@ -47,6 +54,9 @@ struct FStaticMeshData
 	TArray<FStaticMeshSection> Sections;
 	TArray<FStaticMaterialSlot> MaterialSlots;
 	FBox AABB;
+
+	// LOD0 생성용 CPU 메타데이터. GPU vertex layout에는 포함하지 않는다.
+	TArray<FLODSourceVertex> LODSourceVertices;
 
 	// TODO: 나중에 Sections, MaterialSlots 도 Append 해줘야 함.
 	void Append(const FStaticMeshData& Other)

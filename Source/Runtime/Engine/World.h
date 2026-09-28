@@ -15,6 +15,8 @@
 class ULevel;
 class UBillboardComponent;
 
+struct FLODViewContext;
+
 class UWorld : public UObject
 {
 	DECLARE_CLASS(UWorld, UObject)
@@ -37,7 +39,7 @@ public:
 
 	void ClearWorld();
 
-	void GatherRenderPackets(TQueue<FRenderPacket>& RenderQueue);
+	void GatherRenderPackets(TQueue<FRenderPacket>& RenderQueue, const FLODViewContext* LODView = nullptr);
 
 	void CreateMainCamera();
 

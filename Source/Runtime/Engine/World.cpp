@@ -15,6 +15,9 @@
 #include "Collision/Ray.h"
 #include "Component/BillboardComponent.h"
 
+#include "Component/StaticMeshComponent.h"
+#include "Asset/LOD/StaticMeshLODSelector.h"
+
 UWorld::~UWorld()
 {
 
@@ -120,13 +123,32 @@ void UWorld::ClearWorld()
 	HTR_LOG(Info, "{} : ", PersistentLevel->GetActorNum());
 }
 
-void UWorld::GatherRenderPackets(TQueue<FRenderPacket>& RenderQueue)
+void UWorld::GatherRenderPackets(TQueue<FRenderPacket>& RenderQueue, const FLODViewContext* LODView)
 {
-	//for (UPrimitiveComponent* Primitive : PrimitiveComponents)
 	for (TObjectIterator<UPrimitiveComponent> Itr; Itr; ++Itr)
 	{
-		if (*Itr && Itr->IsVisible())
-			Itr->SubmitToRenderQueue(RenderQueue);
+		if (!*Itr || !Itr->IsVisible())
+			continue;
+
+		if (LODView)
+		{
+			if (auto* Component = Cast<UStaticMeshComponent>(*Itr))
+			{
+				if (UStaticMesh* Mesh =
+					Component->GetStaticMesh())
+				{
+					const uint32 LOD = SelectStaticMeshLOD(
+							*Mesh,
+							Component->GetWorldMatrix(),
+							*LODView);
+
+					Component->SubmitToRenderQueue(RenderQueue, LOD);
+					continue;
+				}
+			}
+		}
+
+		Itr->SubmitToRenderQueue(RenderQueue);
 	}
 }
 

@@ -16,10 +16,12 @@ static_assert(std::is_trivially_copyable_v<FStaticMeshSection>);
 static_assert(std::is_trivially_copyable_v<FVector4>);
 static_assert(std::is_trivially_copyable_v<FBox>);
 
+static_assert(std::is_trivially_copyable_v<FLODSourceVertex>);
+
 namespace
 {
 	// FStaticMeshData, FVertexPNCT, FStaticMeshSection, FStaticMaterialSlot 구조가 바뀌면 올린다
-	constexpr uint32 BakeVersion = 2;
+	constexpr uint32 BakeVersion = 3;
 
 	struct FBakeHeader
 	{
@@ -117,6 +119,7 @@ TUniquePtr<FStaticMeshData> FStaticMeshBake::ReadBaked(const FString& BinPath)
 	}
 
 	if (!ReadArray<FVertexPNCT>(In, Data->Vertices, MaxCount) ||
+		!ReadArray<FLODSourceVertex>(In, Data->LODSourceVertices, MaxCount) ||
 		!ReadArray<uint32>(In, Data->Indices, MaxCount) ||
 		!ReadArray<FStaticMeshSection>(In, Data->Sections, MaxCount))
 	{
@@ -170,6 +173,7 @@ void FStaticMeshBake::WriteBaked(const FString& BinPath, const FStaticMeshData& 
 
 	WritePod<FBakeHeader>(Out, FBakeHeader());
 	WriteArray<FVertexPNCT>(Out, Data.Vertices);
+	WriteArray<FLODSourceVertex>(Out, Data.LODSourceVertices);
 	WriteArray<uint32>(Out, Data.Indices);
 	WriteArray<FStaticMeshSection>(Out, Data.Sections);
 

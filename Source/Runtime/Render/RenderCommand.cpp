@@ -90,10 +90,10 @@ void RenderCommand::BindShaderProgram(FShaderProgram* Shader)
 	RenderDevice->GetContext()->IASetInputLayout(Shader->VertexShader->GetLayout());
 }
 
-void RenderCommand::BindMesh(UStaticMesh* Mesh)
+void RenderCommand::BindMesh(UStaticMesh* Mesh, uint32 LODIndex)
 {
-	BindVertexBuffer(Mesh->VertexBuffer.get());
-	BindIndexBuffer(Mesh->IndexBuffer.get());
+	BindVertexBuffer(Mesh->GetVertexBuffer(LODIndex));
+	BindIndexBuffer(Mesh->GetIndexBuffer(LODIndex));
 }
 
 void RenderCommand::Draw(uint32 VertexCount, uint32 StartIndexLocation)

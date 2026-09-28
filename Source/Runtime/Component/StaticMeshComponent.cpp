@@ -53,6 +53,46 @@ UMaterial* UStaticMeshComponent::GetDefaultMaterial(int32 SlotIndex) const
     return StaticMesh ? StaticMesh->GetMaterial(static_cast<uint32>(SlotIndex)) : nullptr;
 }
 
+// 기존 호출 경로는 LOD0를 사용한다.
+void UStaticMeshComponent::SubmitToRenderQueue(TQueue<FRenderPacket>& RenderQueue)
+{
+    SubmitToRenderQueue(RenderQueue, 0);
+}
+
+// 지정한 LOD의 Section으로 패킷을 만든다.
+void UStaticMeshComponent::SubmitToRenderQueue(TQueue<FRenderPacket>& RenderQueue,uint32 LODIndex)
+{
+    if (!StaticMesh) return;
+
+    // 잘못된 번호가 들어오면 안전하게 LOD0 사용
+    if (LODIndex >= StaticMesh->GetLODCount()) LODIndex = 0;
+
+    const FStaticMeshData& MeshData = StaticMesh->GetMeshData(LODIndex);
+
+    for (const FStaticMeshSection& Section : MeshData.Sections)
+    {
+        UMaterial* SectionMaterial = GetMaterial(
+                static_cast<int32>(Section.MaterialSlotIndex));
+
+        if (!SectionMaterial) continue;
+
+        FRenderPacket Packet;
+        Packet.mesh = StaticMesh;
+        Packet.model = GetWorldMatrix();
+        Packet.material = SectionMaterial;
+
+        // 반드시 선택한 LOD의 Section 범위를 사용
+        Packet.StartIndex = Section.StartIndex;
+        Packet.IndexCount = Section.IndexCount;
+
+        // Renderer가 이 번호의 GPU 버퍼를 바인딩한다.
+        Packet.LODIndex = static_cast<uint8>(LODIndex);
+        RenderQueue.Enqueue(Packet);
+    }
+}
+
+
+/*
 // Section별 Material·Texture와 인덱스 범위를 보존해 패킷을 제출한다.
 void UStaticMeshComponent::SubmitToRenderQueue(TQueue<FRenderPacket>& RenderQueue)
 {
@@ -78,3 +118,4 @@ void UStaticMeshComponent::SubmitToRenderQueue(TQueue<FRenderPacket>& RenderQueu
         RenderQueue.Enqueue(rp);
     }
 }
+*/
