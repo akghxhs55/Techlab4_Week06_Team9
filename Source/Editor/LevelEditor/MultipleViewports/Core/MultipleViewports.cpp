@@ -89,14 +89,6 @@ static FMatrix ZeroMatrix()
     return Result;
 }
 
-// 평면 방정식을 법선 길이 1이 되도록 정규화한다.
-static FPlane NormalizePlane(const FPlane Plane)
-{
-    const float Length = sqrtf(LengthSquared(Plane.Normal));
-    assert(Length > Epsilon);
-    return {Scale(Plane.Normal, 1.0f / Length), Plane.Distance / Length};
-}
-
 // 세 축의 slab 구간을 교차해 Ray와 AABB의 충돌을 검사한다.
 static bool MultipleViewportsRayIntersectsAABB(const FRay& Ray, const FAABB& Bounds)
 {
@@ -352,47 +344,6 @@ void ComputeViewRects(const FSplitRatio& Ratio, const FVector2 WindowSize, FRect
     OutRects[1] = {LeftWidth, 0.0f, RightWidth, TopHeight};
     OutRects[2] = {0.0f, TopHeight, LeftWidth, BottomHeight};
     OutRects[3] = {LeftWidth, TopHeight, RightWidth, BottomHeight};
-}
-
-// row-vector ViewProjection 열 조합으로 좌·우·상·하·근·원 평면을 추출한다.
-FFrustumPlanes ExtractFrustumPlanes(const FMatrix& Matrix)
-{
-    auto MakePlane = [&Matrix](const int ColumnA, const float ScaleA, const int ColumnB, const float ScaleB)
-    {
-        return NormalizePlane({
-            {ScaleA * Matrix.M[0][ColumnA] + ScaleB * Matrix.M[0][ColumnB], ScaleA * Matrix.M[1][ColumnA] + ScaleB * Matrix.M[1][ColumnB], ScaleA * Matrix.M[2][ColumnA] + ScaleB * Matrix.M[2][ColumnB]},
-            ScaleA * Matrix.M[3][ColumnA] + ScaleB * Matrix.M[3][ColumnB]});
-    };
-    FFrustumPlanes Result{};
-    Result.Planes[0] = MakePlane(3, 1.0f, 0, 1.0f);
-    Result.Planes[1] = MakePlane(3, 1.0f, 0, -1.0f);
-    Result.Planes[2] = MakePlane(3, 1.0f, 1, 1.0f);
-    Result.Planes[3] = MakePlane(3, 1.0f, 1, -1.0f);
-    Result.Planes[4] = NormalizePlane({{Matrix.M[0][2], Matrix.M[1][2], Matrix.M[2][2]}, Matrix.M[3][2]});
-    Result.Planes[5] = MakePlane(3, 1.0f, 2, -1.0f);
-    return Result;
-}
-
-// 각 평면에 대한 AABB projected radius로 완전한 바깥 여부를 검사한다.
-bool IsAABBInFrustum(const FAABB& Bounds, const FFrustumPlanes& Frustum)
-{
-    //assert(Bounds.Extent.X >= 0.0f && Bounds.Extent.Y >= 0.0f && Bounds.Extent.Z >= 0.0f);
-    FVectorRegister Boundreg = VectorSIMD::LoadFloat3(&Bounds.Extent.X);
-    FVectorRegister Centerreg = VectorSIMD::LoadFloat3(&Bounds.Center.X);
-    for (const FPlane& Plane : Frustum.Planes)
-    {
-        FVectorRegister Planereg = VectorSIMD::LoadFloat3(&Plane.Normal.X);
-        FVectorRegister absPlanereg = VectorSIMD::Abs(Planereg);
-
-        const float Radius = VectorSIMD::Dot(absPlanereg, Boundreg);
-        const float CenterDist = VectorSIMD::Dot(Planereg, Centerreg);
-
-        if (CenterDist + Plane.Distance + Radius < 0.0f)
-        {
-            return false;
-        }
-    }
-    return true;
 }
 
 // 절두체 검사에 통과한 렌더 대상 ID를 재사용 출력 버퍼에 모은다.

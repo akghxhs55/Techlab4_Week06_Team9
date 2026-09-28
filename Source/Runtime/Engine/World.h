@@ -8,6 +8,7 @@
 #include "Math/Transform.h"
 #include "Render/Renderer.h"
 #include "PathTracker.h"
+#include "Math/Frustum.h"
 
 #include "Camera/CameraActor.h"
 
@@ -39,7 +40,7 @@ public:
 
 	void ClearWorld();
 
-	void GatherRenderPackets(TQueue<FRenderPacket>& RenderQueue, const FLODViewContext* LODView = nullptr);
+	void GatherRenderPackets(TQueue<FRenderPacket>& RenderQueue, const FLODViewContext* LODView = nullptr, const FFrustumPlanes* Frustum = nullptr);
 
 	void CreateMainCamera();
 

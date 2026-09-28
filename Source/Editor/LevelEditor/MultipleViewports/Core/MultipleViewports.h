@@ -8,6 +8,7 @@
 #include "Math/Vector2.h"
 #include "Math/Quat.h"
 #include "Math/Matrix.h"
+#include "Math/Frustum.h"
 #include "Collision/Ray.h"
 
 // 좌표 규약: +X Forward, +Y Right, +Z Up.
@@ -22,8 +23,8 @@ inline constexpr int32 InvalidViewIndex = -1;
 // 3차원 회전을 나타내는 단위 quaternion 성분을 담는다.
 // 위 엔진 헤더의 동일 값 타입을 직접 사용한다(중복 정의 없음).
 // 행렬은 엔진 FMatrix의 row-vector 규약을 사용하며 이동은 M[3][0..2]에 둔다.
-// 평면의 법선과 원점으로부터의 부호 있는 거리를 담는다.
-struct FPlane { FVector Normal; float Distance; };
+
+
 // 화면상의 좌상단 위치와 너비·높이를 담는다.
 struct FRect { float X, Y, Width, Height; };
 
@@ -119,7 +120,6 @@ FSplitRatio ClampSplitRatio(const FSplitRatio& Raw, float MinRatio);
 void ComputeViewRects(const FSplitRatio& Ratio, FVector2 WindowSize, FRect OutRects[4]);
 
 // 축 정렬 Bounding Box의 중심과 반크기를 담는다.
-struct FAABB { FVector Center; FVector Extent; };
 
 // 렌더 대상의 식별자와 월드 행렬·월드 경계를 담는다.
 struct FRenderableObject
@@ -129,13 +129,7 @@ struct FRenderableObject
     FAABB WorldBounds;
 };
 
-// View 절두체를 이루는 여섯 개의 정규화 평면을 담는다.
-struct FFrustumPlanes { FPlane Planes[6]; };
 
-// ViewProjection 행렬의 행 조합으로 여섯 절두체 평면을 추출한다.
-FFrustumPlanes ExtractFrustumPlanes(const FMatrix& ViewProjection);
-// AABB의 projected radius를 이용해 절두체 포함 여부를 검사한다.
-bool IsAABBInFrustum(const FAABB& Bounds, const FFrustumPlanes& Frustum);
 // 같은 월드 스냅샷에서 절두체를 통과한 Object ID만 출력 버퍼에 쓴다.
 void CullForView(const TArray<FRenderableObject>& WorldObjects, const FFrustumPlanes& Frustum, TArray<ObjectId>& OutVisibleIds);
 

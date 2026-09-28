@@ -107,12 +107,16 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 
 	UCameraComponent* Camera = World->GetMainCamera()->GetCameraComponent();
 	Camera->SetAspectRatio(static_cast<float>(Width) / Height);
+
 	const FLODViewContext LODView{ Camera->GetViewProjectionMatrix(), Width, Height };
+	const FMatrix ViewProjection = Camera->GetViewProjectionMatrix();
+	const FFrustumPlanes Frustum = ExtractFrustumPlanes(ViewProjection);
+
 
 	TQueue<FRenderPacket> RenderQueue;
 	{
 		SCOPE_CYCLE_COUNTER(STAT_GatherRenderPackets);
-		World->GatherRenderPackets(RenderQueue, &LODView);
+		World->GatherRenderPackets(RenderQueue, &LODView, &Frustum);
 	}
 
 	GetEngineLoop().BeginBackbufferPass();
