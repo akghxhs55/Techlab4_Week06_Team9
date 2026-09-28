@@ -4,7 +4,6 @@
 #include "Core/Window.h"
 #include "Core/Types.h"
 
-#include "Engine/World.h"
 #include "Render/Renderer.h"
 #include "Render/RenderDevice.h"
 #include "Render/Swapchain.h"
@@ -67,8 +66,6 @@ private:
 	FSwapchain* MainWindowSC = nullptr;
 	FRenderer* Renderer = nullptr;
 
-	UWorld* World;
-
 	TUniquePtr<FEditorUI> EditorUI;
 
 	TUniquePtr<FImGuiRenderer> ImGuiRenderer;
@@ -81,11 +78,8 @@ private:
 	TUniquePtr<FOutlineRenderer> OutlineRenderer;
 	TUniquePtr<FSkyboxRenderer> SkyboxRenderer;
 
-	
-
 	UFont* SystemFont;
 
-	// UE_LOG 매크로용 전역 콘솔
 	FOutputLogPanel* OutputLogPanel = nullptr;
 
 	FDetailsPanel* DetailsPanel = nullptr;

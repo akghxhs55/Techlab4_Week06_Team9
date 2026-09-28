@@ -6,7 +6,7 @@
 
 //int Width, Height, Channels;
 //float* Pixels = stbi_loadf(Path.c_str(), &Width, &Height, &Channels, 4);
-//if (!Pixels) { LOG(Error, "[HDR] load failed: {}", Path); return nullptr; }
+//if (!Pixels) { HTR_LOG(Error, "[HDR] load failed: {}", Path); return nullptr; }
 //
 //D3D11_TEXTURE2D_DESC Desc{};
 //Desc.Width = Width;
@@ -55,7 +55,7 @@ FImageData ImageLoader::LoadHDR(const FString& Path)
 	float* Pixels = stbi_loadf(Path.c_str(), &Width, &Height, &Channels, 4);
 	if (!Pixels)
 	{
-		LOG(Error, "[Image] HDR load failed: {} ({})", Path, stbi_failure_reason());
+		HTR_LOG(Error, "[Image] HDR load failed: {} ({})", Path, stbi_failure_reason());
 		return Result;
 	}
 

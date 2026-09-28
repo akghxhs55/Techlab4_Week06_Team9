@@ -106,7 +106,7 @@ bool FSettingsPanel::SaveSettings() const
 
 	if (!File.is_open())
 	{
-		LOG(Error, "Failed to open editor.ini for saving.");
+		HTR_LOG(Error, "Failed to open editor.ini for saving.");
 		return false;
 	}
 

@@ -27,16 +27,16 @@ private:
 
 public:
 	static UAssetManager& Get();
+	static void Init();
+	static void Shutdown();
 
 	void ScanAssets(const fs::path& AssetRoot);
 	void LoadAsset(const FString& Key, const FString& Path);
 
-	void Init();
 	void CreateDefaultTextures();
 	void CreateDefaultMeshes();
 	void CreateDefaultMaterial();
 	void CreateParticleMaterial();
-	void Shutdown();
 
 	template <typename T>
 	static T* GetAssetByPath(const FString& Path)

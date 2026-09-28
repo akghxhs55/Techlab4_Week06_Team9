@@ -1,5 +1,5 @@
 #include "EnginePCH.h"
-#include "EngineLoop.h"
+#include "Launch/LaunchEngineLoop.h"
 
 #include "Asset/AssetManager.h"
 #include "Core/EngineTimer.h"
@@ -46,7 +46,7 @@ bool FEngineLoop::PreInit(HINSTANCE hInstance, UClass* EngineClass)
 	GEngine->EngineLoop = this;
 	Config = GEngine->GetConfig();
 
-	// 0이면 주 모니터 해상도를 쓴다.
+	// 0이면 주 모니터 해상도
 	const uint32 Width = Config.Width != 0 ? Config.Width : static_cast<uint32>(GetSystemMetrics(SM_CXSCREEN));
 	const uint32 Height = Config.Height != 0 ? Config.Height : static_cast<uint32>(GetSystemMetrics(SM_CYSCREEN));
 
@@ -69,7 +69,7 @@ bool FEngineLoop::PreInit(HINSTANCE hInstance, UClass* EngineClass)
 	}
 
 	FRenderResourceManager::Init();
-	UAssetManager::Get().Init();
+	UAssetManager::Init();
 
 	if (!GEngine->Init())
 	{
@@ -127,7 +127,7 @@ void FEngineLoop::Exit()
 	}
 
 	// UAssetManager도 UObject이므로 일괄 삭제 전에 종료한다.
-	UAssetManager::Get().Shutdown();
+	UAssetManager::Shutdown();
 	FRenderResourceManager::Shutdown();
 
 	DestroyAllObjectsExceptEngine();

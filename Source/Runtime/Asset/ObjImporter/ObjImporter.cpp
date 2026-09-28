@@ -116,7 +116,7 @@ namespace
 		std::ifstream File(Path);
 		if (!File.is_open())
 		{
-			LOG(Warning, "[MTL] {}: cannot open file", Path);
+			HTR_LOG(Warning, "[MTL] {}: cannot open file", Path);
 			return false;
 		}
 
@@ -151,7 +151,7 @@ namespace
 
 				if (!(Stream >> MtlInfo.Name))
 				{
-					LOG(Warning, "[MTL] {}:{}: newmtl without name", Path, LineNumber);
+					HTR_LOG(Warning, "[MTL] {}:{}: newmtl without name", Path, LineNumber);
 					return false;
 				}
 			}
@@ -159,7 +159,7 @@ namespace
 			{
 				if (!(Stream >> MtlInfo.Kd.X >> MtlInfo.Kd.Y >> MtlInfo.Kd.Z))
 				{
-					LOG(Warning, "[MTL] {}:{}: invalid Kd '{}'", Path, LineNumber, Line);
+					HTR_LOG(Warning, "[MTL] {}:{}: invalid Kd '{}'", Path, LineNumber, Line);
 					return false;
 				}
 			}
@@ -168,7 +168,7 @@ namespace
 				FString MapKd;
 				if (!(Stream >> MapKd) || !TransformPath(Path, MapKd, MtlInfo.MapKd))
 				{
-					LOG(Warning, "[MTL] {}:{}: invalid map_Kd '{}'", Path, LineNumber, Line);
+					HTR_LOG(Warning, "[MTL] {}:{}: invalid map_Kd '{}'", Path, LineNumber, Line);
 					return false;
 				}
 			}
@@ -176,7 +176,7 @@ namespace
 			{
 				if (!(Stream >> MtlInfo.D))
 				{
-					LOG(Warning, "[MTL] {}:{}: invalid d '{}'", Path, LineNumber, Line);
+					HTR_LOG(Warning, "[MTL] {}:{}: invalid d '{}'", Path, LineNumber, Line);
 					return false;
 				}
 			}
@@ -209,7 +209,7 @@ bool FObjImporter::ParseObj(const FString& Path, FObjInfo& Out)
 	std::ifstream File(Path);
 	if (!File.is_open())
 	{
-		LOG(Error, "[OBJ] {}: cannot open file", Path);
+		HTR_LOG(Error, "[OBJ] {}: cannot open file", Path);
 		return false;
 	}
 
@@ -240,7 +240,7 @@ bool FObjImporter::ParseObj(const FString& Path, FObjInfo& Out)
 			FVector P;
 			if (!(Stream >> P.X >> P.Y >> P.Z))
 			{
-				LOG(Error, "[OBJ] {}:{}: invalid position '{}'", Path, LineNumber, Line);
+				HTR_LOG(Error, "[OBJ] {}:{}: invalid position '{}'", Path, LineNumber, Line);
 				return false;
 			}
 			Info.Positions.Add(P);
@@ -250,7 +250,7 @@ bool FObjImporter::ParseObj(const FString& Path, FObjInfo& Out)
 			FVector2 UV;
 			if (!(Stream >> UV.X >> UV.Y))
 			{
-				LOG(Error, "[OBJ] {}:{}: invalid uv '{}'", Path, LineNumber, Line);
+				HTR_LOG(Error, "[OBJ] {}:{}: invalid uv '{}'", Path, LineNumber, Line);
 				return false;
 			}
 			Info.UVs.Add(UV);
@@ -260,7 +260,7 @@ bool FObjImporter::ParseObj(const FString& Path, FObjInfo& Out)
 			FVector N;
 			if (!(Stream >> N.X >> N.Y >> N.Z))
 			{
-				LOG(Error, "[OBJ] {}:{}: invalid normal '{}'", Path, LineNumber, Line);
+				HTR_LOG(Error, "[OBJ] {}:{}: invalid normal '{}'", Path, LineNumber, Line);
 				return false;
 			}
 			Info.Normals.Add(N);
@@ -275,14 +275,14 @@ bool FObjImporter::ParseObj(const FString& Path, FObjInfo& Out)
 				// 칸이 없거나 비어 있으면 0, 파일에 적힌 0은 실패
 				if (!ParseIndex(Token, I))
 				{
-					LOG(Error, "[OBJ] {}:{}: invalid face token '{}'", Path, LineNumber, Token);
+					HTR_LOG(Error, "[OBJ] {}:{}: invalid face token '{}'", Path, LineNumber, Token);
 					return false;
 				}
 				if (!TransformIndex(I.PositionIndex, Info.Positions.Num(), I.PositionIndex) ||
 					!TransformIndex(I.UVIndex, Info.UVs.Num(), I.UVIndex) ||
 					!TransformIndex(I.NormalIndex, Info.Normals.Num(), I.NormalIndex))
 				{
-					LOG(Error, "[OBJ] {}:{}: face index out of range '{}' (v {}, vt {}, vn {})",
+					HTR_LOG(Error, "[OBJ] {}:{}: face index out of range '{}' (v {}, vt {}, vn {})",
 						Path, LineNumber, Token, Info.Positions.Num(), Info.UVs.Num(), Info.Normals.Num());
 					return false;
 				}
@@ -294,7 +294,7 @@ bool FObjImporter::ParseObj(const FString& Path, FObjInfo& Out)
 			}
 			if (F.Indexes.Num() < 3)
 			{
-				LOG(Error, "[OBJ] {}:{}: face needs at least 3 vertices (got {})", Path, LineNumber, F.Indexes.Num());
+				HTR_LOG(Error, "[OBJ] {}:{}: face needs at least 3 vertices (got {})", Path, LineNumber, F.Indexes.Num());
 				return false;
 			}
 			Info.Faces.Add(F);
@@ -305,7 +305,7 @@ bool FObjImporter::ParseObj(const FString& Path, FObjInfo& Out)
 			FString Mtl;
 			if (!(Stream >> Mtl))
 			{
-				LOG(Error, "[OBJ] {}:{}: usemtl without name", Path, LineNumber);
+				HTR_LOG(Error, "[OBJ] {}:{}: usemtl without name", Path, LineNumber);
 				return false;
 			}
 
@@ -336,7 +336,7 @@ bool FObjImporter::ParseObj(const FString& Path, FObjInfo& Out)
 	// No Faces
 	if (Info.Faces.IsEmpty())
 	{
-		LOG(Error, "[OBJ] {}: no faces", Path);
+		HTR_LOG(Error, "[OBJ] {}: no faces", Path);
 		return false;
 	}
 
@@ -352,7 +352,7 @@ bool FObjImporter::ParseObj(const FString& Path, FObjInfo& Out)
 		if (!TransformPath(Path, Mtl, MtlPath) ||
 			!ParseMaterial(MtlPath, Info.MaterialInfos))
 		{
-			LOG(Warning, "[OBJ] {}: mtllib '{}' skipped", Path, Mtl);
+			HTR_LOG(Warning, "[OBJ] {}: mtllib '{}' skipped", Path, Mtl);
 		}
 	}
 
@@ -370,7 +370,7 @@ bool FObjImporter::ParseObj(const FString& Path, FObjInfo& Out)
 		}
 		if (Section.MaterialIndex == 0 && !Section.Material.empty())
 		{
-			LOG(Warning, "[OBJ] {}: material '{}' not found, using Default", Path, Section.Material);
+			HTR_LOG(Warning, "[OBJ] {}: material '{}' not found, using Default", Path, Section.Material);
 		}
 	}
 
@@ -479,7 +479,7 @@ bool FObjImporter::Cook(const FObjInfo& Raw, FStaticMeshData& Out)
 	FString Error;
 	if (!Cooked.Validate(Error))
 	{
-		LOG(Error, "[OBJ] {}: {}", Raw.Path, Error);
+		HTR_LOG(Error, "[OBJ] {}: {}", Raw.Path, Error);
 		return false;
 	}
 
@@ -512,20 +512,20 @@ TUniquePtr<FStaticMeshData> FObjImporter::LoadStaticMeshData(const FString& Path
 // 디버그용 출력
 void FObjImporter::PrintObjInfo(const FObjInfo& ObjInfo)
 {
-	LOG(Info, "Path: {}", ObjInfo.Path);
-	LOG(Info, "Positions Size: {}", ObjInfo.Positions.Num());
-	LOG(Info, "UVs Size: {}", ObjInfo.UVs.Num());
-	LOG(Info, "Normals Size: {}", ObjInfo.Normals.Num());
-	LOG(Info, "Faces Size: {}", ObjInfo.Faces.Num());
-	LOG(Info, "Sections Size: {}", ObjInfo.Sections.Num());
-	LOG(Info, "Mtllibs Size: {}", ObjInfo.Mtllibs.Num());
-	LOG(Info, "MaterialInfos Size: {}", ObjInfo.MaterialInfos.Num());
+	HTR_LOG(Info, "Path: {}", ObjInfo.Path);
+	HTR_LOG(Info, "Positions Size: {}", ObjInfo.Positions.Num());
+	HTR_LOG(Info, "UVs Size: {}", ObjInfo.UVs.Num());
+	HTR_LOG(Info, "Normals Size: {}", ObjInfo.Normals.Num());
+	HTR_LOG(Info, "Faces Size: {}", ObjInfo.Faces.Num());
+	HTR_LOG(Info, "Sections Size: {}", ObjInfo.Sections.Num());
+	HTR_LOG(Info, "Mtllibs Size: {}", ObjInfo.Mtllibs.Num());
+	HTR_LOG(Info, "MaterialInfos Size: {}", ObjInfo.MaterialInfos.Num());
 }
 
 void FObjImporter::PrintSMD(const FStaticMeshData& SMD)
 {
-	LOG(Info, "Vertices Size: {}", SMD.Vertices.Num());
-	LOG(Info, "Indices Size: {}", SMD.Indices.Num());
-	LOG(Info, "Sections Size: {}", SMD.Sections.Num());
-	LOG(Info, "MaterialSlots Size: {}", SMD.MaterialSlots.Num());
+	HTR_LOG(Info, "Vertices Size: {}", SMD.Vertices.Num());
+	HTR_LOG(Info, "Indices Size: {}", SMD.Indices.Num());
+	HTR_LOG(Info, "Sections Size: {}", SMD.Sections.Num());
+	HTR_LOG(Info, "MaterialSlots Size: {}", SMD.MaterialSlots.Num());
 }

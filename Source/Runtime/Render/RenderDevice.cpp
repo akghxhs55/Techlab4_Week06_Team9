@@ -36,7 +36,7 @@ FRenderDevice::FRenderDevice()
 
 	if (FAILED(hr))
 	{
-		LOG(Error, "Failed to Create D3D11Device & DeviceContext!");
+		HTR_LOG(Error, "Failed to Create D3D11Device & DeviceContext!");
 	}
 
 	ComPtr<IDXGIDevice> DXGIDevice;

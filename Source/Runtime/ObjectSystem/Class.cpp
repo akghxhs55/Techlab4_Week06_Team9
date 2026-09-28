@@ -6,7 +6,7 @@
 UClass::UClass()
 	:UObject(false)
 {
-	//LOG(Info, "Create RTTI UClass");
+	//HTR_LOG(Info, "Create RTTI UClass");
 }
 
 bool UClass::IsChildOf(const UClass* BaseClass) const

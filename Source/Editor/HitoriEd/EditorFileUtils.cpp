@@ -34,7 +34,7 @@ bool FEditorFileUtils::SaveScene(UWorld* World)
 
 	if (!FJsonArchive::SaveWorld(World, CurrentScenePath))
 	{
-		LOG(Error, "Failed to save scene: {}", CurrentScenePath);
+		HTR_LOG(Error, "Failed to save scene: {}", CurrentScenePath);
 
 		MessageBoxW(
 			GetActiveWindow(),
@@ -44,7 +44,7 @@ bool FEditorFileUtils::SaveScene(UWorld* World)
 		);
 		return false;
 	}
-	LOG(Info, "Save Scene : {}", CurrentScenePath);
+	HTR_LOG(Info, "Save Scene : {}", CurrentScenePath);
 
 	return true;
 }
@@ -63,7 +63,7 @@ bool FEditorFileUtils::SaveSceneAs(UWorld* World)
 
 	if (!FJsonArchive::SaveWorld(World, FilePath))
 	{
-		LOG(Error, "Failed to save scene: {}", FilePath);
+		HTR_LOG(Error, "Failed to save scene: {}", FilePath);
 
 		MessageBoxW(
 			GetActiveWindow(),
@@ -77,7 +77,7 @@ bool FEditorFileUtils::SaveSceneAs(UWorld* World)
 
 	CurrentScenePath = FilePath;
 
-	LOG(Info, "Save Scene As : {}", CurrentScenePath);
+	HTR_LOG(Info, "Save Scene As : {}", CurrentScenePath);
 
 	return true;
 }
@@ -101,7 +101,7 @@ bool FEditorFileUtils::LoadScene(UWorld* World)
 	// 이제 이 파일이 현재 Scene
 	CurrentScenePath = FilePath;
 
-	LOG(Info, "Load Scene : {}", CurrentScenePath);
+	HTR_LOG(Info, "Load Scene : {}", CurrentScenePath);
 
 	return true;
 }

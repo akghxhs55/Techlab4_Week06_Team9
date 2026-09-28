@@ -3,6 +3,13 @@
 #include "ObjectSystem/Object.h"
 #include "ObjectSystem/Class.h"
 
+#include "Engine/World.h"
+
+enum class EWorldType
+{
+
+};
+
 class FEngineLoop;
 
 // 엔진 모드별 실행 설정. UE에서는 ini가 맡는 부분이다.
@@ -24,22 +31,24 @@ class UEngine : public UObject
 {
 	DECLARE_CLASS(UEngine, UObject)
 	friend class FEngineLoop;
-
 public:
 	// 창을 만들기 전에 호출된다.
 	virtual FEngineConfig GetConfig() const { return {}; }
 
 	// Device·Window·Swapchain·AssetManager가 준비된 뒤 호출된다.
-	virtual bool Init() { return true; }
+	virtual bool Init();
 	// 한 프레임의 갱신과 모든 렌더 패스를 기록한다. Present는 FEngineLoop가 호출 직후에 한다.
 	virtual void Tick(float DeltaTime) = 0;
 	virtual void OnResize(uint32 Width, uint32 Height) {}
 	// UObject 일괄 정리와 GPU 자원 해제 전에 호출된다.
-	virtual void PreExit() {}
+	virtual void PreExit() {};
+
+	UWorld* GetWorld() const { return World; }
 
 protected:
 	FEngineLoop& GetEngineLoop() const { return *EngineLoop; }
 
+	UWorld* World = nullptr;
 private:
 	FEngineLoop* EngineLoop = nullptr;
 };

@@ -25,7 +25,7 @@ FTexture2D::FTexture2D(ID3D11Device* Device, const D3D11_TEXTURE2D_DESC& InDesc,
 			const uint32 BytesPerPixel = FormatToBytes(InDesc.Format);
 			if (BytesPerPixel == 0)
 			{
-				LOG(Error, "[Texture2D] 픽셀당 바이트를 알 수 없는 포맷({})입니다. RowPitch를 직접 넘기세요.", (uint32)InDesc.Format);
+				HTR_LOG(Error, "[Texture2D] 픽셀당 바이트를 알 수 없는 포맷({})입니다. RowPitch를 직접 넘기세요.", (uint32)InDesc.Format);
 				return;
 			}
 			RowPitch = InDesc.Width * BytesPerPixel;
@@ -38,7 +38,7 @@ FTexture2D::FTexture2D(ID3D11Device* Device, const D3D11_TEXTURE2D_DESC& InDesc,
 	HRESULT hr = Device->CreateTexture2D(&InDesc, InitialData ? &SubData : nullptr, (ID3D11Texture2D**)Texture.GetAddressOf());
 	if (FAILED(hr))
 	{
-		LOG(Error, "[Texture2D] CreateTexture2D failed (hr=0x{:08X}, {}x{})", (uint32)hr, InDesc.Width, InDesc.Height);
+		HTR_LOG(Error, "[Texture2D] CreateTexture2D failed (hr=0x{:08X}, {}x{})", (uint32)hr, InDesc.Width, InDesc.Height);
 		return;
 	}
 
@@ -64,21 +64,21 @@ void FTexture2D::CreateViews(ID3D11Device* Device, const D3D11_TEXTURE2D_DESC& I
 	{
 		hr = Device->CreateShaderResourceView(Texture.Get(), nullptr, SRV.GetAddressOf());
 		if (FAILED(hr))
-			LOG(Error, "[Texture2D] CreateShaderResourceView failed (hr=0x{:08X})", (uint32)hr);
+			HTR_LOG(Error, "[Texture2D] CreateShaderResourceView failed (hr=0x{:08X})", (uint32)hr);
 	}
 
 	if (InDesc.BindFlags & D3D11_BIND_RENDER_TARGET)
 	{
 		hr = Device->CreateRenderTargetView(Texture.Get(), nullptr, RTV.GetAddressOf());
 		if (FAILED(hr))
-			LOG(Error, "[Texture2D] CreateRenderTargetView failed (hr=0x{:08X})", (uint32)hr);
+			HTR_LOG(Error, "[Texture2D] CreateRenderTargetView failed (hr=0x{:08X})", (uint32)hr);
 	}
 
 	if (InDesc.BindFlags & D3D11_BIND_DEPTH_STENCIL)
 	{
 		hr = Device->CreateDepthStencilView(Texture.Get(), nullptr, DSV.GetAddressOf());
 		if (FAILED(hr))
-			LOG(Error, "[Texture2D] CreateDepthStencilView failed (hr=0x{:08X})", (uint32)hr);
+			HTR_LOG(Error, "[Texture2D] CreateDepthStencilView failed (hr=0x{:08X})", (uint32)hr);
 	}
 }
 

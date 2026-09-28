@@ -161,7 +161,7 @@ void UObject::Serialize(json& Handle, bool bIsLoading)
 					// (파일 하나가 없어져도 씬은 열리고, 액터가 사라지지 않고 기본 모양으로 보인다)
 					if (!Asset || (Property.Class && !Asset->IsA(Property.Class)))
 					{
-						LOG(Warning, "Load: asset '{}' not found for {}, keeping default", AssetPath, Property.Name);
+						HTR_LOG(Warning, "Load: asset '{}' not found for {}, keeping default", AssetPath, Property.Name);
 						break;
 					}
 

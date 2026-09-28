@@ -108,7 +108,7 @@ void UAssetManager::ScanAssets(const fs::path& AssetRoot)
 {
 	if (!fs::exists(AssetRoot))
 	{
-		LOG(Error, "Asset root not found: {}", AssetRoot.generic_string());
+		HTR_LOG(Error, "Asset root not found: {}", AssetRoot.generic_string());
 		return;
 	}
 
@@ -151,11 +151,11 @@ void UAssetManager::Init()
 {
 	FGeometryGenerator::CreateDefaultMeshDatas();
 	// 머티리얼이 참조하므로 반드시 먼저 만든다
-	CreateDefaultTextures();
-	CreateDefaultMaterial();
-	ScanAssets("Assets");
-	CreateDefaultMeshes();
-	CreateParticleMaterial();
+	Get().CreateDefaultTextures();
+	Get().CreateDefaultMaterial();
+	Get().ScanAssets("Assets");
+	Get().CreateDefaultMeshes();
+	Get().CreateParticleMaterial();
 }
 
 void UAssetManager::CreateDefaultTextures()
@@ -283,7 +283,7 @@ void UAssetManager::CreateParticleMaterial()
 
 void UAssetManager::Shutdown()
 {
-	//AssetMap.Empty();
+	Get().AssetMap.Empty();
 }
 
 

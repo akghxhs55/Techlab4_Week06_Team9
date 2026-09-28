@@ -24,7 +24,7 @@ FTextureCube::FTextureCube(ID3D11Device* Device, const D3D11_TEXTURE2D_DESC& InD
 	HRESULT hr = Device->CreateTexture2D(&InDesc, InitialDatas.IsEmpty() ? nullptr : SubDatas.GetData(), (ID3D11Texture2D**)Texture.GetAddressOf());
 	if (FAILED(hr))
 	{
-		LOG(Error, "[TextureCube] CreateTexture2D failed (hr=0x{:08X}, {}x{})", (uint32)hr, InDesc.Width, InDesc.Height);
+		HTR_LOG(Error, "[TextureCube] CreateTexture2D failed (hr=0x{:08X}, {}x{})", (uint32)hr, InDesc.Width, InDesc.Height);
 		return;
 	}
 
@@ -47,7 +47,7 @@ void FTextureCube::CreateViews(ID3D11Device* Device, const D3D11_TEXTURE2D_DESC&
 
 		hr = Device->CreateShaderResourceView(Texture.Get(), &SrvDesc, SRV.GetAddressOf());
 		if (FAILED(hr))
-			LOG(Error, "[TextureCube] CreateShaderResourceView failed (hr=0x{:08X})", (uint32)hr);
+			HTR_LOG(Error, "[TextureCube] CreateShaderResourceView failed (hr=0x{:08X})", (uint32)hr);
 	}
 
 	if (InDesc.BindFlags & D3D11_BIND_RENDER_TARGET)
@@ -64,7 +64,7 @@ void FTextureCube::CreateViews(ID3D11Device* Device, const D3D11_TEXTURE2D_DESC&
 
 			hr = Device->CreateRenderTargetView(Texture.Get(), &RtvDesc, FaceRTVs[Face].GetAddressOf());
 			if (FAILED(hr))
-				LOG(Error, "[TextureCube] CreateRenderTargetView failed (face={}, hr=0x{:08X})", Face, (uint32)hr);
+				HTR_LOG(Error, "[TextureCube] CreateRenderTargetView failed (face={}, hr=0x{:08X})", Face, (uint32)hr);
 		}
 	}
 }

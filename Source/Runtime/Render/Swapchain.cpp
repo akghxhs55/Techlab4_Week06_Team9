@@ -27,7 +27,7 @@ FSwapchain::FSwapchain(FRenderDevice* InRenderDevice, FWindow* InWindow)
 
 	HRESULT hr = RenderDevice->GetFactory()->CreateSwapChain(RenderDevice->GetDevice(), &Desc, Swapchain.GetAddressOf());
 	if (FAILED(hr))
-		LOG(Error, "Failed To Create Swapchain!");
+		HTR_LOG(Error, "Failed To Create Swapchain!");
 
 	CreateBackbuffer();
 

@@ -27,7 +27,7 @@ bool  UWorld::Init()
 
 	if (!PersistentLevel)
 	{
-		LOG(Error, "Failed to create PersistentLevel");
+		HTR_LOG(Error, "Failed to create PersistentLevel");
 		return false;
 	}
 
@@ -52,7 +52,7 @@ AActor* UWorld::SpawnActor(UClass* Class, FName InName, const FTransform* Transf
 
 	if (!NewActor)
 	{
-		LOG(Error, "SpawnActor : Failed to create Actor");
+		HTR_LOG(Error, "SpawnActor : Failed to create Actor");
 		return nullptr;
 	}
 
@@ -117,7 +117,7 @@ void UWorld::ClearWorld()
 	{
 		Level->ClearActors();
 	}
-	LOG(Info, "{} : ", PersistentLevel->GetActorNum());
+	HTR_LOG(Info, "{} : ", PersistentLevel->GetActorNum());
 }
 
 void UWorld::GatherRenderPackets(TQueue<FRenderPacket>& RenderQueue)
@@ -140,7 +140,7 @@ void UWorld::CreateMainCamera()
 
 	if (!MainCamera)
 	{
-		LOG(Error, "Failed to create MainCamera");
+		HTR_LOG(Error, "Failed to create MainCamera");
 		return;
 	}
 
@@ -217,7 +217,7 @@ bool UWorld::DestroyActor(AActor* Actor)
 	// 6. Actor 삭제
 	delete Actor;
 
-	LOG(Info, "Destroy Actor : {} UUID {}", ActorName, ActorUUID);
+	HTR_LOG(Info, "Destroy Actor : {} UUID {}", ActorName, ActorUUID);
 
 	return true;
 }

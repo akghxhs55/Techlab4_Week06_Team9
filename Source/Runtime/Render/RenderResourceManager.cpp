@@ -13,7 +13,7 @@ void FRenderResourceManager::ScanShaders(const fs::path& ShaderRoot)
 
 	if (!fs::exists(ShaderRoot, ErrorCode))
 	{
-		LOG(Error, "[Shader] Scan Root Not Found : {}", ShaderRoot.generic_string());
+		HTR_LOG(Error, "[Shader] Scan Root Not Found : {}", ShaderRoot.generic_string());
 		return;
 	}
 
@@ -39,7 +39,7 @@ FShaderProgram* FRenderResourceManager::GetShaderProgram(const FString& InPath)
 	if (TUniquePtr<FShaderProgram>* Found = Get().ShaderProgramMap.Find(InPath))
 		return Found->get();
 
-	LOG(Error, "[Shader] not found: {}", InPath);
+	HTR_LOG(Error, "[Shader] not found: {}", InPath);
 
 	if (TUniquePtr<FShaderProgram>* Fallback =
 		Get().ShaderProgramMap.Find("Resources/Shader/DefaultShader.hlsl"))
@@ -57,7 +57,7 @@ void FRenderResourceManager::LoadOrCompileShader(const FString& Path)
 
 	if (!VSCode.IsValid() || !PSCode.IsValid())
 	{
-		LOG(Error, "[Shader] compile failed: {}", Path);
+		HTR_LOG(Error, "[Shader] compile failed: {}", Path);
 		return;
 	}
 
@@ -66,7 +66,7 @@ void FRenderResourceManager::LoadOrCompileShader(const FString& Path)
 
 	if (!Vs || !Vs->IsValid() || !Ps || !Ps->IsValid())
 	{
-		LOG(Error, "[Shader] device create failed: {}", Path);
+		HTR_LOG(Error, "[Shader] device create failed: {}", Path);
 		return;
 	}
 
@@ -77,6 +77,6 @@ void FRenderResourceManager::LoadOrCompileShader(const FString& Path)
 	PixelShaderMap[PSCSOPath] = std::move(Ps);
 	ShaderProgramMap[Path] = MakeUnique<FShaderProgram>(VsRaw, PsRaw);
 
-	LOG(Info, "[Shader] loaded: {}", Path);
+	HTR_LOG(Info, "[Shader] loaded: {}", Path);
 
 }

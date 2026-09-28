@@ -5,6 +5,7 @@
 class FObjectFactory
 {
 public:
+	//static UObject* NewObject(UClass* Class, UObject* Outer, FName Name);
 	static UObject* ConstructObject(UClass* Class, UObject* Outer = nullptr, FName Name = NAME_None);
 
 	template <typename T>

@@ -1,11 +1,11 @@
 #pragma once
 
-#include "Engine/Engine.h"
+#include "Engine/GameEngine.h"
 #include "Engine/World.h"
 
-class UBenchmarkEngine : public UEngine
+class UBenchmarkEngine : public UGameEngine
 {
-	DECLARE_CLASS(UBenchmarkEngine, UEngine)
+	DECLARE_CLASS(UBenchmarkEngine, UGameEngine)
 
 public:
 	FEngineConfig GetConfig() const override;
@@ -14,5 +14,4 @@ public:
 	void Tick(float DeltaTime) override;
 
 private:
-	UWorld* World = nullptr;
 };

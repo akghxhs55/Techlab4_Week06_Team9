@@ -64,7 +64,7 @@ bool FJsonArchive::LoadWorld(UWorld* World, const FString& Path)
 
 	if (!std::filesystem::exists(Path))
 	{
-		LOG(Warning, "{} is Not Exist!", Path);
+		HTR_LOG(Warning, "{} is Not Exist!", Path);
 		return false;
 	}
 
@@ -124,7 +124,7 @@ bool FJsonArchive::LoadWorld(UWorld* World, const FString& Path)
 		AActor* Actor = World->SpawnActor(Class);
 		if (!Actor)
 		{
-			LOG(Warning, "Load: failed to spawn {}", ActorJson["Class"].get<FString>());
+			HTR_LOG(Warning, "Load: failed to spawn {}", ActorJson["Class"].get<FString>());
 			continue;
 		}
 		Actor->Serialize(ActorJson["Properties"], true);
@@ -146,13 +146,13 @@ bool FJsonArchive::LoadWorld(UWorld* World, const FString& Path)
 
 			if (!Component)
 			{
-				LOG(Warning, "Load: {} has no component {}", Class->Name, Name.ToString());
+				HTR_LOG(Warning, "Load: {} has no component {}", Class->Name, Name.ToString());
 				continue;
 			}
 
 			if (Component->GetClass()->Name != ComponentJson["Class"].get<FString>())
 			{
-				LOG(Warning, "Load: component {} class mismatch", Name.ToString());
+				HTR_LOG(Warning, "Load: component {} class mismatch", Name.ToString());
 				continue;
 			}
 

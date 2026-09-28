@@ -19,7 +19,7 @@ FBuffer::FBuffer(ID3D11Device* Device, const D3D11_BUFFER_DESC& Desc, const void
 	}
 	if (FAILED(hr))
 	{
-		LOG(Warning, "Failed To Create Buffer!");
+		HTR_LOG(Warning, "Failed To Create Buffer!");
 	}
 }
 

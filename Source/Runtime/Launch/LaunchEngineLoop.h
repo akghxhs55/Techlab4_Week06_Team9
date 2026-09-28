@@ -32,7 +32,7 @@ public:
 	bool Tick();
 	void Exit();
 
-	void RequestExit() { bIsRunning = false; }
+	inline void RequestExit() { bIsRunning = false; }
 
 	// 백버퍼(+깊이 버퍼)를 렌더 타깃으로 열고 불투명 3D 기본 상태를 설정한다.
 	void BeginBackbufferPass();
@@ -59,7 +59,7 @@ private:
 	TUniquePtr<FRenderer> Renderer;
 	TUniquePtr<FWindow> MainWindow;
 	TUniquePtr<FSwapchain> Swapchain;
-	TUniquePtr<FTexture2D> DepthBuffer;
+	TUniquePtr<FTexture2D> DepthBuffer = nullptr;
 
 	FEngineConfig Config;
 

@@ -1,10 +1,10 @@
 #include "EnginePCH.h"
 
-#include "Editor/HitoriEd/Engine.h"
+#include "Editor/HitoriEd/EditorEngine.h"
 
 #include "Core/EngineStatics.h"
 #include "Core/EngineTimer.h"
-#include "Launch/EngineLoop.h"
+#include "Launch/LaunchEngineLoop.h"
 #include "Core/StatOverlay.h"
 #include "Input/InputSystem.h"
 
@@ -49,6 +49,9 @@ FEngineConfig UEditorEngine::GetConfig() const
 // Device·Window·Swapchain·AssetManager는 FEngineLoop가 먼저 만들어 둔다.
 bool UEditorEngine::Init()
 {
+	if (!Super::Init())
+		return false;
+
 	MainWindow = GetEngineLoop().GetMainWindow();
 	MainWindowSC = GetEngineLoop().GetSwapchain();
 	Renderer = GetEngineLoop().GetRenderer();
@@ -64,15 +67,15 @@ bool UEditorEngine::Init()
 
 	OutputLogPanel = EditorUI->AddEditorPanel<FOutputLogPanel>();
 	FLog::AddSink(OutputLogPanel);
-	LOG(Info, "Editor Initialize...");
+	HTR_LOG(Info, "Editor Initialize...");
 
-	LOG(Info, "Initialize ImGui...");
+	HTR_LOG(Info, "Initialize ImGui...");
 	ImGuiRenderer = MakeUnique<FImGuiRenderer>();
 	if (!ImGuiRenderer->Init(MainWindow->GetHandle(), RenderDevice->GetDevice(), RenderDevice->GetContext()))
 	{
-		LOG(Error, "Failed To Initialize ImGui!");
+		HTR_LOG(Error, "Failed To Initialize ImGui!");
 	}
-	LOG(Info, "Initialize ImGui Success!");
+	HTR_LOG(Info, "Initialize ImGui Success!");
 
 	GridRenderer = MakeUnique<FGridRenderer>();
 	GridRenderer->Init(Renderer);
@@ -101,9 +104,6 @@ bool UEditorEngine::Init()
 	TextRenderer = MakeUnique<FTextRenderer>();
 	TextRenderer->Init();
 
-	// Scene
-	World = FObjectFactory::ConstructObject<UWorld>();
-	World->Init();
 	// 투영 행렬 생성 
 	MultipleViewportsAdapter.InitializeFromWorld(*World);
 	// 화면 나눔 비율 설정 가져오기
@@ -157,9 +157,6 @@ bool UEditorEngine::Init()
 
 	SkyboxRenderer = MakeUnique<FSkyboxRenderer>();
 	SkyboxRenderer->Init("Assets/SkySphere/Sky.jpg");
-
-	LOG(Info, "{}", "Hello, World!");
-	LOG(Info, "{}", FName().ToString());
 
 	return true;
 }

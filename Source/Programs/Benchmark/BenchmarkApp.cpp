@@ -3,7 +3,7 @@
 
 #include "Asset/AssetManager.h"
 #include "Core/Window.h"
-#include "Launch/EngineLoop.h"
+#include "Launch/LaunchEngineLoop.h"
 #include "Render/Renderer.h"
 
 #include "GameFramework/Actor/StaticMeshActor.h"
@@ -17,8 +17,8 @@ FEngineConfig UBenchmarkEngine::GetConfig() const
 
 bool UBenchmarkEngine::Init()
 {
-	World = FObjectFactory::ConstructObject<UWorld>();
-	World->Init();
+	if (!Super::Init())
+		return false;
 
 	UStaticMesh* Mesh = UAssetManager::LoadObjStaticMesh("Assets/Models/Apple/apple_mid.obj");   // 실제 경로 확인 필요
 	UStaticMesh* Mesh_2 = UAssetManager::LoadObjStaticMesh("Assets/Models/Apple/bitten_apple_mid.obj");   // 실제 경로 확인 필요
@@ -41,7 +41,7 @@ bool UBenchmarkEngine::Init()
 
 void UBenchmarkEngine::Tick(float DeltaTime)
 {
-	World->Tick(DeltaTime);
+	Super::Tick(DeltaTime);
 
 	UCameraComponent* Camera = World->GetMainCamera()->GetCameraComponent();
 	Camera->SetAspectRatio(static_cast<float>(GetEngineLoop().GetViewportWidth()) / GetEngineLoop().GetViewportHeight());

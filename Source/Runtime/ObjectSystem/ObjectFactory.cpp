@@ -2,6 +2,28 @@
 #include "ObjectFactory.h"
 #include "Class.h"
 
+//UObject* FObjectFactory::NewObject(UClass* Class, UObject* Outer, FName Name)
+//{
+//    if (!Class || !Class->Constructor)
+//        return nullptr;
+//
+//    UObject* Object = Class->Constructor();
+//    Object->ClassPrivate = Class;
+//    HashObject(Object, Class);
+//
+//    Object->SetOuter(Outer);
+//
+//    Name = MakeUniqueObjectName(Class, Outer, Name);
+//
+//    Object->SetName(Name);
+//
+//    HTR_LOG(Info, "Create {}", Class->Name);
+//    //HTR_LOG(Info, "Total Allocation Bytes - {}", FEngineStatics::TotalAllocationBytes);
+//    //HTR_LOG(Info, "Total Allocation Count - {}", FEngineStatics::TotalAllocationCount);
+//
+//    return Object;
+//}
+
 UObject* FObjectFactory::ConstructObject(UClass* Class, UObject* Outer, FName Name)
 {
     if (!Class || !Class->Constructor)
@@ -17,9 +39,9 @@ UObject* FObjectFactory::ConstructObject(UClass* Class, UObject* Outer, FName Na
 
     Object->SetName(Name);
 
-    LOG(Info, "Create {}", Class->Name);
-    //LOG(Info, "Total Allocation Bytes - {}", FEngineStatics::TotalAllocationBytes);
-    //LOG(Info, "Total Allocation Count - {}", FEngineStatics::TotalAllocationCount);
+    HTR_LOG(Info, "Create {}", Class->Name);
+    //HTR_LOG(Info, "Total Allocation Bytes - {}", FEngineStatics::TotalAllocationBytes);
+    //HTR_LOG(Info, "Total Allocation Count - {}", FEngineStatics::TotalAllocationCount);
 
     return Object;
 }
