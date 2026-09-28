@@ -176,6 +176,8 @@ void UBenchmarkEngine::DrawProfileOverlay()
 			{
 				const auto* Value = LastFrameStats.FindOrNull(Name);
 
+				ImGui::TableNextRow();
+
 				ImGui::TableSetColumnIndex(0);
 				ImGui::TextUnformatted(Name);
 
