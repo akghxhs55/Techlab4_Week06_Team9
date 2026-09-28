@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "Core/Types.h"
 #include "Core/Windows/WindowsPlatformTime.h"
@@ -32,24 +32,96 @@ struct FCycleStatData
 	double GetAverageMs() const { return CallCount > 0 ? GetTotalMs() / CallCount : 0.0; }
 };
 
+struct FStatHistory
+{
+	static constexpr uint32 Duration = 120;
+
+	uint64 FrameCycles[Duration] = {};
+	uint64 WindowSumCycles = 0;
+	uint64 MaxFrameCycles = 0;
+
+	uint32 NextIndex = 0;
+	uint32 SampleCount = 0;
+
+	void PushFrame(uint64 Cycles)
+	{
+		WindowSumCycles -= FrameCycles[NextIndex];
+		FrameCycles[NextIndex] = Cycles;
+		WindowSumCycles += Cycles;
+
+		NextIndex = (NextIndex + 1) % Duration;
+		if (SampleCount < Duration)
+			++SampleCount;
+		
+		if (Cycles > MaxFrameCycles)
+			MaxFrameCycles = Cycles;
+	}
+
+	double GetRecentAverageMs() const
+	{
+		return SampleCount > 0
+			? FPlatformTime::ToMilliseconds64(WindowSumCycles) / SampleCount
+			: 0.0;
+	}
+
+	double GetMaxMs() const
+	{
+		return FPlatformTime::ToMilliseconds64(MaxFrameCycles);
+	}
+};
+
 // UE는 이 집계를 외부 프로파일러(Insights)에 맡기지만 우리는 직접 모은다.
 class FStatRegistry
 {
 public:
+	static void StartFrame()
+	{
+		std::swap(WriteStats, ReadStats);
+
+		// 처음 측정된 항목 추가
+		for (const auto& [Name, Data] : ReadStats)
+		{
+			if (!Histories.Find(Name))
+			{
+				Histories.Add(Name, FStatHistory{});
+			}
+		}
+
+		// 기록 갱신
+		for (auto& [Name, History] : Histories)
+		{
+			const FCycleStatData* Data = ReadStats.FindOrNull(Name);
+			History.PushFrame(Data ? Data->TotalCycles : 0);
+		}
+
+		WriteStats.Reset();
+	}
+
 	static void AddCycles(TStatId StatId, uint64 Cycles)
 	{
-		FCycleStatData& Data = Stats[StatId.GetName()];
+		FCycleStatData& Data = WriteStats[StatId.GetName()];
 		Data.LastCycles = Cycles;
 		Data.TotalCycles += Cycles;
 		++Data.CallCount;
 	}
 
-	static const FCycleStatData* Find(TStatId StatId) { return Stats.Find(StatId.GetName()); }
-	static const TMap<const char*, FCycleStatData>& GetAll() { return Stats; }
-	static void ResetAll() { Stats.Reset(); }
+	static void ResetHistory()
+	{
+		for (auto& [Name, History] : Histories)
+		{
+			History = FStatHistory{};
+		}
+	}
+
+	static const FCycleStatData* Find(TStatId StatId) { return ReadStats.Find(StatId.GetName()); }
+	static const TMap<const char*, FCycleStatData>& GetLastFrameStats() { return ReadStats; }
+	static const TMap<const char*, FStatHistory>& GetHistories() { return Histories; }
+	static void ResetAll() { return ReadStats.Reset(); }
 
 private:
-	inline static TMap<const char*, FCycleStatData> Stats;
+	inline static TMap<const char*, FCycleStatData> WriteStats;
+	inline static TMap<const char*, FCycleStatData> ReadStats;
+	inline static TMap<const char*, FStatHistory> Histories;
 };
 
 // 생성 시 시작 사이클을 기록하고, 스코프를 벗어날 때 경과 사이클을 FStatRegistry에 보고한다.

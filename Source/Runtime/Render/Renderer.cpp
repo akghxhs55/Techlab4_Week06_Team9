@@ -1,15 +1,19 @@
-#include "EnginePCH.h"
+﻿#include "EnginePCH.h"
 #include "Renderer.h"
 #include "Shader.h"
 #include "Mesh.h"
 
 #include "Core/EngineTimer.h"
+#include "Core/Stats/LightweightStats.h"
 
 #include "RenderCommand.h"
 
 #include "Camera/CameraComponent.h"
 
 #include <algorithm>
+
+DECLARE_CYCLE_STAT("Render State Sort", STAT_RenderStateSort);
+DECLARE_CYCLE_STAT("Render Total", STAT_Total);
 
 bool FRenderer::Init()
 {
@@ -55,6 +59,8 @@ void FRenderer::RenderTranslucent(const FMatrix& ViewProjection)
 
 // 정렬된 패킷 중 [Begin, End) 범위를 View 행렬과 Section 범위로 그린다.
 void FRenderer::DrawPackets(uint32 Begin, uint32 End, const FMatrix& ViewProjection)
+{
+	SCOPE_CYCLE_COUNTER(STAT_Total);
 {	
 	LastMesh = nullptr;
 	LastMaterial = nullptr;
