@@ -1,7 +1,7 @@
 #pragma once
 
 #include "json.hpp"
-using json = nlohmann::ordered_json;
+using json = nlohmann::json;
 
 #ifndef NOMINMAX
 #define NOMINMAX

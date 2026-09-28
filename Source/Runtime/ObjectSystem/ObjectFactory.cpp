@@ -39,7 +39,7 @@ UObject* FObjectFactory::ConstructObject(UClass* Class, UObject* Outer, FName Na
 
     Object->SetName(Name);
 
-    HTR_LOG(Info, "Create {}", Class->Name);
+    //HTR_LOG(Info, "Create {}", Class->Name);
     //HTR_LOG(Info, "Total Allocation Bytes - {}", FEngineStatics::TotalAllocationBytes);
     //HTR_LOG(Info, "Total Allocation Count - {}", FEngineStatics::TotalAllocationCount);
 

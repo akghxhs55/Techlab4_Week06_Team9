@@ -6,6 +6,17 @@
 #include "Component/PrimitiveComponent.h"
 #include "GameFramework/Actor.h"
 #include "UObject/UObjectHash.h"
+#include "GameFramework/Actor/StaticMeshActor.h"
+#include "TypeSerializer.h"
+#include "Asset/AssetManager.h"
+
+namespace
+{
+	//bool LoadJungleSceneFormat()
+	//{
+
+	//}
+}
 
 bool FJsonArchive::SaveWorld(UWorld* World, const FString& Path)
 {
@@ -82,6 +93,25 @@ bool FJsonArchive::LoadWorld(UWorld* World, const FString& Path)
 	catch (const json::parse_error&)
 	{
 		return false;
+	}
+
+	// 임시 DefaultScene.Scene 로딩용
+	if (Json.contains("Primitives"))
+	{
+		World->ClearWorld();
+		for (const auto& [KeyString, PrimJson] : Json["Primitives"].items())
+		{
+			FTransform Transform;
+			Transform.Location = PrimJson["Location"].get<FVector>();
+			Transform.Rotation = PrimJson["Rotation"].get<FRotator>();
+			Transform.Scale = PrimJson["Scale"].get<FVector>();
+
+			AStaticMeshActor* Actor = World->SpawnActor<AStaticMeshActor>(NAME_None, &Transform);
+			UStaticMesh* Mesh = UAssetManager::GetAssetByPath<UStaticMesh>(PrimJson["ObjStaticMeshAsset"].get<FString>());
+			Actor->GetStaticMeshComponent()->SetStaticMesh(Mesh);
+		}
+
+		return true;
 	}
 
 	if (!Json.contains("Version") || Json["Version"] != 2)
