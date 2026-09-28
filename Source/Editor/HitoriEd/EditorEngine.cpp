@@ -255,7 +255,6 @@ void UEditorEngine::TickWorldAndEditor(const float DeltaTime)
 	{
 		SCOPE_CYCLE_COUNTER(STAT_WorldTick);
 		World->Tick(DeltaTime);
-		
 	}
 	{
 		SCOPE_CYCLE_COUNTER(STAT_EditorTick);

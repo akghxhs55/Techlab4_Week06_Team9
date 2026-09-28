@@ -10,6 +10,8 @@
 #include <cassert>
 #include <format>
 
+#include "Core/Stats/EditorStats.h"
+
 namespace
 {
 constexpr ImU32 SplitterColor = IM_COL32(55, 55, 55, 230);
@@ -309,12 +311,25 @@ void FViewportsPanel::DrawStatOverlay(ImDrawList* DrawList, const ImVec2& ViewMi
 
 		for (const auto& [Name, Data] : FStatRegistry::GetAll())
 		{
+			if (TStatId{ Name } == EditorStats::STAT_PickingTime)
+				continue;
+
 			FProfileStatLine Line{"  " + FString(Name), ValueColor};
 			Line.Values[0] = std::format("{:.2f}", Data.GetLastMs());
 			Line.Values[1] = std::format("{:.2f}", Data.GetRecentAverageMs());
 			Line.Values[2] = std::format("{:.2f}", Data.GetMaxMs());
 			ProfileLines.Add(Line);
 		}
+	}
+
+	if (const FCycleStatData* PickingData = FStatRegistry::Find(EditorStats::STAT_PickingTime))
+	{
+		ProfileLines.Add({ "Picking", TitleColor });
+		FProfileStatLine Line{"  Time (ms)", ValueColor};
+		Line.Values[0] = std::format("Last: {:.2f}", PickingData->GetLastMs());
+		Line.Values[1] = std::format("Num Attempts: {}", PickingData->CallCount);
+		Line.Values[2] = std::format("Accumulated: {:.2f}", PickingData->GetTotalMs());
+		ProfileLines.Add(Line);
 	}
 
 	if (Lines.Num() == 0 && ProfileLines.Num() == 0)
@@ -331,7 +346,7 @@ void FViewportsPanel::DrawStatOverlay(ImDrawList* DrawList, const ImVec2& ViewMi
 	for (int32 Index = 0; Index < Lines.Num(); ++Index)
 		MaxWidth = std::max(MaxWidth, ImGui::CalcTextSize(Lines[Index].Text.c_str()).x);
 
-	const float MinValueWidth = ImGui::CalcTextSize("0000.00").x;
+	const float MinValueWidth = ImGui::CalcTextSize("00000.00").x;
 	float NameWidth = 0.0f;
 	float ValueWidths[3] = { MinValueWidth, MinValueWidth, MinValueWidth };
 	bool bHasColumns = false;
