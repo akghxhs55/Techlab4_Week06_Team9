@@ -1,4 +1,4 @@
-#include "EnginePCH.h"
+﻿#include "EnginePCH.h"
 
 #include "Editor/HitoriEd/EditorEngine.h"
 
@@ -30,6 +30,17 @@
 #include "UObject/UObjectIterator.h"
 
 #include "Core/EngineLog.h"
+#include "Core/Stats/LightweightStats.h"
+
+namespace
+{
+	DECLARE_CYCLE_STAT("Viewport Update", STAT_ViewportUpdate);
+	DECLARE_CYCLE_STAT("World Tick", STAT_WorldTick);
+	DECLARE_CYCLE_STAT("Editor Tick", STAT_EditorTick);
+	DECLARE_CYCLE_STAT("Capture World", STAT_CaptureWorld);
+	DECLARE_CYCLE_STAT("Build Render Queue", STAT_BuildRenderQueue);
+	DECLARE_CYCLE_STAT("ImGui", STAT_ImGui);
+}
 
 FEngineConfig UEditorEngine::GetConfig() const
 {
@@ -175,6 +186,8 @@ void UEditorEngine::Tick(const float DeltaTime)
 // DeltaTime을 패널에 전달하고 에디터 단축키를 처리한다.
 void UEditorEngine::BeginFrame(const float DeltaTime)
 {
+	FStatRegistry::BeginFrame();
+
 	FStatOverlay::Tick(DeltaTime);
 	EditorControlsPanel->FEditorControlsPanel::DeltaTime = DeltaTime;
 
@@ -185,6 +198,8 @@ void UEditorEngine::BeginFrame(const float DeltaTime)
 // 패널의 Layout·Preset 요청과 입력을 Adapter에 반영한다.
 void UEditorEngine::UpdateMultipleViewportState(const float DeltaTime)
 {
+	SCOPE_CYCLE_COUNTER(STAT_ViewportUpdate);
+
 	const FVector2 ViewportSize = ViewportsPanel->GetContentSize();
 	const FVector2 LocalMousePosition = ViewportsPanel->GetLocalMousePosition();
 
@@ -235,9 +250,19 @@ void UEditorEngine::UpdateMultipleViewportState(const float DeltaTime)
 void UEditorEngine::TickWorldAndEditor(const float DeltaTime)
 {
 	// 월드 상태는 프레임마다 정확히 한 번 갱신하고 캡처한다.
-	World->Tick(DeltaTime);
-	EditorUI->Tick(DeltaTime);
-	MultipleViewportsAdapter.CaptureWorld(*World);
+	{
+		SCOPE_CYCLE_COUNTER(STAT_WorldTick);
+		World->Tick(DeltaTime);
+		
+	}
+	{
+		SCOPE_CYCLE_COUNTER(STAT_EditorTick);
+		EditorUI->Tick(DeltaTime);
+	}
+	{
+		SCOPE_CYCLE_COUNTER(STAT_CaptureWorld);
+		MultipleViewportsAdapter.CaptureWorld(*World);
+	}
 	UpdateGizmoAndPicking();
 }
 
@@ -252,7 +277,11 @@ void UEditorEngine::RenderMultipleViewports()
 			continue;
 
 		TQueue<FRenderPacket> RenderQueue;
-		MultipleViewportsAdapter.BuildRenderQueue(ViewIndex, RenderQueue);
+		{
+			SCOPE_CYCLE_COUNTER(STAT_BuildRenderQueue);
+			MultipleViewportsAdapter.BuildRenderQueue(ViewIndex, RenderQueue);
+		}
+
 		RenderFrame(
 			ViewIndex,
 			ViewportsPanel->GetRenderingInfo(ViewIndex),
@@ -487,11 +516,15 @@ void UEditorEngine::PresentFrame()
 	// Swapchain 렌더링
 	RenderCommand::BeginRenderPass(MainWindowSC->GetRenderingInfo());
 
-	ImGuiRenderer->Begin();
+	{
+		SCOPE_CYCLE_COUNTER(STAT_ImGui);
 
-	EditorUI->OnRender();
+		ImGuiRenderer->Begin();
 
-	ImGuiRenderer->End();
+		EditorUI->OnRender();
+
+		ImGuiRenderer->End();
+	}
 
 	RenderCommand::EndRenderPass(MainWindowSC->GetRenderingInfo());
 }

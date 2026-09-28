@@ -74,7 +74,7 @@ struct FStatHistory
 class FStatRegistry
 {
 public:
-	static void StartFrame()
+	static void BeginFrame()
 	{
 		std::swap(WriteStats, ReadStats);
 

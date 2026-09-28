@@ -1,4 +1,4 @@
-#include "EnginePCH.h"
+﻿#include "EnginePCH.h"
 #include "StatOverlay.h"
 
 #include "EngineStatics.h"
@@ -70,7 +70,7 @@ bool FStatOverlay::ExecCommand(const FString& CommandLine, FString& OutMessage)
 
 	if (Tokens.Num() < 2)
 	{
-		OutMessage = "Usage: stat <fps|memory|all|none>";
+		OutMessage = "Usage: stat <fps|memory|profile|all|none>";
 		return true;
 	}
 
@@ -85,7 +85,7 @@ bool FStatOverlay::ExecCommand(const FString& CommandLine, FString& OutMessage)
 
 	if (EqualsIgnoreCase(Arg, "all"))
 	{
-		Flags = EStatFlags::FPS | EStatFlags::Memory;
+		Flags = EStatFlags::FPS | EStatFlags::Memory | EStatFlags::Profile;
 		OutMessage = "stat all: all overlays enabled";
 		return true;
 	}
@@ -95,10 +95,12 @@ bool FStatOverlay::ExecCommand(const FString& CommandLine, FString& OutMessage)
 		Target = EStatFlags::FPS;
 	else if (EqualsIgnoreCase(Arg, "memory"))
 		Target = EStatFlags::Memory;
+	else if (EqualsIgnoreCase(Arg, "profile"))
+		Target = EStatFlags::Profile;
 
 	if (Target == EStatFlags::None)
 	{
-		OutMessage = std::format("stat: unknown stat '{}'. Available: fps, memory, all, none", Arg);
+		OutMessage = std::format("stat: unknown stat '{}'. Available: fps, memory, profile, all, none", Arg);
 		return true;
 	}
 

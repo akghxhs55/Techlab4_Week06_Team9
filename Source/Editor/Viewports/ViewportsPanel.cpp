@@ -1,8 +1,9 @@
-#include "EnginePCH.h"
+﻿#include "EnginePCH.h"
 #include "Editor/Viewports/ViewportsPanel.h"
 #include "Editor/LevelEditor/MultipleViewports/Adapter/MultipleViewportsAdapter.h"
 
 #include "Core/StatOverlay.h"
+#include "Core/Stats/LightweightStats.h"
 #include "Render/RenderCommand.h"
 
 #include <algorithm>
@@ -271,7 +272,11 @@ void FViewportsPanel::DrawStatOverlay(ImDrawList* DrawList, const ImVec2& ViewMi
 	constexpr float BytesPerMegabyte = 1024.0f * 1024.0f;
 
 	// 제목은 UE처럼 노란색, 값은 흰색으로 구분한다.
-	struct FStatLine { FString Text; ImU32 Color; };
+	struct FStatLine
+	{
+		FString Text;
+		ImU32 Color;
+	};
 	TArray<FStatLine> Lines;
 
 	if (FStatOverlay::IsEnabled(EStatFlags::FPS))
@@ -291,7 +296,30 @@ void FViewportsPanel::DrawStatOverlay(ImDrawList* DrawList, const ImVec2& ViewMi
 			static_cast<double>(FStatOverlay::GetProcessWorkingSetBytes()) / BytesPerMegabyte), ValueColor});
 	}
 
-	if (Lines.Num() == 0)
+	struct FProfileStatLine
+	{
+		FString Text;
+		ImU32 Color;
+		FString Values[3];
+	};
+	TArray<FProfileStatLine> ProfileLines;
+	if (FStatOverlay::IsEnabled(EStatFlags::Profile))
+	{
+		ProfileLines.Add({"CPU Profile (ms)", TitleColor, {"Last", "Avg", "Max"}});
+
+		const auto& Stats = FStatRegistry::GetLastFrameStats();
+		for (const auto& [Name, History] : FStatRegistry::GetHistories())
+		{
+			const FCycleStatData* Data = Stats.FindOrNull(Name);
+			FProfileStatLine Line{"  " + FString(Name), ValueColor};
+			Line.Values[0] = std::format("{:.2f}", Data ? Data->GetTotalMs() : 0.0);
+			Line.Values[1] = std::format("{:.2f}", History.GetRecentAverageMs());
+			Line.Values[2] = std::format("{:.2f}", History.GetMaxMs());
+			ProfileLines.Add(Line);
+		}
+	}
+
+	if (Lines.Num() == 0 && ProfileLines.Num() == 0)
 		return;
 
 	// 제어 위젯 한 줄 아래에서 시작해 Combo와 겹치지 않게 한다.
@@ -300,22 +328,65 @@ void FViewportsPanel::DrawStatOverlay(ImDrawList* DrawList, const ImVec2& ViewMi
 		ViewMin.x + StatOverlayMargin,
 		ViewMin.y + StatOverlayMargin + ImGui::GetFrameHeight() + StatOverlayMargin};
 
+	// 최대 너비 계산
 	float MaxWidth = 0.0f;
 	for (int32 Index = 0; Index < Lines.Num(); ++Index)
 		MaxWidth = std::max(MaxWidth, ImGui::CalcTextSize(Lines[Index].Text.c_str()).x);
 
+	const float MinValueWidth = ImGui::CalcTextSize("0000.00").x;
+	float NameWidth = 0.0f;
+	float ValueWidths[3] = { MinValueWidth, MinValueWidth, MinValueWidth };
+	bool bHasColumns = false;
+
+	for (const FProfileStatLine& Line : ProfileLines)
+	{
+		const float TextWidth = ImGui::CalcTextSize(Line.Text.c_str()).x;
+		bHasColumns = true;
+		NameWidth = std::max(NameWidth, TextWidth);
+		for (int32 Column = 0; Column < 3; ++Column)
+			ValueWidths[Column] = std::max(MinValueWidth, ImGui::CalcTextSize(Line.Values[Column].c_str()).x);
+	}
+
+	float ColumnRight[3]{};
+	if (bHasColumns)
+	{
+		float Width = NameWidth;
+		for (int32 Column = 0; Column < 3; ++Column)
+		{
+			Width += ImGui::GetFontSize() + ValueWidths[Column];
+			ColumnRight[Column] = Origin.x + Width;
+		}
+		MaxWidth = std::max(MaxWidth, Width);
+	}
+
 	const ImVec2 BackgroundMin{Origin.x - StatOverlayPadding, Origin.y - StatOverlayPadding};
 	const ImVec2 BackgroundMax{
 		Origin.x + MaxWidth + StatOverlayPadding,
-		Origin.y + LineHeight * static_cast<float>(Lines.Num()) + StatOverlayPadding};
+		Origin.y + LineHeight * static_cast<float>(Lines.Num() + ProfileLines.Num()) + StatOverlayPadding};
 	DrawList->AddRectFilled(BackgroundMin, BackgroundMax, StatOverlayBackgroundColor, 4.0f);
 
+	// Lines 그리기
 	for (int32 Index = 0; Index < Lines.Num(); ++Index)
 	{
 		DrawList->AddText(
-			{Origin.x, Origin.y + LineHeight * static_cast<float>(Index)},
+			{ Origin.x, Origin.y + LineHeight * static_cast<float>(Index) },
 			Lines[Index].Color,
 			Lines[Index].Text.c_str());
+	}
+
+	// ProfileLines 그리기
+	for (int32 Index = 0; Index < ProfileLines.Num(); ++Index)
+	{
+		const FProfileStatLine& Line = ProfileLines[Index];
+		const float Y = Origin.y + LineHeight * static_cast<float>(Lines.Num() + Index);
+		DrawList->AddText({ Origin.x, Y }, Line.Color, Line.Text.c_str());
+
+		for (int32 Column = 0; Column < 3; ++Column)
+		{
+			const FString& Text = Line.Values[Column];
+			const float TextWidth = ImGui::CalcTextSize(Text.c_str()).x;
+			DrawList->AddText({ ColumnRight[Column] - TextWidth, Y }, Line.Color, Text.c_str());
+		}
 	}
 }
 

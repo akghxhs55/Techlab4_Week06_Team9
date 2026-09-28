@@ -44,7 +44,7 @@ bool UBenchmarkEngine::Init()
 
 void UBenchmarkEngine::Tick(float DeltaTime)
 {
-	FStatRegistry::StartFrame();
+	FStatRegistry::BeginFrame();
 	{
 		SCOPE_CYCLE_COUNTER(STAT_WorldTick);
 		World->Tick(DeltaTime);

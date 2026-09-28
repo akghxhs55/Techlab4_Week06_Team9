@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "Types.h"
 #include "EngineString.h"
@@ -6,9 +6,10 @@
 // Overlay로 표시할 Stat 항목. 여러 항목을 동시에 켤 수 있어 비트 플래그로 둔다.
 enum class EStatFlags : uint32
 {
-	None   = 0,
-	FPS    = 1 << 0,
-	Memory = 1 << 1,
+	None    = 0,
+	FPS     = 1 << 0,
+	Memory  = 1 << 1,
+	Profile = 1 << 2,
 };
 DEFINE_ENUM_OPERATORS(EStatFlags)
 
