@@ -63,6 +63,7 @@ void FRenderer::DrawPackets(uint32 Begin, uint32 End, const FMatrix& ViewProject
 
 	LastMesh = nullptr;
 	LastMaterial = nullptr;
+	uint8 LastLODIndex = 0;
 
 	RenderCommand::BindConstantBuffer(0, PerObjectCB.get(), EShaderBindFlagBits::Vertex);
 
@@ -70,8 +71,8 @@ void FRenderer::DrawPackets(uint32 Begin, uint32 End, const FMatrix& ViewProject
 	{
 		const FRenderPacket& RenderPacket = RenderPackets[Index];
 		if (RenderPacket.mesh == nullptr || RenderPacket.material == nullptr) continue;
-		if (RenderPacket.mesh != LastMesh) {
-			RenderCommand::BindMesh(RenderPacket.mesh);
+		if (RenderPacket.mesh != LastMesh || RenderPacket.LODIndex != LastLODIndex) {
+			RenderCommand::BindMesh(RenderPacket.mesh,RenderPacket.LODIndex);
 		}
 		if (RenderPacket.material != LastMaterial) {
 			BindMaterial(RenderPacket.material);
@@ -80,11 +81,12 @@ void FRenderer::DrawPackets(uint32 Begin, uint32 End, const FMatrix& ViewProject
 		UpdatePerObjectConstants(RenderPacket, ViewProjection);
 
 		RenderCommand::DrawIndexed(
-			RenderPacket.IndexCount ? RenderPacket.IndexCount : RenderPacket.mesh->IndexBuffer->GetIndexCount(),
+			RenderPacket.IndexCount ? RenderPacket.IndexCount : RenderPacket.mesh->GetIndexBuffer(RenderPacket.LODIndex)->GetIndexCount(),
 			RenderPacket.StartIndex
 		);
 		LastMaterial = RenderPacket.material;
 		LastMesh = RenderPacket.mesh;
+		LastLODIndex = RenderPacket.LODIndex;
 	}
 }
 

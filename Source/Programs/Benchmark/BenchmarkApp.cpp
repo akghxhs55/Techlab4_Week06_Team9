@@ -10,6 +10,8 @@
 
 #include "GameFramework/Actor/StaticMeshActor.h"
 
+#include "Asset/LOD/StaticMeshLODSelector.h"
+
 namespace
 {
 	// 숫자 셀 오른쪽 정렬
@@ -38,6 +40,59 @@ bool UBenchmarkEngine::Init()
 	World = FObjectFactory::ConstructObject<UWorld>();
 	World->Init();
 
+	UStaticMesh* Mesh = UAssetManager::LoadObjStaticMesh("Assets/Models/Apple/apple_mid.obj");
+	UStaticMesh* Mesh_2 = UAssetManager::LoadObjStaticMesh("Assets/Models/Apple/bitten_apple_mid.obj");
+
+	if (!Mesh || !Mesh_2)
+		return false;
+
+	FLODGenerateRequest Request;
+	Request.ScreenThresholds = { 0.15f, 0.07f, 0.01f };
+	Request.bSaveToAsset = false; // 현재 저장 경로가 미구현
+
+	auto GenerateFor = [&](UStaticMesh* Asset)
+		{
+			const FLODGenerateResult Report = UAssetManager::Get().GenerateStaticMeshLODs(*Asset, Request);
+			const FString Diagnostics = std::format(
+				"[Benchmark] {}: LOD {}. target={}/{}/{}/{}, actual={}/{}/{}/{}, feature={}, topology={}, flips={}, reason={}\n",
+				Asset->GetPath(), Report.bSuccess ? "OK" : "FAILED",
+				Report.TargetTriangles[0], Report.TargetTriangles[1],
+				Report.TargetTriangles[2], Report.TargetTriangles[3],
+				Report.ActualTriangles[0], Report.ActualTriangles[1],
+				Report.ActualTriangles[2], Report.ActualTriangles[3],
+				Report.RejectedFeatureEdges, Report.RejectedTopology,
+				Report.RejectedFlips, Report.FailureReason);
+			OutputDebugStringA(Diagnostics.c_str());
+
+			if (!Report.bSuccess)
+			{
+				HTR_LOG(Warning, "LOD generation failed for {}: {}", Asset->GetPath(), Report.FailureReason);
+				return;
+			}
+
+			HTR_LOG(Info, "{} LOD triangles: {} / {} / {} / {}",
+				Asset->GetPath(),
+				Report.ActualTriangles[0],
+				Report.ActualTriangles[1],
+				Report.ActualTriangles[2],
+				Report.ActualTriangles[3]);
+		};
+
+	GenerateFor(Mesh);
+	GenerateFor(Mesh_2);
+
+	constexpr int32 CountX = 50, CountY = 50, CountZ = 20;
+	constexpr float Spacing = 1.0f;
+	for (int32 Z = 0; Z < CountZ; ++Z)
+		for (int32 Y = 0; Y < CountY; ++Y)
+			for (int32 X = 0; X < CountX; ++X)
+			{
+				FTransform Transform = FTransform::Identity;
+				Transform.Location = FVector(X * Spacing, Y * Spacing, Z * Spacing);
+
+				AStaticMeshActor* Actor = World->SpawnActor<AStaticMeshActor>(NAME_None, &Transform);
+				Actor->GetStaticMeshComponent()->SetStaticMesh(Y % 2 == 0 ? Mesh : Mesh_2);
+			}
 
 	return true;
 }
@@ -50,13 +105,19 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 		World->Tick(DeltaTime);
 	}
 
+	const uint32 Width = GetEngineLoop().GetViewportWidth();
+	const uint32 Height = GetEngineLoop().GetViewportHeight();
+	if (Width == 0 || Height == 0)
+		return;
+
 	UCameraComponent* Camera = World->GetMainCamera()->GetCameraComponent();
-	Camera->SetAspectRatio(static_cast<float>(GetEngineLoop().GetViewportWidth()) / GetEngineLoop().GetViewportHeight());
+	Camera->SetAspectRatio(static_cast<float>(Width) / Height);
+	const FLODViewContext LODView{Camera->GetViewProjectionMatrix(), Width, Height};
 
 	TQueue<FRenderPacket> RenderQueue;
 	{
 		SCOPE_CYCLE_COUNTER(STAT_GatherRenderPackets);
-		World->GatherRenderPackets(RenderQueue);
+		World->GatherRenderPackets(RenderQueue, &LODView);
 	}
 
 	GetEngineLoop().BeginBackbufferPass();
@@ -114,8 +175,6 @@ void UBenchmarkEngine::DrawProfileOverlay()
 			for (const auto& [Name, History] : FStatRegistry::GetHistories())
 			{
 				const auto* Value = LastFrameStats.FindOrNull(Name);
-
-				ImGui::TableNextRow();
 
 				ImGui::TableSetColumnIndex(0);
 				ImGui::TextUnformatted(Name);

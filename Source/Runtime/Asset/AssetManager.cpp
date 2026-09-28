@@ -361,3 +361,56 @@ UStaticMesh* UAssetManager::LoadObjStaticMesh(const FString& Path)
 	Get().RegisterAsset(Key, Mesh);
 	return Mesh;
 }
+
+FLODGenerateResult UAssetManager::GenerateStaticMeshLODs(UStaticMesh& Mesh,const FLODGenerateRequest& Request)
+{
+	TArray<FStaticMeshData> Generated;
+	FLODGenerateResult Result = FStaticMeshLODGenerator::Generate(Mesh.GetMeshData(), Generated);
+
+	if (!Result.bSuccess) return Result;
+
+	if (!(Request.ScreenThresholds[0] >
+		Request.ScreenThresholds[1] &&
+		Request.ScreenThresholds[1] >
+		Request.ScreenThresholds[2] &&
+		Request.ScreenThresholds[2] > 0.0f))
+	{
+		Result.bSuccess = false;
+		Result.FailureReason = "Screen thresholds must descend";
+		return Result;
+	}
+
+	TArray<FStaticMeshLODResource> NewResources;
+
+	for (FStaticMeshData& Data : Generated)
+	{
+		FStaticMeshLODResource Resource;
+		Resource.Data = std::move(Data);
+
+		Resource.VertexBuffer = RenderCommand::CreateStaticVertexBuffer(
+				Resource.Data.Vertices.GetData(),
+				sizeof(FVertexPNCT) *
+				static_cast<uint32>(Resource.Data.Vertices.Num()),
+				sizeof(FVertexPNCT));
+
+		Resource.IndexBuffer = RenderCommand::CreateStaticIndexBuffer(
+				Resource.Data.Indices.GetData(),
+				static_cast<uint32>(Resource.Data.Indices.Num()));
+
+		if (!Resource.VertexBuffer || !Resource.IndexBuffer)
+		{
+			Result.bSuccess = false;
+			Result.FailureReason = "LOD GPU buffer creation failed";
+			return Result;
+		}
+
+		NewResources.Add(std::move(Resource));
+	}
+
+	// bSaveToAsset이면 이 지점에서 파일 저장.
+	// 저장 실패 시 기존 Mesh.AdditionalLODs는 그대로 둔다.
+
+	Mesh.AdditionalLODs = std::move(NewResources);
+	Mesh.ScreenThresholds = Request.ScreenThresholds;
+	return Result;
+}

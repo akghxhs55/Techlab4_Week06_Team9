@@ -12,6 +12,13 @@ class TArray
 public:
 	TArray() = default;
 	~TArray() = default;
+
+	TArray(const TArray&) = default;
+	TArray& operator=(const TArray&) = default;
+
+	TArray(TArray&&) noexcept = default;
+	TArray& operator=(TArray&&) noexcept = default;
+
 	TArray(std::initializer_list<T> initList);
 
 	T& operator[](uint32 index);

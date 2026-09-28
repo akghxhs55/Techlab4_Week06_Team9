@@ -3,6 +3,7 @@
 #include "ObjectSystem/Object.h"
 #include "ObjectSystem/Property.h"
 #include "Render/Renderer.h"
+#include "Asset/LOD/StaticMeshLODGenerator.h"
 
 #include <filesystem>
 
@@ -58,6 +59,8 @@ public:
 	UTexture2D* LoadTexture(const FString& InPath);
 	UFont* LoadFontAtlas(const FString& JsonPath, const FString& AtlasTexturePath);
 	static UStaticMesh* LoadObjStaticMesh(const FString& Path);
+
+	FLODGenerateResult GenerateStaticMeshLODs(UStaticMesh& Mesh,const FLODGenerateRequest& Request);
 
 private:
 	TMap<FString, FString> AssetPathMap;

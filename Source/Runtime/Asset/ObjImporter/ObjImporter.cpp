@@ -444,6 +444,11 @@ bool FObjImporter::Cook(const FObjInfo& Raw, FStaticMeshData& Out)
 					Vertex.UV.Y = 1.0f - Vertex.UV.Y;
 				}
 				Cooked.Vertices.Add(std::move(Vertex));
+				Cooked.LODSourceVertices.Add({
+					RawIndex.PositionIndex,
+					RawIndex.UVIndex,
+					RawIndex.NormalIndex
+				});
 			}
 
 			// 삼각형 분할 (fan). OBJ는 CCW, 엔진은 CW가 앞면이라 (0, k, k+1) → (0, k+1, k)
