@@ -25,10 +25,19 @@ public: \
 	};\
 private:
 
+// 추상 클래스는 생성자를 등록하지 않는다.
+// 템플릿이어야 버려진 if constexpr 분기의 new T()가 컴파일되지 않고,
+// 멤버여야 private 생성자(싱글턴 등)에 접근할 수 있다.
 #define DECLARE_CLASS(ClassName, SuperClassName)                        \
 public:                                                                 \
     using Super = SuperClassName;                                       \
     using ThisClass = ClassName;		                                \
+    template <typename T = ClassName>                                   \
+    static UObject* InternalConstructInstance()                         \
+    {                                                                   \
+        if constexpr (std::is_abstract_v<T>) { return nullptr; }        \
+        else { return new T(); }                                        \
+    }                                                                   \
     static UClass* StaticClass()                                        \
     {                                                                   \
         static UClass c;                                                \
@@ -37,14 +46,7 @@ public:                                                                 \
         {                                                               \
             c.Name  = #ClassName;                                       \
             c.Super = Super::StaticClass();								\
-			if constexpr(std::is_abstract_v<ClassName>)					\
-			{															\
-				c.Constructor = nullptr;								\
-			}															\
-			else														\
-			{															\
-				c.Constructor = []() -> UObject* { return new ClassName(); };\
-			}															\
+			c.Constructor = std::is_abstract_v<ClassName> ? nullptr : &InternalConstructInstance<ClassName>;\
 			if (&ClassName::RegisterProperties != &Super::RegisterProperties) \
 			{															\
 				ClassName::RegisterProperties(&c);						\

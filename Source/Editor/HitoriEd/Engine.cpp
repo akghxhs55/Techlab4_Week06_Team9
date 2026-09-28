@@ -4,6 +4,7 @@
 
 #include "Core/EngineStatics.h"
 #include "Core/EngineTimer.h"
+#include "Launch/EngineLoop.h"
 #include "Core/StatOverlay.h"
 #include "Input/InputSystem.h"
 
@@ -30,9 +31,29 @@
 
 #include "Core/EngineLog.h"
 
-// 렌더 자원·월드·에디터와 MultipleViewports 연결을 초기화한다.
-bool FEditorApplication::Init(HINSTANCE hInstance)
+FEngineConfig UEditorEngine::GetConfig() const
 {
+	FEngineConfig Desc;
+	Desc.Title = L"Hitori Engine";
+	Desc.Width = 1920;
+	Desc.Height = 1080;
+	Desc.bBorderless = false;
+	Desc.SyncInterval = 1;
+	// View는 각자 깊이 버퍼를 쓰고 백버퍼에는 ImGui만 그린다.
+	Desc.bCreateDepthBuffer = false;
+	Desc.bExitOnEscape = false;
+	return Desc;
+}
+
+// 렌더 자원·월드·에디터와 MultipleViewports 연결을 초기화한다.
+// Device·Window·Swapchain·AssetManager는 FEngineLoop가 먼저 만들어 둔다.
+bool UEditorEngine::Init()
+{
+	MainWindow = GetEngineLoop().GetMainWindow();
+	MainWindowSC = GetEngineLoop().GetSwapchain();
+	Renderer = GetEngineLoop().GetRenderer();
+	FRenderDevice* RenderDevice = GetEngineLoop().GetRenderDevice();
+
 	EditorUI = MakeUnique<FEditorUI>();
 	EditorUI->Init();
 
@@ -43,35 +64,7 @@ bool FEditorApplication::Init(HINSTANCE hInstance)
 
 	OutputLogPanel = EditorUI->AddEditorPanel<FOutputLogPanel>();
 	FLog::AddSink(OutputLogPanel);
-	LOG(Info, "Engine Initialize...");
-
-	LOG(Info, "Initialize Renderer...");
-	Renderer = MakeUnique<FRenderer>();
-	RenderDevice = MakeUnique<FRenderDevice>();
-	RenderCommand::Init(RenderDevice.get());
-	Renderer->Init();
-
-	// Create Main Window & Swapchain
-	FWindowContext MainWindowCtx;
-	LOG(Info, "Create Main Window...");
-	MainWindowCtx.Window = MakeUnique<FWindow>();
-	if (!MainWindowCtx.Window->Create(hInstance, 1920, 1080, L"Hitori Engine"))
-	{
-		LOG(Error, "Failed To Create Main Window!");
-		return false;
-	}
-	LOG(Info, "Success!");
-	MainWindowCtx.Swapchain = MakeUnique<FSwapchain>(RenderDevice.get(), MainWindowCtx.Window.get());
-	MainWindow = MainWindowCtx.Window.get();
-	MainWindowSC = MainWindowCtx.Swapchain.get();
-	Windows.Add(std::move(MainWindowCtx));
-
-
-	LOG(Info, "Initialize AssetManager...");
-	FRenderResourceManager::Init();
-	UAssetManager::Get().Init();
-	LOG(Info, "Initialize AssetManager Success!");
-
+	LOG(Info, "Editor Initialize...");
 
 	LOG(Info, "Initialize ImGui...");
 	ImGuiRenderer = MakeUnique<FImGuiRenderer>();
@@ -82,10 +75,10 @@ bool FEditorApplication::Init(HINSTANCE hInstance)
 	LOG(Info, "Initialize ImGui Success!");
 
 	GridRenderer = MakeUnique<FGridRenderer>();
-	GridRenderer->Init(Renderer.get());
+	GridRenderer->Init(Renderer);
 
 	GizmoRenderer = MakeUnique<FGizmoRenderer>();
-	GizmoRenderer->Init(Renderer.get());
+	GizmoRenderer->Init(Renderer);
 
 	Gizmo = MakeUnique<FGizmo>();
 
@@ -97,7 +90,7 @@ bool FEditorApplication::Init(HINSTANCE hInstance)
 
 	// OutLine
 	OutlineRenderer = MakeUnique<FOutlineRenderer>();
-	OutlineRenderer->Init(Renderer.get());
+	OutlineRenderer->Init(Renderer);
 
 	SettingsPanel = EditorUI->AddEditorPanel<FSettingsPanel>();
 
@@ -150,7 +143,7 @@ bool FEditorApplication::Init(HINSTANCE hInstance)
 	);
 
 	LineBatcher = MakeUnique<FLineBatcher>();
-	LineBatcher->Init(Renderer.get(), World);
+	LineBatcher->Init(Renderer, World);
 
 	DetailsPanel->SetWorld(World);
 
@@ -165,58 +158,35 @@ bool FEditorApplication::Init(HINSTANCE hInstance)
 	SkyboxRenderer = MakeUnique<FSkyboxRenderer>();
 	SkyboxRenderer->Init("Assets/SkySphere/Sky.jpg");
 
-
-
-
-	bIsRunning = true;
-
-	return true;
-}
-
-// 프레임 시작·View 상태·월드 갱신·렌더·종료를 순차 반복한다.
-void FEditorApplication::Run()
-{
-	EngineTimer::Init();
-
 	LOG(Info, "{}", "Hello, World!");
 	LOG(Info, "{}", FName().ToString());
 
-	while (bIsRunning)
-	{
-		float DeltaTime = 0.0f;
-		if (!BeginFrame(DeltaTime))
-			break;
-
-		UpdateMultipleViewportState(DeltaTime);
-		TickWorldAndEditor(DeltaTime);
-		RenderMultipleViewports();
-		EndFrame();
-	}
-}
-
-// 창 이벤트·입력을 갱신하고 DeltaTime을 계산한다.
-bool FEditorApplication::BeginFrame(float& OutDeltaTime)
-{
-
-	EngineTimer::Tick();
-	OutDeltaTime = EngineTimer::GetDeltaTime();
-	FStatOverlay::Tick(OutDeltaTime);
-	EditorControlsPanel->FEditorControlsPanel::DeltaTime = OutDeltaTime;
-	FInputSystem::UpdateInputStates();
-
-	MainWindow->ProcessMessage(bIsRunning);
-	if (!bIsRunning)
-		return false;
-
-	if (!ImGui::GetIO().WantTextInput && FInputSystem::IsKeyPressed(EKeyCode::Delete))
-		DeleteActor(OutlinerPanel->GetSelectedActor());
-
-	HandleMainWindow();
 	return true;
 }
 
+// 프레임 시작·View 상태·월드 갱신 후 View별 오프스크린 렌더와 UI 합성을 진행한다.
+// 입력·창 메시지는 FEngineLoop가 먼저 처리하고 Present는 호출 직후에 한다.
+void UEditorEngine::Tick(const float DeltaTime)
+{
+	BeginFrame(DeltaTime);
+	UpdateMultipleViewportState(DeltaTime);
+	TickWorldAndEditor(DeltaTime);
+	RenderMultipleViewports();
+	EndFrame();
+}
+
+// DeltaTime을 패널에 전달하고 에디터 단축키를 처리한다.
+void UEditorEngine::BeginFrame(const float DeltaTime)
+{
+	FStatOverlay::Tick(DeltaTime);
+	EditorControlsPanel->FEditorControlsPanel::DeltaTime = DeltaTime;
+
+	if (!ImGui::GetIO().WantTextInput && FInputSystem::IsKeyPressed(EKeyCode::Delete))
+		DeleteActor(OutlinerPanel->GetSelectedActor());
+}
+
 // 패널의 Layout·Preset 요청과 입력을 Adapter에 반영한다.
-void FEditorApplication::UpdateMultipleViewportState(const float DeltaTime)
+void UEditorEngine::UpdateMultipleViewportState(const float DeltaTime)
 {
 	const FVector2 ViewportSize = ViewportsPanel->GetContentSize();
 	const FVector2 LocalMousePosition = ViewportsPanel->GetLocalMousePosition();
@@ -265,7 +235,7 @@ void FEditorApplication::UpdateMultipleViewportState(const float DeltaTime)
 }
 
 // 월드를 한 번 Tick·Capture한 뒤 에디터와 피킹을 갱신한다.
-void FEditorApplication::TickWorldAndEditor(const float DeltaTime)
+void UEditorEngine::TickWorldAndEditor(const float DeltaTime)
 {
 	// 월드 상태는 프레임마다 정확히 한 번 갱신하고 캡처한다.
 	World->Tick(DeltaTime);
@@ -275,7 +245,7 @@ void FEditorApplication::TickWorldAndEditor(const float DeltaTime)
 }
 
 // 공유 월드 캡처로 활성 View별 렌더 큐를 만들고 렌더한다.
-void FEditorApplication::RenderMultipleViewports()
+void UEditorEngine::RenderMultipleViewports()
 {
 	for (int32 ViewIndex = 0; ViewIndex < 4; ++ViewIndex)
 	{
@@ -305,7 +275,7 @@ void FEditorApplication::RenderMultipleViewports()
 }
 
 // 화면을 표시하고 UI 변경 후 View 설정을 보관한다.
-void FEditorApplication::EndFrame()
+void UEditorEngine::EndFrame()
 {
 	PresentFrame();
 	// UI 변경 후 설정을 복사해 종료 시 카메라 수명에 의존하지 않는다.
@@ -313,7 +283,7 @@ void FEditorApplication::EndFrame()
 }
 
 // 입력 View의 Ray와 피킹으로 Gizmo·공유 선택을 갱신한다.
-void FEditorApplication::UpdateGizmoAndPicking()
+void UEditorEngine::UpdateGizmoAndPicking()
 {
 	// Delete는 BeginFrame에서 한 번만 처리하고 여기서는 View 입력만 다룬다.
 	const int32 ViewIndex = MultipleViewportsAdapter.GetActiveViewIndex();
@@ -351,7 +321,7 @@ void FEditorApplication::UpdateGizmoAndPicking()
 }
 
 // View 행렬로 Scene·Grid·Gizmo·텍스트·Outline을 렌더한다.
-void FEditorApplication::RenderFrame(const int32 ViewIndex, const FRenderingInfo& ViewRenderingInfo, const FMatrix& ViewProjection, const FVector& ViewCameraLocation, const FVector& ViewCameraForward, TQueue<FRenderPacket>& RenderQueue)
+void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& ViewRenderingInfo, const FMatrix& ViewProjection, const FVector& ViewCameraLocation, const FVector& ViewCameraForward, TQueue<FRenderPacket>& RenderQueue)
 {
 	RenderCommand::BeginRenderPass(ViewRenderingInfo);
 	if (SettingsPanel->GetSettings().bDrawBatchLine)
@@ -514,8 +484,8 @@ void FEditorApplication::RenderFrame(const int32 ViewIndex, const FRenderingInfo
 }
 
 
-// View Texture가 포함된 UI를 Swapchain에 합성해 표시한다.
-void FEditorApplication::PresentFrame()
+// View Texture가 포함된 UI를 Swapchain 백버퍼에 합성한다. Present는 FEngineLoop가 한다.
+void UEditorEngine::PresentFrame()
 {
 	// Swapchain 렌더링
 	RenderCommand::BeginRenderPass(MainWindowSC->GetRenderingInfo());
@@ -527,37 +497,16 @@ void FEditorApplication::PresentFrame()
 	ImGuiRenderer->End();
 
 	RenderCommand::EndRenderPass(MainWindowSC->GetRenderingInfo());
-
-	MainWindowSC->SwapBuffers();
-
 }
 
-// 엔진 종료에 필요한 자원 정리를 수행한다.
-void FEditorApplication::Shutdown()
+// ImGui를 정리한다. UObject 일괄 삭제와 공용 자원·Device 정리는 FEngineLoop가 이어서 한다.
+void UEditorEngine::PreExit()
 {
-	UAssetManager::Get().Shutdown();
-	FRenderResourceManager::Shutdown();
-
-	while (GUObjectArray.Num() > 0)
-	{
-		delete GUObjectArray.Last();
-	}
-
 	ImGuiRenderer->Shutdown();
-	RenderDevice->Shutdown();
-}
-
-// 메인 창 크기에 맞춰 Swapchain을 갱신한다.
-void FEditorApplication::HandleMainWindow()
-{
-	if (MainWindow->CheckResized())
-	{
-		MainWindowSC->Resize(MainWindow->GetWidth(), MainWindow->GetHeight());
-	}
 }
 
 // 선택과 Gizmo 참조를 정리한 뒤 Actor를 삭제한다.
-void FEditorApplication::DeleteActor(AActor* Actor)
+void UEditorEngine::DeleteActor(AActor* Actor)
 {
 	if (!Actor)
 		return;
@@ -568,7 +517,7 @@ void FEditorApplication::DeleteActor(AActor* Actor)
 }
 
 // 씬 변경으로 무효화된 에디터의 선택 참조를 모두 해제한다.
-void FEditorApplication::ResetSceneSelection()
+void UEditorEngine::ResetSceneSelection()
 {
 	Gizmo->SetTarget(nullptr);
 	Outline->SetTarget(nullptr);
@@ -577,7 +526,7 @@ void FEditorApplication::ResetSceneSelection()
 }
 
 // 새 씬 생성이 성공하면 에디터 선택 상태를 초기화한다.
-void FEditorApplication::CreateNewScene()
+void UEditorEngine::CreateNewScene()
 {
 	if (!FEditorFileUtils::NewScene(World))
 		return;
@@ -586,7 +535,7 @@ void FEditorApplication::CreateNewScene()
 }
 
 // 씬 불러오기가 성공하면 에디터 선택 상태를 초기화한다.
-void FEditorApplication::OpenScene()
+void UEditorEngine::OpenScene()
 {
 	if (!FEditorFileUtils::LoadScene(World))
 		return;
@@ -595,13 +544,13 @@ void FEditorApplication::OpenScene()
 }
 
 // 공통 파일 유틸리티로 현재 씬을 저장한다.
-void FEditorApplication::SaveCurrentScene()
+void UEditorEngine::SaveCurrentScene()
 {
 	FEditorFileUtils::SaveScene(World);
 }
 
 // 공통 파일 유틸리티로 새 경로에 씬을 저장한다.
-void FEditorApplication::SaveSceneAs()
+void UEditorEngine::SaveSceneAs()
 {
 	FEditorFileUtils::SaveSceneAs(World);
 }

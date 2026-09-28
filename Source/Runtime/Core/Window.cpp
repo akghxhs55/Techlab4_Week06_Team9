@@ -40,7 +40,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	return DefWindowProc(hWnd, msg, wParam, lParam);   // return 0 대신
 }
 
-bool FWindow::Create(HINSTANCE hInstance, int InWidth, int InHeight, const wchar_t* Title)
+bool FWindow::Create(HINSTANCE hInstance, int InWidth, int InHeight, const wchar_t* Title, bool bBorderless)
 {
 	Width = InWidth;
 	Height = InHeight;
@@ -53,7 +53,7 @@ bool FWindow::Create(HINSTANCE hInstance, int InWidth, int InHeight, const wchar
 	wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON2));
 	RegisterClassW(&wc);
 
-	DWORD style = WS_OVERLAPPEDWINDOW;
+	DWORD style = bBorderless ? WS_POPUP : WS_OVERLAPPEDWINDOW;
 
 	// 원하는 클라이언트 크기 -> 실제 윈도우 크기로 보정
 	RECT rc = { 0, 0, Width, Height };
@@ -65,7 +65,7 @@ bool FWindow::Create(HINSTANCE hInstance, int InWidth, int InHeight, const wchar
 	hWnd = CreateWindowEx(
 		0, CLASS_NAME, Title,
 		style,
-		CW_USEDEFAULT, CW_USEDEFAULT, WindowWidth, WindowHeight,
+		bBorderless ? 0 : CW_USEDEFAULT, bBorderless ? 0 : CW_USEDEFAULT, WindowWidth, WindowHeight,
 		nullptr, nullptr, hInstance, this);
 
 	if (hWnd == nullptr)

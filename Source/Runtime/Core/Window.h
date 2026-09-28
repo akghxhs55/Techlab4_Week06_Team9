@@ -15,7 +15,8 @@ public:
 	// 훅은 등록한 쪽이 수명을 책임진다. 해제는 nullptr을 넘긴다.
 	static void SetWndProcHook(FWndProcHook Hook);
 
-	bool Create(HINSTANCE hInstance, int Width, int Height, const wchar_t* Title);
+	// bBorderless면 테두리 없이 (0,0)에 띄워 클라이언트 영역이 곧 요청 크기가 된다.
+	bool Create(HINSTANCE hInstance, int Width, int Height, const wchar_t* Title, bool bBorderless = false);
 	void ProcessMessage(bool& bIsRunning);
 
 	HWND GetHandle() const { return hWnd;  }

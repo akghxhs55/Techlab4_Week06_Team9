@@ -2,11 +2,10 @@
 #include "ObjViewerApp.h"
 
 #include "Asset/AssetManager.h"
+#include "Core/Window.h"
+#include "Launch/EngineLoop.h"
 #include "Input/InputSystem.h"
-#include "Render/RenderCommand.h"
-#include "Render/RenderResourceManager.h"
-
-#include "Core/Application.h"
+#include "Render/Renderer.h"
 
 #include <commdlg.h>
 #include <filesystem>
@@ -86,101 +85,48 @@ namespace
 	}
 }
 
-bool FObjViewerApp::Init(HINSTANCE hInstance)
+FEngineConfig UObjViewerEngine::GetConfig() const
 {
-	RenderDevice = MakeUnique<FRenderDevice>();
-	RenderCommand::Init(RenderDevice.get());
+	FEngineConfig Desc;
+	Desc.Title = WindowTitle;
+	Desc.Width = WindowWidth;
+	Desc.Height = WindowHeight;
+	Desc.bBorderless = false;
+	Desc.SyncInterval = 1;
+	return Desc;
+}
 
-	Renderer = MakeUnique<FRenderer>();
-	Renderer->Init();
-
-	MainWindow = MakeUnique<FWindow>();
-	if (!MainWindow->Create(hInstance, WindowWidth, WindowHeight, WindowTitle))
-	{
-		return false;
-	}
-
-	Swapchain = MakeUnique<FSwapchain>(RenderDevice.get(), MainWindow.get());
-	CreateDepthBuffer(MainWindow->GetWidth(), MainWindow->GetHeight());
-
-	FRenderResourceManager::Init();
-	UAssetManager::Get().Init();
+bool UObjViewerEngine::Init()
+{
 	if (!LoadMesh(DefaultMeshPath))
 	{
 		// 기본 메쉬가 없어도 단축키 안내는 보여준다.
 		UpdateWindowTitle();
 	}
-
-	bIsRunning = true;
 	return true;
 }
 
-void FObjViewerApp::Run()
+void UObjViewerEngine::Tick(float DeltaTime)
 {
-	while (bIsRunning)
-	{
-		FInputSystem::UpdateInputStates();
-		MainWindow->ProcessMessage(bIsRunning);
-		if (!bIsRunning)
-		{
-			break;
-		}
-
-		HandleResize();
-
-		// 최소화 중에는 그릴 대상이 없다.
-		if (MainWindow->GetWidth() == 0 || MainWindow->GetHeight() == 0)
-		{
-			continue;
-		}
-
-		HandleShortcuts();
-		UpdateCamera();
-		RenderFrame();
-	}
+	HandleShortcuts();
+	UpdateCamera();
+	RenderFrame();
 }
 
-// Init의 역순으로 GPU 자원을 해제하고 Device를 마지막에 정리한다.
-void FObjViewerApp::Shutdown()
+void UObjViewerEngine::PreExit()
 {
 	Mesh = nullptr;
-	UAssetManager::Get().Shutdown();
-	FRenderResourceManager::Shutdown();
-
-	DepthBuffer.reset();
-	Swapchain.reset();
-	Renderer.reset();
-
-	RenderDevice->Shutdown();
 }
 
-void FObjViewerApp::HandleResize()
-{
-	if (!MainWindow->CheckResized())
-	{
-		return;
-	}
-
-	const uint32 Width = MainWindow->GetWidth();
-	const uint32 Height = MainWindow->GetHeight();
-	if (Width == 0 || Height == 0)
-	{
-		return;
-	}
-
-	Swapchain->Resize(Width, Height);
-	CreateDepthBuffer(Width, Height);
-}
-
-void FObjViewerApp::HandleShortcuts()
+void UObjViewerEngine::HandleShortcuts()
 {
 	if (FInputSystem::IsKeyDown(EKeyCode::Control) && FInputSystem::IsKeyPressed(EKeyCode::O))
 	{
 		// 모달 대화상자: 닫힐 때까지 루프가 멈춘다. 눌린 키 상태는 WM_KILLFOCUS에서 초기화된다.
-		const FString Path = OpenObjFileDialog(MainWindow->GetHandle());
+		const FString Path = OpenObjFileDialog(GetEngineLoop().GetMainWindow()->GetHandle());
 		if (!Path.empty() && !LoadMesh(Path))
 		{
-			MessageBoxA(MainWindow->GetHandle(), Path.c_str(), "Failed to load OBJ", MB_OK | MB_ICONERROR);
+			MessageBoxA(GetEngineLoop().GetMainWindow()->GetHandle(), Path.c_str(), "Failed to load OBJ", MB_OK | MB_ICONERROR);
 		}
 	}
 
@@ -190,7 +136,7 @@ void FObjViewerApp::HandleShortcuts()
 	}
 }
 
-void FObjViewerApp::UpdateCamera()
+void UObjViewerEngine::UpdateCamera()
 {
 	if (FInputSystem::IsMouseDown(EMouseButton::Right))
 	{
@@ -209,33 +155,22 @@ void FObjViewerApp::UpdateCamera()
 	}
 }
 
-void FObjViewerApp::RenderFrame()
+void UObjViewerEngine::RenderFrame()
 {
-	const float Aspect = static_cast<float>(MainWindow->GetWidth()) / static_cast<float>(MainWindow->GetHeight());
+	const float Aspect = static_cast<float>(GetEngineLoop().GetViewportWidth()) / static_cast<float>(GetEngineLoop().GetViewportHeight());
 	const FMatrix View = MakeLookAt(GetCameraEye(), CameraTarget);
 	const FMatrix Projection = MakePerspective(CameraFovDegrees, Aspect, CameraNearZ, CameraFarZ);
 
 	TQueue<FRenderPacket> RenderQueue;
 	BuildRenderQueue(RenderQueue);
 
-	FRenderingInfo Info = Swapchain->GetRenderingInfo();
-	Info.DepthStencil.Texture = DepthBuffer.get();
-
-	RenderCommand::BeginRenderPass(Info);
-
-	RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
-	RenderCommand::SetBlendState(EBlendState::Opaque);
-	RenderCommand::SetDepthStencilState(EDepthStencilState::Default);
-	RenderCommand::SetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	Renderer->RenderAll(RenderQueue, View * Projection);
-
-	RenderCommand::EndRenderPass(Info);
-
-	Swapchain->SwapBuffers();
+	GetEngineLoop().BeginBackbufferPass();
+	GetEngineLoop().GetRenderer()->RenderAll(RenderQueue, View * Projection);
+	GetEngineLoop().EndBackbufferPass();
 }
 
 // 로드에 실패하면 기존 메쉬를 유지한다.
-bool FObjViewerApp::LoadMesh(const FString& Path)
+bool UObjViewerEngine::LoadMesh(const FString& Path)
 {
 	UStaticMesh* NewMesh = UAssetManager::LoadObjStaticMesh(Path);
 	if (!NewMesh)
@@ -255,7 +190,7 @@ bool FObjViewerApp::LoadMesh(const FString& Path)
 }
 
 // 창 제목에 파일명·정점·삼각형 수와 단축키 안내를 표시한다.
-void FObjViewerApp::UpdateWindowTitle()
+void UObjViewerEngine::UpdateWindowTitle()
 {
 	FString Title = WindowTitleWithHint;
 	if (Mesh)
@@ -266,10 +201,10 @@ void FObjViewerApp::UpdateWindowTitle()
 			+ std::to_string(Data.Indices.Num() / 3) + " tris) - " + Title;
 	}
 
-	SetWindowTextA(MainWindow->GetHandle(), Title.c_str());
+	SetWindowTextA(GetEngineLoop().GetMainWindow()->GetHandle(), Title.c_str());
 }
 
-void FObjViewerApp::BuildRenderQueue(TQueue<FRenderPacket>& OutQueue) const
+void UObjViewerEngine::BuildRenderQueue(TQueue<FRenderPacket>& OutQueue) const
 {
 	if (!Mesh)
 	{
@@ -288,23 +223,8 @@ void FObjViewerApp::BuildRenderQueue(TQueue<FRenderPacket>& OutQueue) const
 	}
 }
 
-void FObjViewerApp::CreateDepthBuffer(uint32 Width, uint32 Height)
-{
-	D3D11_TEXTURE2D_DESC Desc{};
-	Desc.Width = Width;
-	Desc.Height = Height;
-	Desc.MipLevels = 1;
-	Desc.ArraySize = 1;
-	Desc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;   // 깊이 24bit + 스텐실 8bit
-	Desc.SampleDesc.Count = 1;                     // 백버퍼와 동일해야 함 (MSAA 없음)
-	Desc.Usage = D3D11_USAGE_DEFAULT;
-	Desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;     // FTexture2D가 DSV를 만들어 준다
-
-	DepthBuffer = RenderCommand::CreateTexture2D(Desc);
-}
-
 // 메쉬의 경계 구가 시야에 모두 들어오도록 Target과 Distance를 정한다.
-void FObjViewerApp::FitCameraToMesh()
+void UObjViewerEngine::FitCameraToMesh()
 {
 	if (!Mesh)
 	{
@@ -320,7 +240,7 @@ void FObjViewerApp::FitCameraToMesh()
 }
 
 // Yaw·Pitch로 바라보는 방향을 구하고 Target에서 Distance만큼 뒤로 물린다.
-FVector FObjViewerApp::GetCameraEye() const
+FVector UObjViewerEngine::GetCameraEye() const
 {
 	const float YawRad = FMath::DegreesToRadians(CameraYaw);
 	const float PitchRad = FMath::DegreesToRadians(CameraPitch);
