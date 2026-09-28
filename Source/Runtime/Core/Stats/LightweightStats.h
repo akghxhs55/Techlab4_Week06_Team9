@@ -23,18 +23,11 @@ struct TStatId
 // 스탯 하나의 누적 결과. 시간은 사이클로 모으고 표시할 때만 ms로 바꾼다.
 struct FCycleStatData
 {
+	static constexpr uint32 Duration = 120; // 120 프레임 수집
+
 	uint64 LastCycles = 0;
 	uint64 TotalCycles = 0;
 	uint32 CallCount = 0;
-
-	double GetLastMs() const { return FPlatformTime::ToMilliseconds64(LastCycles); }
-	double GetTotalMs() const { return FPlatformTime::ToMilliseconds64(TotalCycles); }
-	double GetAverageMs() const { return CallCount > 0 ? GetTotalMs() / CallCount : 0.0; }
-};
-
-struct FStatHistory
-{
-	static constexpr uint32 Duration = 120;
 
 	uint64 FrameCycles[Duration] = {};
 	uint64 WindowSumCycles = 0;
@@ -43,8 +36,18 @@ struct FStatHistory
 	uint32 NextIndex = 0;
 	uint32 SampleCount = 0;
 
+	double GetLastMs() const { return FPlatformTime::ToMilliseconds64(LastCycles); }
+	double GetTotalMs() const { return FPlatformTime::ToMilliseconds64(TotalCycles); }
+	double GetAverageMs() const { return CallCount > 0 ? GetTotalMs() / CallCount : 0.0; }
+	double GetRecentAverageMs() const { return SampleCount > 0 ? FPlatformTime::ToMilliseconds64(WindowSumCycles) / SampleCount : 0.0; }
+	double GetMaxMs() const { return FPlatformTime::ToMilliseconds64(MaxFrameCycles); }
+
 	void PushFrame(uint64 Cycles)
 	{
+		LastCycles = Cycles;
+		TotalCycles += Cycles;
+		CallCount++;
+
 		WindowSumCycles -= FrameCycles[NextIndex];
 		FrameCycles[NextIndex] = Cycles;
 		WindowSumCycles += Cycles;
@@ -52,76 +55,50 @@ struct FStatHistory
 		NextIndex = (NextIndex + 1) % Duration;
 		if (SampleCount < Duration)
 			++SampleCount;
-		
+
 		if (Cycles > MaxFrameCycles)
 			MaxFrameCycles = Cycles;
 	}
+};
 
-	double GetRecentAverageMs() const
-	{
-		return SampleCount > 0
-			? FPlatformTime::ToMilliseconds64(WindowSumCycles) / SampleCount
-			: 0.0;
-	}
-
-	double GetMaxMs() const
-	{
-		return FPlatformTime::ToMilliseconds64(MaxFrameCycles);
-	}
+struct FPendingCycleStat
+{
+	TStatId StatId;
+	uint64 Cycles;
 };
 
 // UE는 이 집계를 외부 프로파일러(Insights)에 맡기지만 우리는 직접 모은다.
 class FStatRegistry
 {
 public:
-	static void BeginFrame()
+	static void EndFrame()
 	{
-		std::swap(WriteStats, ReadStats);
-
-		// 처음 측정된 항목 추가
-		for (const auto& [Name, Data] : ReadStats)
+		for (const auto& [Name, Cycles]: PendingStats)
 		{
-			if (!Histories.Find(Name))
-			{
-				Histories.Add(Name, FStatHistory{});
-			}
+			Stats[Name.GetName()].PushFrame(Cycles);
 		}
-
-		// 기록 갱신
-		for (auto& [Name, History] : Histories)
-		{
-			const FCycleStatData* Data = ReadStats.FindOrNull(Name);
-			History.PushFrame(Data ? Data->TotalCycles : 0);
-		}
-
-		WriteStats.Reset();
+		PendingStats.Reset();
 	}
 
 	static void AddCycles(TStatId StatId, uint64 Cycles)
 	{
-		FCycleStatData& Data = WriteStats[StatId.GetName()];
-		Data.LastCycles = Cycles;
-		Data.TotalCycles += Cycles;
-		++Data.CallCount;
+		PendingStats.Add({ StatId, Cycles });
 	}
 
-	static void ResetHistory()
+	static void Reset()
 	{
-		for (auto& [Name, History] : Histories)
+		for (auto& [Name, Data] : Stats)
 		{
-			History = FStatHistory{};
+			Data = FCycleStatData{};
 		}
 	}
 
-	static const FCycleStatData* Find(TStatId StatId) { return ReadStats.Find(StatId.GetName()); }
-	static const TMap<const char*, FCycleStatData>& GetLastFrameStats() { return ReadStats; }
-	static const TMap<const char*, FStatHistory>& GetHistories() { return Histories; }
-	static void ResetAll() { return ReadStats.Reset(); }
+	static const FCycleStatData* Find(TStatId StatId) { return Stats.Find(StatId.GetName()); }
+	static const TMap<const char*, FCycleStatData>& GetAll() { return Stats; }
 
 private:
-	inline static TMap<const char*, FCycleStatData> WriteStats;
-	inline static TMap<const char*, FCycleStatData> ReadStats;
-	inline static TMap<const char*, FStatHistory> Histories;
+	inline static TMap<const char*, FCycleStatData> Stats;
+	inline static TArray<FPendingCycleStat> PendingStats;
 };
 
 // 생성 시 시작 사이클을 기록하고, 스코프를 벗어날 때 경과 사이클을 FStatRegistry에 보고한다.

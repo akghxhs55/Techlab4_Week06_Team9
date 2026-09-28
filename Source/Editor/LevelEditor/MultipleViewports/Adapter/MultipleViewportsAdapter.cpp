@@ -1,4 +1,4 @@
-#include "EnginePCH.h"
+﻿#include "EnginePCH.h"
 
 #include "Editor/LevelEditor/MultipleViewports/Adapter/MultipleViewportsAdapter.h"
 
@@ -8,6 +8,7 @@
 #include "Component/StaticMeshComponent.h"
 #include "Component/BillboardComponent.h"
 #include "Component/ParticleSubUVComponent.h"
+#include "Core/Stats/LightweightStats.h"
 #include "Editor/Outliner/OutlinerPanel.h"
 #include "Editor/Rendering/GridRenderer.h"
 #include "Engine/World.h"
@@ -30,6 +31,8 @@ constexpr float MinimumOrthographicWidth = 0.01f;
 // 양방향 깊이 보정 뒤에도 절두체 평면 법선이 Core epsilon(1e-6)보다 충분히 크게 유지되게 한다.
 // 정사각 View의 최악 조건에서 깊이 계수는 약 1 / (4 * sqrt(2) * Span)이다.
 constexpr float MaximumOrthographicSpan = 80000.0f;
+
+DECLARE_CYCLE_STAT("Picking Time", STAT_PickingTime);
 
 // 외부 설정과 화면 비율을 반영해 직교 투영 폭이 안전한 범위를 벗어나지 않게 한다.
 void ConstrainOrthographicWidth(FCameraProjection& Projection, const FRect& Rect)
@@ -720,7 +723,9 @@ void FMultipleViewportsAdapter::BuildRenderQueue(const int32 ViewIndex, TQueue<F
 // 클릭한 View의 Ray를 World에 전달하고 Component의 최근접 교차 결과를 보관한다.
 FPickHit FMultipleViewportsAdapter::PickActiveView(const FVector2 LocalMousePosition, UWorld& World)
 {
-    LastPick = {};
+    SCOPE_CYCLE_COUNTER(STAT_PickingTime);
+
+	LastPick = {};
     FRay Ray{};
     if (!TryGetActiveViewRay(LocalMousePosition, Ray)) return LastPick;
 

@@ -99,7 +99,6 @@ bool UBenchmarkEngine::Init()
 
 void UBenchmarkEngine::Tick(float DeltaTime)
 {
-	FStatRegistry::BeginFrame();
 	{
 		SCOPE_CYCLE_COUNTER(STAT_WorldTick);
 		World->Tick(DeltaTime);
@@ -132,6 +131,8 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 	}
 
 	GetEngineLoop().EndBackbufferPass();
+
+	FStatRegistry::EndFrame();
 }
 
 void UBenchmarkEngine::DrawProfileOverlay()
@@ -153,9 +154,9 @@ void UBenchmarkEngine::DrawProfileOverlay()
 
 		ImGui::TextUnformatted("CPU Profile");
 		ImGui::SameLine();
-		if (ImGui::SmallButton("Reset History"))
+		if (ImGui::SmallButton("Reset"))
 		{
-			FStatRegistry::ResetHistory();
+			FStatRegistry::Reset();
 		}
 
 		constexpr ImGuiTableFlags TableFlags =
@@ -171,24 +172,21 @@ void UBenchmarkEngine::DrawProfileOverlay()
 			ImGui::TableSetupColumn("Max", ImGuiTableColumnFlags_WidthFixed, 80.0f);
 			ImGui::TableHeadersRow();
 
-			const auto& LastFrameStats = FStatRegistry::GetLastFrameStats();
-			for (const auto& [Name, History] : FStatRegistry::GetHistories())
+			for (const auto& [Name, Data] : FStatRegistry::GetAll())
 			{
-				const auto* Value = LastFrameStats.FindOrNull(Name);
-
 				ImGui::TableNextRow();
 
 				ImGui::TableSetColumnIndex(0);
 				ImGui::TextUnformatted(Name);
 
 				ImGui::TableSetColumnIndex(1);
-				DrawTimeCell(Value ? Value->GetTotalMs() : 0.0);
+				DrawTimeCell(Data.GetLastMs());
 
 				ImGui::TableSetColumnIndex(2);
-				DrawTimeCell(History.GetRecentAverageMs());
+				DrawTimeCell(Data.GetRecentAverageMs());
 
 				ImGui::TableSetColumnIndex(3);
-				DrawTimeCell(History.GetMaxMs());
+				DrawTimeCell(Data.GetMaxMs());
 			}
 
 			ImGui::EndTable();

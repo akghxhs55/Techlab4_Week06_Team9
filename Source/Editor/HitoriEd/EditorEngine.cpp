@@ -190,8 +190,6 @@ void UEditorEngine::Tick(const float DeltaTime)
 // DeltaTime을 패널에 전달하고 에디터 단축키를 처리한다.
 void UEditorEngine::BeginFrame(const float DeltaTime)
 {
-	FStatRegistry::BeginFrame();
-
 	FStatOverlay::Tick(DeltaTime);
 	EditorControlsPanel->FEditorControlsPanel::DeltaTime = DeltaTime;
 
@@ -310,6 +308,8 @@ void UEditorEngine::EndFrame()
 	PresentFrame();
 	// UI 변경 후 설정을 복사해 종료 시 카메라 수명에 의존하지 않는다.
 	SettingsPanel->CaptureViewportSettings();
+	// 프로파일러 반영
+	FStatRegistry::EndFrame();
 }
 
 // 입력 View의 Ray와 피킹으로 Gizmo·공유 선택을 갱신한다.

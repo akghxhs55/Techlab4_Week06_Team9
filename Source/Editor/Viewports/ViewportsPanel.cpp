@@ -307,14 +307,12 @@ void FViewportsPanel::DrawStatOverlay(ImDrawList* DrawList, const ImVec2& ViewMi
 	{
 		ProfileLines.Add({"CPU Profile (ms)", TitleColor, {"Last", "Avg", "Max"}});
 
-		const auto& Stats = FStatRegistry::GetLastFrameStats();
-		for (const auto& [Name, History] : FStatRegistry::GetHistories())
+		for (const auto& [Name, Data] : FStatRegistry::GetAll())
 		{
-			const FCycleStatData* Data = Stats.FindOrNull(Name);
 			FProfileStatLine Line{"  " + FString(Name), ValueColor};
-			Line.Values[0] = std::format("{:.2f}", Data ? Data->GetTotalMs() : 0.0);
-			Line.Values[1] = std::format("{:.2f}", History.GetRecentAverageMs());
-			Line.Values[2] = std::format("{:.2f}", History.GetMaxMs());
+			Line.Values[0] = std::format("{:.2f}", Data.GetLastMs());
+			Line.Values[1] = std::format("{:.2f}", Data.GetRecentAverageMs());
+			Line.Values[2] = std::format("{:.2f}", Data.GetMaxMs());
 			ProfileLines.Add(Line);
 		}
 	}
