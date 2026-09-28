@@ -16,26 +16,26 @@ FRay ToLocalRay(const FRay& WorldRay, const FMatrix& WorldMatrix)
 
 bool RayIntersectsAABB(const FRay& Ray, const FVector& BoxMin, const FVector& BoxMax, float& OutT)
 {
-    float invRayDir = 1.0f / Ray.Direction.X;
-    float tX1 = (BoxMin.X - Ray.Origin.X) * invRayDir;
-    float tX2 = (BoxMax.X - Ray.Origin.X) * invRayDir;
-    float tMinX = fmin(tX1, tX2);
-    float tMaxX = fmax(tX1, tX2);
+    FVectorRegister Rayoriginreg = VectorSIMD::LoadFloat3(&Ray.Origin.X);
+    FVectorRegister Raydirreg = VectorSIMD::LoadFloat3(&Ray.Direction.X);
+    FVectorRegister Boxminreg = VectorSIMD::LoadFloat3(&BoxMin.X);
+    FVectorRegister Boxmaxreg = VectorSIMD::LoadFloat3(&BoxMax.X);
 
-    invRayDir = 1.0f / Ray.Direction.Y;
-    float tY1 = (BoxMin.Y - Ray.Origin.Y) * invRayDir;
-    float tY2 = (BoxMax.Y - Ray.Origin.Y) * invRayDir;
-    float tMinY = fmin(tY1, tY2);
-    float tMaxY = fmax(tY1, tY2);
+    FVectorRegister invRayDirreg = VectorSIMD::Reciprocal(Raydirreg);
 
-    invRayDir = 1.0f / Ray.Direction.Z;
-    float tZ1 = (BoxMin.Z - Ray.Origin.Z) * invRayDir;
-    float tZ2 = (BoxMax.Z - Ray.Origin.Z) * invRayDir;
-    float tMinZ = fmin(tZ1, tZ2);
-    float tMaxZ = fmax(tZ1, tZ2);   
-    
-    float tEnter = fmax(fmax(tMinX, tMinY), tMinZ);   // min 중에 가장 큰 값 (진입점)
-    float tExit = fmin(fmin(tMaxX, tMaxY), tMaxZ);   // max 중에 가장 작은 값 (이탈점)
+    FVectorRegister tX1reg = VectorSIMD::Mul(VectorSIMD::Sub(Boxminreg, Rayoriginreg), invRayDirreg);
+    FVectorRegister tX2reg = VectorSIMD::Mul(VectorSIMD::Sub(Boxmaxreg, Rayoriginreg), invRayDirreg);
+
+    FVectorRegister tminreg = VectorSIMD::Min(tX1reg,tX2reg);
+    FVectorRegister tmaxreg = VectorSIMD::Max(tX1reg, tX2reg);
+
+    FVectorRegister maxXY = VectorSIMD::Max(tminreg, VectorSIMD::SplatY(tminreg));
+    FVectorRegister maxXYZ = VectorSIMD::Max(maxXY, VectorSIMD::SplatZ(tminreg));
+    float tEnter = _mm_cvtss_f32(maxXYZ); 
+
+    FVectorRegister minXY = VectorSIMD::Min(tmaxreg, VectorSIMD::SplatY(tmaxreg));
+    FVectorRegister minXYZ = VectorSIMD::Min(minXY, VectorSIMD::SplatZ(tmaxreg));
+    float tExit = _mm_cvtss_f32(minXYZ);
 
     if (tEnter > tExit)
     {   // 충돌 안함
@@ -56,18 +56,19 @@ bool RayIntersectsTriangle(const FRay& Ray, const FVector& v1, const FVector& v2
 {
     constexpr float epsilon = 1e-5f;
     // 평면 정의
-    FVector edge1 = v2 - v1;
-    FVector edge2 = v3 - v1;
 
-    const FVector normal = FVector::Cross(edge1, edge2);
-    FVector RayVector = Ray.Direction;
-    if (normal.Dot(RayVector) > 0.0f) // 내적의 결과가 양수면 뒷면임
+    FVectorRegister edge1 = VectorSIMD::Sub(VectorSIMD::LoadFloat3(&v2.X), VectorSIMD::LoadFloat3(&v1.X));
+    FVectorRegister edge2 = VectorSIMD::Sub(VectorSIMD::LoadFloat3(&v3.X), VectorSIMD::LoadFloat3(&v1.X));
+
+    const FVectorRegister normal = VectorSIMD::Cross3(edge1, edge2);
+    FVectorRegister RayVector = VectorSIMD::LoadFloat3(&Ray.Direction.X);
+    if (VectorSIMD::Dot(normal,RayVector) > 0.0f) // 내적의 결과가 양수면 뒷면임
     {
         return false;
     }
 
-    const FVector rayCrossVec = FVector::Cross(RayVector, edge2);
-    float det = FVector::Dot(rayCrossVec, edge1);
+    const FVectorRegister rayCrossVec = VectorSIMD::Cross3(RayVector, edge2);
+    float det = VectorSIMD::Dot(rayCrossVec, edge1);
     if (fabs(det) < epsilon)
     {   // 내적의 결과가 0에 가까우면 180도. 평행한 관계
         return false;
@@ -77,23 +78,23 @@ bool RayIntersectsTriangle(const FRay& Ray, const FVector& v1, const FVector& v2
     float invDet = 1.0f / det;
     // 수식: Ray.Origin - v1 = u * edge1 + v * edge2 - t * Ray.Direction
     // 1. u 구하기
-    FVector s = Ray.Origin - v1;
-    float u = invDet * FVector::Dot(s, rayCrossVec);
+    FVectorRegister s = VectorSIMD::Sub(VectorSIMD::LoadFloat3(&Ray.Origin.X), VectorSIMD::LoadFloat3(&v1.X));
+    float u = invDet * VectorSIMD::Dot(s, rayCrossVec);
 
     if (-epsilon > u || epsilon < u - 1)
     {
         return false;
     }
 
-    FVector sCrossE1 = FVector::Cross(s, edge1);
-    float v = invDet * FVector::Dot(RayVector, sCrossE1);
+    FVectorRegister sCrossE1 = VectorSIMD::Cross3(s, edge1);
+    float v = invDet * VectorSIMD::Dot(RayVector, sCrossE1);
         
     if (-epsilon > v || epsilon < u + v - 1)
     {
         return false;
     }
 
-    float t = invDet * FVector::Dot(edge2, sCrossE1);
+    float t = invDet * VectorSIMD::Dot(edge2, sCrossE1);
 
     if (t > epsilon)
     {

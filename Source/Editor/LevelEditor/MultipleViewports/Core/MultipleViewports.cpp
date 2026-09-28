@@ -377,10 +377,17 @@ FFrustumPlanes ExtractFrustumPlanes(const FMatrix& Matrix)
 bool IsAABBInFrustum(const FAABB& Bounds, const FFrustumPlanes& Frustum)
 {
     //assert(Bounds.Extent.X >= 0.0f && Bounds.Extent.Y >= 0.0f && Bounds.Extent.Z >= 0.0f);
+    FVectorRegister Boundreg = VectorSIMD::LoadFloat3(&Bounds.Extent.X);
+    FVectorRegister Centerreg = VectorSIMD::LoadFloat3(&Bounds.Center.X);
     for (const FPlane& Plane : Frustum.Planes)
     {
-        const float Radius = fabsf(Plane.Normal.X) * Bounds.Extent.X + fabsf(Plane.Normal.Y) * Bounds.Extent.Y + fabsf(Plane.Normal.Z) * Bounds.Extent.Z;
-        if (Dot(Plane.Normal, Bounds.Center) + Plane.Distance + Radius < 0.0f)
+        FVectorRegister Planereg = VectorSIMD::LoadFloat3(&Plane.Normal.X);
+        FVectorRegister absPlanereg = VectorSIMD::Abs(Planereg);
+
+        const float Radius = VectorSIMD::Dot(absPlanereg, Boundreg);
+        const float CenterDist = VectorSIMD::Dot(Planereg, Centerreg);
+
+        if (CenterDist + Plane.Distance + Radius < 0.0f)
         {
             return false;
         }
