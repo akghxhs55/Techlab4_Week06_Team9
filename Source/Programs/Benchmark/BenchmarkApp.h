@@ -14,6 +14,8 @@ public:
 
 	bool Init() override;
 	void Tick(float DeltaTime) override;
+	void PreExit() override;
+
 
 private:
 	// ImGui로 프로파일링 오버레이를 그린다.

@@ -18,6 +18,8 @@
 #include "Component/StaticMeshComponent.h"
 #include "Asset/LOD/StaticMeshLODSelector.h"
 
+#include "Math/Frustum.h"
+
 UWorld::~UWorld()
 {
 
@@ -123,12 +125,23 @@ void UWorld::ClearWorld()
 	HTR_LOG(Info, "{} : ", PersistentLevel->GetActorNum());
 }
 
-void UWorld::GatherRenderPackets(TQueue<FRenderPacket>& RenderQueue, const FLODViewContext* LODView)
+void UWorld::GatherRenderPackets(TQueue<FRenderPacket>& RenderQueue, const FLODViewContext* LODView, const FFrustumPlanes* Frustum)
 {
 	for (TObjectIterator<UPrimitiveComponent> Itr; Itr; ++Itr)
 	{
 		if (!*Itr || !Itr->IsVisible())
 			continue;
+
+		if (Frustum)
+		{
+			const FBox Box = Itr->CalcBounds(); 
+			const FAABB Bounds{
+				(Box.Min + Box.Max) * 0.5f,
+				(Box.Max - Box.Min) * 0.5f
+			};
+			if (!IsAABBInFrustum(Bounds, *Frustum))
+				continue;
+		}
 
 		if (LODView)
 		{

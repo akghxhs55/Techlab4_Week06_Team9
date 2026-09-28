@@ -67,14 +67,6 @@ void ApplySplitterGutter(const FVector2 WindowSize, FRect ViewRects[4])
     ViewRects[3] = {RightX, BottomY, RightWidth, BottomHeight};
 }
 
-// 엔진 FBox의 최소·최대점으로 Native AABB 중심과 반크기를 만든다.
-FAABB MakeWorldBounds(const FBox& Value)
-{
-    const FVector Center = (Value.Min + Value.Max) * 0.5f;
-    const FVector Extent = (Value.Max - Value.Min) * 0.5f;
-    return {Center, Extent};
-}
-
 // 양·음 방향 키 상태 차이로 -1~1 축 입력을 만든다.
 float AxisValue(const EKeyCode Positive, const EKeyCode Negative)
 {
