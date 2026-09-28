@@ -27,7 +27,7 @@ bool UGameEngine::Init()
 
 void UGameEngine::Tick(float DeltaTime)
 {
-	World->Tick(DeltaTime);
+	//World->Tick(DeltaTime);
 
 }
 

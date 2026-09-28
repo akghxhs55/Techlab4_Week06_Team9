@@ -12,6 +12,8 @@
 
 #include "Asset/LOD/StaticMeshLODSelector.h"
 
+#include "Serialization/JsonArchive.h"
+
 namespace
 {
 	// 숫자 셀 오른쪽 정렬
@@ -31,17 +33,17 @@ FEngineConfig UBenchmarkEngine::GetConfig() const
 
 bool UBenchmarkEngine::Init()
 {
+	if (!Super::Init())
+		return false;
+
 	ImGuiRenderer = MakeUnique<FImGuiRenderer>();
 	if (!ImGuiRenderer->Init(GetEngineLoop().GetMainWindow()->GetHandle(), GetEngineLoop().GetRenderDevice()->GetDevice(), GetEngineLoop().GetRenderDevice()->GetContext()))
 	{
 		return false;
 	}
 
-	World = FObjectFactory::ConstructObject<UWorld>();
-	World->Init();
-
-	UStaticMesh* Mesh = UAssetManager::LoadObjStaticMesh("Assets/Models/Apple/apple_mid.obj");
-	UStaticMesh* Mesh_2 = UAssetManager::LoadObjStaticMesh("Assets/Models/Apple/bitten_apple_mid.obj");
+	UStaticMesh* Mesh = UAssetManager::LoadObjStaticMesh("Assets/Data/apple_mid.obj");
+	UStaticMesh* Mesh_2 = UAssetManager::LoadObjStaticMesh("Assets/Data/bitten_apple_mid.obj");
 
 	if (!Mesh || !Mesh_2)
 		return false;
@@ -81,24 +83,17 @@ bool UBenchmarkEngine::Init()
 	GenerateFor(Mesh);
 	GenerateFor(Mesh_2);
 
-	constexpr int32 CountX = 50, CountY = 50, CountZ = 20;
-	constexpr float Spacing = 1.0f;
-	for (int32 Z = 0; Z < CountZ; ++Z)
-		for (int32 Y = 0; Y < CountY; ++Y)
-			for (int32 X = 0; X < CountX; ++X)
-			{
-				FTransform Transform = FTransform::Identity;
-				Transform.Location = FVector(X * Spacing, Y * Spacing, Z * Spacing);
+	FJsonArchive::LoadWorld(World, "Scenes/Default.scene");
 
-				AStaticMeshActor* Actor = World->SpawnActor<AStaticMeshActor>(NAME_None, &Transform);
-				Actor->GetStaticMeshComponent()->SetStaticMesh(Y % 2 == 0 ? Mesh : Mesh_2);
-			}
+	World->GetMainCamera()->GetCameraComponent()->SetRelativeLocation(FVector(-50.0f, 0.0f, 0.0f));
 
 	return true;
 }
 
 void UBenchmarkEngine::Tick(float DeltaTime)
 {
+	Super::Tick(DeltaTime);
+
 	FStatRegistry::BeginFrame();
 	{
 		SCOPE_CYCLE_COUNTER(STAT_WorldTick);
@@ -112,7 +107,7 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 
 	UCameraComponent* Camera = World->GetMainCamera()->GetCameraComponent();
 	Camera->SetAspectRatio(static_cast<float>(Width) / Height);
-	const FLODViewContext LODView{Camera->GetViewProjectionMatrix(), Width, Height};
+	const FLODViewContext LODView{ Camera->GetViewProjectionMatrix(), Width, Height };
 
 	TQueue<FRenderPacket> RenderQueue;
 	{
@@ -132,6 +127,11 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 	}
 
 	GetEngineLoop().EndBackbufferPass();
+}
+
+void UBenchmarkEngine::PreExit()
+{
+	ImGuiRenderer->Shutdown();
 }
 
 void UBenchmarkEngine::DrawProfileOverlay()
@@ -204,7 +204,7 @@ namespace
 	{
 		char Text[32];
 		snprintf(Text, sizeof(Text), "%.2f ms", Milliseconds);
-		
+
 		const float TextWidth = ImGui::CalcTextSize(Text).x;
 		const float AvailableWidth = ImGui::GetContentRegionAvail().x;
 
