@@ -42,30 +42,6 @@ void FRenderer::RenderOpaque(TQueue<FRenderPacket>& InQueue, const FMatrix& View
 		InQueue.Dequeue();
 	}
 
-	// 불투명 먼저, 반투명은 먼 것부터
-	std::stable_sort(
-		RenderPackets.begin(),
-		RenderPackets.end(),
-		[](const FRenderPacket& First, const FRenderPacket& Second) -> bool
-		{
-			const bool bFirstTranslucent = First.material->BlendState != EBlendState::Opaque;
-			const bool bSecondTranslucent = Second.material->BlendState != EBlendState::Opaque;
-
-			if (bFirstTranslucent != bSecondTranslucent){return !bFirstTranslucent;}
-			if (bFirstTranslucent){return First.CameraToParticleDistance > Second.CameraToParticleDistance;}
-
-			return false;
-		});
-
-	// 정렬 결과 반투명은 뒤쪽에 모이므로 첫 반투명 위치에서 두 패스를 나눈다.
-	FirstTranslucentIndex = 0;
-	while (FirstTranslucentIndex < RenderPackets.size()
-		&& (RenderPackets[FirstTranslucentIndex].material == nullptr
-			|| RenderPackets[FirstTranslucentIndex].material->BlendState == EBlendState::Opaque))
-	{
-		++FirstTranslucentIndex;
-	}
-
 	DrawPackets(0, FirstTranslucentIndex, ViewProjection);
 }
 
@@ -79,21 +55,31 @@ void FRenderer::RenderTranslucent(const FMatrix& ViewProjection)
 
 // 정렬된 패킷 중 [Begin, End) 범위를 View 행렬과 Section 범위로 그린다.
 void FRenderer::DrawPackets(uint32 Begin, uint32 End, const FMatrix& ViewProjection)
-{
+{	
+	LastMesh = nullptr;
+	LastMaterial = nullptr;
+
+	RenderCommand::BindConstantBuffer(0, PerObjectCB.get(), EShaderBindFlagBits::Vertex);
+
 	for (uint32 Index = Begin; Index < End; ++Index)
 	{
 		const FRenderPacket& RenderPacket = RenderPackets[Index];
 		if (RenderPacket.mesh == nullptr || RenderPacket.material == nullptr) continue;
-		RenderCommand::BindMesh(RenderPacket.mesh);
-		BindMaterial(RenderPacket.material);
-
-		UpdateMaterialParams(RenderPacket);
+		if (RenderPacket.mesh != LastMesh) {
+			RenderCommand::BindMesh(RenderPacket.mesh);
+		}
+		if (RenderPacket.material != LastMaterial) {
+			BindMaterial(RenderPacket.material);
+			UpdateMaterialParams(RenderPacket);
+		}
 		UpdatePerObjectConstants(RenderPacket, ViewProjection);
 
 		RenderCommand::DrawIndexed(
 			RenderPacket.IndexCount ? RenderPacket.IndexCount : RenderPacket.mesh->IndexBuffer->GetIndexCount(),
 			RenderPacket.StartIndex
 		);
+		LastMaterial = RenderPacket.material;
+		LastMesh = RenderPacket.mesh;
 	}
 }
 
@@ -160,5 +146,4 @@ void FRenderer::UpdatePerObjectConstants(const FRenderPacket& RenderPacket, cons
 	Constants.World = RenderPacket.model.GetTransposed();
 
 	RenderCommand::UpdateBufferData(PerObjectCB.get(), &Constants);
-	RenderCommand::BindConstantBuffer(0, PerObjectCB.get(), EShaderBindFlagBits::Vertex);
 }

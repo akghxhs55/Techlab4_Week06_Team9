@@ -38,6 +38,8 @@ private:
 	// 정렬된 RenderPackets에서 반투명 패킷이 시작되는 위치
 	uint32 FirstTranslucentIndex = 0;
 	TUniquePtr<FConstantBuffer> PerObjectCB;
+	UMaterial* LastMaterial;
+	UStaticMesh* LastMesh;
 
 	void DrawPackets(uint32 Begin, uint32 End, const FMatrix& ViewProjection);
 	void BindMaterial(UMaterial* material);
