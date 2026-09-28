@@ -71,6 +71,20 @@ FVector2 FViewportsPanel::GetLocalMousePosition() const
 	return {Mouse.x - ContentOrigin.x, Mouse.y - ContentOrigin.y};
 }
 
+// 엔진 입력 처리는 ImGui NewFrame보다 먼저 실행되므로 현재 OS 커서로 버튼 영역을 검사한다.
+bool FViewportsPanel::IsHovered() const
+{
+	if (bStatResetButtonVisible && FStatOverlay::IsAnyEnabled())
+	{
+		POINT Cursor{};
+		if (::GetCursorPos(&Cursor) &&
+			Cursor.x >= StatResetButtonMin.x && Cursor.x < StatResetButtonMax.x &&
+			Cursor.y >= StatResetButtonMin.y && Cursor.y < StatResetButtonMax.y)
+			return false;
+	}
+	return bHovered;
+}
+
 // 누적 가로 Splitter 이동량을 반환하고 초기화한다.
 float FViewportsPanel::ConsumeHorizontalDrag()
 {
@@ -132,6 +146,7 @@ void FViewportsPanel::OnRender()
 	ContentSize.x = std::max(1.0f, ContentSize.x);
 	ContentSize.y = std::max(1.0f, ContentSize.y);
 	bHovered = ImGui::IsWindowHovered();
+	bStatResetButtonVisible = false;
 
 	// 전체 캔버스를 한 번 확보한 뒤 각 렌더 타깃을 창 DrawList에 직접 그린다.
 	// Image 항목 네 개를 따로 배치하면 ImGui 레이아웃과 클리핑 상태가 삽입 순서에
@@ -247,6 +262,18 @@ void FViewportsPanel::OnRender()
 			RequestedSingleViewIndex = ViewIndex;
 			bHasLayoutRequest = true;
 		}
+		if (ViewportAdapter && ViewIndex == ViewportAdapter->GetEditorViewIndex() &&
+			FStatOverlay::IsAnyEnabled() &&
+			(FStatOverlay::IsEnabled(EStatFlags::Profile) ||
+				FStatRegistry::Find(EditorStats::STAT_PickingTime)))
+		{
+			ImGui::SameLine();
+			if (ImGui::SmallButton("Reset Stats"))
+				FStatRegistry::Reset();
+			StatResetButtonMin = ImGui::GetItemRectMin();
+			StatResetButtonMax = ImGui::GetItemRectMax();
+			bStatResetButtonVisible = true;
+		}
 		ImGui::PopID();
 	}
 
@@ -327,8 +354,8 @@ void FViewportsPanel::DrawStatOverlay(ImDrawList* DrawList, const ImVec2& ViewMi
 		ProfileLines.Add({ "Picking", TitleColor });
 		FProfileStatLine Line{"  Time (ms)", ValueColor};
 		Line.Values[0] = std::format("Last: {:.2f}", PickingData->GetLastMs());
-		Line.Values[1] = std::format("Num Attempts: {}", PickingData->CallCount);
-		Line.Values[2] = std::format("Accumulated: {:.2f}", PickingData->GetTotalMs());
+		Line.Values[1] = std::format("Attempts: {}", PickingData->CallCount);
+		Line.Values[2] = std::format("Acc.: {:.2f}", PickingData->GetTotalMs());
 		ProfileLines.Add(Line);
 	}
 

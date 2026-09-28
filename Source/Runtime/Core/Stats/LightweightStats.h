@@ -87,6 +87,7 @@ public:
 
 	static void Reset()
 	{
+		PendingStats.Reset();
 		for (auto& [Name, Data] : Stats)
 		{
 			Data = FCycleStatData{};

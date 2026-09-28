@@ -24,7 +24,7 @@ public:
 
 	FVector2 GetContentSize() const { return {ContentSize.x, ContentSize.y}; }
 	FVector2 GetLocalMousePosition() const;
-	bool IsHovered() const { return bHovered; }
+	bool IsHovered() const;
 
 	float ConsumeHorizontalDrag();
 	float ConsumeVerticalDrag();
@@ -58,6 +58,9 @@ private:
 	ImVec2 ContentOrigin{};
 	ImVec2 ContentSize{1.0f, 1.0f};
 	bool bHovered = false;
+	bool bStatResetButtonVisible = false;
+	ImVec2 StatResetButtonMin{};
+	ImVec2 StatResetButtonMax{};
 	float PendingHorizontalDrag = 0.0f;
 	float PendingVerticalDrag = 0.0f;
 	// 누른 뒤 커서가 Splitter 영역을 벗어나도 버튼을 놓을 때까지 드래그를 유지한다.
