@@ -6,11 +6,11 @@ template <typename T>
 class TBVH
 {
 public:
-	using FBoundsGetter = std::function<FBox(T const&)>;
+	using FBoundsGetter = std::function<FBox(const T&)>;
 
 	explicit TBVH(FBoundsGetter BoundsGetter) : BoundsGetter(std::move(BoundsGetter)) {}
 
-	void Build(std::span<T const> InElements);
+	void Build(std::span<const T> InElements);
 
 	// 루트노드부터 Bounding Box 재계산
 	void Refit();

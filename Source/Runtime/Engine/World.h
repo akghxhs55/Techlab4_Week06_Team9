@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "ObjectSystem/Object.h"
 #include "ObjectSystem/Class.h"
@@ -9,8 +9,8 @@
 #include "Render/Renderer.h"
 #include "PathTracker.h"
 #include "Math/Frustum.h"
+#include "Math/BVH.h"
 #include "Engine/Scene.h"
-
 #include "Camera/CameraActor.h"
 
 //class ACameraActor;

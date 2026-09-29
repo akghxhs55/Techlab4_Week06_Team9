@@ -23,6 +23,7 @@
 
 #include "Input/InputSystem.h"
 #include "Collision/HitResult.h"
+#include "Core/Stats/EditorStats.h"
 
 namespace
 {
@@ -182,6 +183,7 @@ void UBenchmarkEngine::UpdateGizmoAndPicking()
 	if (FInputSystem::IsMousePressed(EMouseButton::Left) &&
 		!Gizmo->IsUsing() && Gizmo->GetHoveredAxis() < 0)
 	{
+		SCOPE_CYCLE_COUNTER(EditorStats::STAT_PickingTime_Name);
 		FHitResult Hit;
 		SelectPrimitive(World->LineTraceSingle(Ray, Hit) ? Hit.HitComponent : nullptr);
 	}
@@ -306,6 +308,9 @@ void UBenchmarkEngine::DrawProfileOverlay()
 
 			for (const auto& [Name, Data] : FStatRegistry::GetAll())
 			{
+				if (TStatId{ Name } == EditorStats::STAT_PickingTime)
+					continue;
+
 				ImGui::TableNextRow();
 
 				ImGui::TableSetColumnIndex(0);
@@ -322,6 +327,11 @@ void UBenchmarkEngine::DrawProfileOverlay()
 			}
 
 			ImGui::EndTable();
+		}
+
+		if (const FCycleStatData* PickingData = FStatRegistry::Find(EditorStats::STAT_PickingTime))
+		{
+			ImGui::Text("Picking Time - Last: %.2f ms, Attempts: %d, Acc.: %.2f ms", PickingData->GetLastMs(), PickingData->CallCount, PickingData->GetTotalMs());
 		}
 	}
 	ImGui::End();

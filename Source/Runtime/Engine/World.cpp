@@ -1,4 +1,4 @@
-#include "EnginePCH.h"
+﻿#include "EnginePCH.h"
 #include "World.h"
 #include "Level.h"
 
@@ -330,19 +330,32 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 	FBillboardTraceTransform ResolveBillboard, const void* ViewContext)
 {
 	OutHit = FHitResult();
-	for (TObjectIterator<UPrimitiveComponent> It; It; ++It)
+
+	const auto TraceComponent = [&](UPrimitiveComponent* Component)
 	{
-		if (!It->IsVisible() || !It->GetOwner() || It->GetOwner()->GetWorld() != this) continue;
+		if (!Component || !Component->IsVisible())
+			return;
+
 		FHitResult Hit;
-		bool bHit = false;
-		UBillboardComponent* Billboard = Cast<UBillboardComponent>(*It);
+		bool bHit;
+
+		UBillboardComponent* Billboard = Cast<UBillboardComponent>(Component);
 		if (Billboard && ResolveBillboard)
 			bHit = Billboard->LineTraceComponentForView(WorldRay, Hit, ResolveBillboard(*Billboard, ViewContext));
 		else
-			bHit = It->LineTraceComponent(WorldRay, Hit);
+			bHit = Component->LineTraceComponent(WorldRay, Hit);
 		if (bHit && Hit.HitComponent && Hit.Distance >= 0.0f && Hit.Distance < OutHit.Distance)
 			OutHit = Hit;
-	}
+	};
+
+	Scene.BVH.Query(
+		[&](const FBox& Bounds)
+		{
+			float BoundsT;
+			return RayIntersectsAABB(WorldRay, Bounds.Min, Bounds.Max, BoundsT) && BoundsT <= OutHit.Distance;
+		}, 
+		TraceComponent);
+
 	return OutHit.HitComponent != nullptr;
 }
 
