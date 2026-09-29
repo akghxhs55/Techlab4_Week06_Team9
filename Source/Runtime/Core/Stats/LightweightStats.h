@@ -61,33 +61,27 @@ struct FCycleStatData
 	}
 };
 
-struct FPendingCycleStat
-{
-	TStatId StatId;
-	uint64 Cycles;
-};
-
 // UE는 이 집계를 외부 프로파일러(Insights)에 맡기지만 우리는 직접 모은다.
 class FStatRegistry
 {
 public:
 	static void EndFrame()
 	{
-		for (const auto& [Name, Cycles]: PendingStats)
+		for (const auto& [Name, Cycles]: PendingStatCycles)
 		{
-			Stats[Name.GetName()].PushFrame(Cycles);
+			Stats[Name].PushFrame(Cycles);
 		}
-		PendingStats.Reset();
+		PendingStatCycles.Reset();
 	}
 
 	static void AddCycles(TStatId StatId, uint64 Cycles)
 	{
-		PendingStats.Add({ StatId, Cycles });
+		PendingStatCycles[StatId.GetName()] += Cycles;
 	}
 
 	static void Reset()
 	{
-		PendingStats.Reset();
+		PendingStatCycles.Reset();
 		for (auto& [Name, Data] : Stats)
 		{
 			Data = FCycleStatData{};
@@ -99,7 +93,7 @@ public:
 
 private:
 	inline static TMap<const char*, FCycleStatData> Stats;
-	inline static TArray<FPendingCycleStat> PendingStats;
+	inline static TMap<const char*, uint64> PendingStatCycles;
 };
 
 // 생성 시 시작 사이클을 기록하고, 스코프를 벗어날 때 경과 사이클을 FStatRegistry에 보고한다.
