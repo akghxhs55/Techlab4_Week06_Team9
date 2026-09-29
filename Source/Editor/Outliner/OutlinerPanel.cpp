@@ -1,4 +1,4 @@
-#include "EnginePCH.h"
+﻿#include "EnginePCH.h"
 #include "Editor/Outliner/OutlinerPanel.h"
 
 #include "Engine/Level.h"
@@ -68,12 +68,17 @@ void FOutlinerPanel::DrawActors(ULevel* Level)
         { EPrimitiveType::Plane,  "Plane" }
     };
 
-    for (AActor* Actor : Actors)
-    {
-        if (!Actor)
-            continue;
+    ImGuiListClipper Clipper;
+	Clipper.Begin(Actors.Num(), ImGui::GetTextLineHeightWithSpacing());
 
-        DrawActorNode(Actor);
+    while (Clipper.Step())
+    {
+		for (int32 Index = Clipper.DisplayStart; Index < Clipper.DisplayEnd; ++Index)
+		{
+			AActor* Actor = Actors[Index];
+			if (Actor)
+				DrawActorNode(Actor);
+		}
     }
 
     if (PendingDeleteActor)
