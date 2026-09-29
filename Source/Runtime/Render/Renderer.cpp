@@ -58,7 +58,7 @@ void FRenderer::RenderQueueSorting(TQueue<FRenderPacket>& InQueue, const FMatrix
 		InQueue.Dequeue();
 	}
 
-	std::stable_sort(
+	std::sort(
 		RenderPackets.begin(),
 		RenderPackets.end(),
 		[](const FRenderPacket& First, const FRenderPacket& Second) -> bool
