@@ -17,7 +17,7 @@ namespace
 {
     // 원본 LOD0의 삼각형 수에 곱한다.
     constexpr double TargetRatios[4] = {
-        1.0, 0.75, 0.6, 0.3
+        1.0, 0.70, 0.25, 0.1
     };
 
     struct FQuadric
