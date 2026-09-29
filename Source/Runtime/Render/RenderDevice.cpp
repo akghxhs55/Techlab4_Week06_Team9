@@ -39,8 +39,11 @@ FRenderDevice::FRenderDevice()
 		HTR_LOG(Error, "Failed to Create D3D11Device & DeviceContext!");
 	}
 
-	ComPtr<IDXGIDevice> DXGIDevice;
-	Device->QueryInterface(IID_PPV_ARGS(DXGIDevice.GetAddressOf()));
+	ComPtr<IDXGIDevice1> DXGIDevice;
+	if (SUCCEEDED(Device->QueryInterface(IID_PPV_ARGS(DXGIDevice.GetAddressOf()))))
+	{
+		DXGIDevice->SetMaximumFrameLatency(1);
+	}
 	ComPtr<IDXGIAdapter> DXGIAdapter;
 	DXGIDevice->GetParent(IID_PPV_ARGS(DXGIAdapter.GetAddressOf()));
 	DXGIAdapter->GetParent(IID_PPV_ARGS(DXGIFactory.GetAddressOf()));
