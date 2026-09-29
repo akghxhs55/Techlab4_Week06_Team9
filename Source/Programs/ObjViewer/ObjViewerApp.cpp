@@ -161,7 +161,7 @@ void UObjViewerEngine::RenderFrame()
 	const FMatrix View = MakeLookAt(GetCameraEye(), CameraTarget);
 	const FMatrix Projection = MakePerspective(CameraFovDegrees, Aspect, CameraNearZ, CameraFarZ);
 
-	TQueue<FRenderPacket> RenderQueue;
+	TArray<FRenderPacket> RenderQueue;
 	BuildRenderQueue(RenderQueue);
 
 	GetEngineLoop().BeginBackbufferPass();
@@ -204,7 +204,7 @@ void UObjViewerEngine::UpdateWindowTitle()
 	SetWindowTextA(GetEngineLoop().GetMainWindow()->GetHandle(), Title.c_str());
 }
 
-void UObjViewerEngine::BuildRenderQueue(TQueue<FRenderPacket>& OutQueue) const
+void UObjViewerEngine::BuildRenderQueue(TArray<FRenderPacket>& OutArray) const
 {
 	if (!Mesh)
 	{
@@ -219,7 +219,7 @@ void UObjViewerEngine::BuildRenderQueue(TQueue<FRenderPacket>& OutQueue) const
 		Packet.material = Mesh->GetMaterial(Section.MaterialSlotIndex);
 		Packet.StartIndex = Section.StartIndex;
 		Packet.IndexCount = Section.IndexCount;
-		OutQueue.Enqueue(Packet);
+		OutArray.Add(Packet);
 	}
 }
 

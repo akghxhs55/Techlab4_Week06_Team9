@@ -56,13 +56,13 @@ UMaterial* UStaticMeshComponent::GetDefaultMaterial(int32 SlotIndex) const
 }
 
 // 기존 호출 경로는 LOD0를 사용한다.
-void UStaticMeshComponent::SubmitToRenderQueue(TQueue<FRenderPacket>& RenderQueue)
+void UStaticMeshComponent::SubmitToRenderQueue(TArray<FRenderPacket>& RenderQueue)
 {
     SubmitToRenderQueue(RenderQueue, 0);
 }
 
 // 지정한 LOD의 Section으로 패킷을 만든다.
-void UStaticMeshComponent::SubmitToRenderQueue(TQueue<FRenderPacket>& RenderQueue,uint32 LODIndex)
+void UStaticMeshComponent::SubmitToRenderQueue(TArray<FRenderPacket>& RenderQueue,uint32 LODIndex)
 {
     if (!StaticMesh) return;
 
@@ -89,7 +89,7 @@ void UStaticMeshComponent::SubmitToRenderQueue(TQueue<FRenderPacket>& RenderQueu
 
         // Renderer가 이 번호의 GPU 버퍼를 바인딩한다.
         Packet.LODIndex = static_cast<uint8>(LODIndex);
-        RenderQueue.Enqueue(Packet);
+        RenderQueue.Add(Packet);
     }
 }
 

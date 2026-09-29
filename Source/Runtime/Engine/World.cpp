@@ -27,6 +27,8 @@ DECLARE_CYCLE_STAT("Update All Transforms", STAT_UpdateAllTransforms); // 각 Tr
 DECLARE_CYCLE_STAT("Gather Render Packets", STAT_GatherRenderPackets);
 DECLARE_CYCLE_STAT("Frustum Cull", STAT_FrustumCull);
 DECLARE_CYCLE_STAT("Gather Elements", STAT_GatherElements);
+DECLARE_CYCLE_STAT("Gather - LOD", STAT_GatherLOD);
+DECLARE_CYCLE_STAT("Gather - Submit", STAT_GatherSubmit);
 
 
 
@@ -148,11 +150,11 @@ void UWorld::ClearWorld()
 	HTR_LOG(Info, "{} : ", PersistentLevel->GetActorNum());
 }
 
-void UWorld::GatherRenderPackets(TQueue<FRenderPacket>& RenderQueue, const FLODViewContext* LODView, const FFrustumPlanes* Frustum)
+void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODViewContext* LODView, const FFrustumPlanes* Frustum)
 {
 	TArray<FPrimitiveSceneProxy*> VisibleProxies;
 	{
-		SCOPE_CYCLE_COUNTER(STAT_FrustumCull);          
+		SCOPE_CYCLE_COUNTER(STAT_FrustumCull);
 		const int32 Count = Scene.Proxies.Num();
 		Scene.BVH.Query(
 			[&](const FBox& Bounds) {
@@ -163,6 +165,8 @@ void UWorld::GatherRenderPackets(TQueue<FRenderPacket>& RenderQueue, const FLODV
 					VisibleProxies.Add(Component->GetSceneProxy());
 			});
 	}
+
+	RenderQueue.Reserve(VisibleProxies.Num());
 
 	{
 		SCOPE_CYCLE_COUNTER(STAT_GatherElements);
@@ -182,7 +186,10 @@ void UWorld::GatherRenderPackets(TQueue<FRenderPacket>& RenderQueue, const FLODV
 							Proxy->GetBounds(),
 							*LODView);
 
-						Component->SubmitToRenderQueue(RenderQueue, LOD);
+						{
+							//SCOPE_CYCLE_COUNTER(STAT_GatherSubmit);
+							Component->SubmitToRenderQueue(RenderQueue, LOD);
+						}
 						continue;
 					}
 				}

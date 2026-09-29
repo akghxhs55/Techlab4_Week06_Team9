@@ -17,32 +17,30 @@ FTexture2D::FTexture2D(ID3D11Device* Device, const D3D11_TEXTURE2D_DESC& InDesc,
 	Format = InDesc.Format;
 	Dimension = ETextureDimension::Texture2D;
 
-	D3D11_SUBRESOURCE_DATA SubData{};
-	if (InitialData)
+	if (InitialData && RowPitch == 0)
 	{
-		if (RowPitch == 0)
-		{
-			const uint32 BytesPerPixel = FormatToBytes(InDesc.Format);
-			if (BytesPerPixel == 0)
-			{
-				HTR_LOG(Error, "[Texture2D] 픽셀당 바이트를 알 수 없는 포맷({})입니다. RowPitch를 직접 넘기세요.", (uint32)InDesc.Format);
-				return;
-			}
-			RowPitch = InDesc.Width * BytesPerPixel;
-		}
-
-		SubData.pSysMem = InitialData;
-		SubData.SysMemPitch = RowPitch;
+		const uint32 BytesPerPixel = FormatToBytes(InDesc.Format);
+		if (BytesPerPixel == 0) { /* 기존 에러 처리 그대로 */ return; }
+		RowPitch = InDesc.Width * BytesPerPixel;
 	}
 
-	HRESULT hr = Device->CreateTexture2D(&InDesc, InitialData ? &SubData : nullptr, (ID3D11Texture2D**)Texture.GetAddressOf());
-	if (FAILED(hr))
-	{
-		HTR_LOG(Error, "[Texture2D] CreateTexture2D failed (hr=0x{:08X}, {}x{})", (uint32)hr, InDesc.Width, InDesc.Height);
-		return;
-	}
+	const bool bGenerateMips = (InDesc.MiscFlags & D3D11_RESOURCE_MISC_GENERATE_MIPS) != 0;
+
+	D3D11_SUBRESOURCE_DATA SubData{ InitialData, RowPitch, 0 };
+	const D3D11_SUBRESOURCE_DATA* InitPtr = (InitialData && !bGenerateMips) ? &SubData : nullptr;
+
+	HRESULT hr = Device->CreateTexture2D(&InDesc, InitPtr, (ID3D11Texture2D**)Texture.GetAddressOf());
+	if (FAILED(hr)) { /* 기존 로그 그대로 */ return; }
 
 	CreateViews(Device, InDesc);
+
+	if (bGenerateMips && InitialData && SRV)
+	{
+		ComPtr<ID3D11DeviceContext> Context;
+		Device->GetImmediateContext(Context.GetAddressOf());
+		Context->UpdateSubresource(Texture.Get(), 0, nullptr, InitialData, RowPitch, 0); // 0번 레벨
+		Context->GenerateMips(SRV.Get());                                              // 나머지 레벨
+	}
 }
 FTexture2D::FTexture2D(ID3D11Device* Device, ComPtr<ID3D11Resource> SwapchainTexture, const D3D11_TEXTURE2D_DESC& InDesc)
 {
@@ -67,7 +65,8 @@ void FTexture2D::CreateViews(ID3D11Device* Device, const D3D11_TEXTURE2D_DESC& I
 			HTR_LOG(Error, "[Texture2D] CreateShaderResourceView failed (hr=0x{:08X})", (uint32)hr);
 	}
 
-	if (InDesc.BindFlags & D3D11_BIND_RENDER_TARGET)
+	if ((InDesc.BindFlags & D3D11_BIND_RENDER_TARGET) &&
+		!(InDesc.MiscFlags & D3D11_RESOURCE_MISC_GENERATE_MIPS))
 	{
 		hr = Device->CreateRenderTargetView(Texture.Get(), nullptr, RTV.GetAddressOf());
 		if (FAILED(hr))

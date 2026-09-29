@@ -305,11 +305,11 @@ void UAssetManager::Shutdown()
 
 void UAssetManager::RegisterAsset(const FString& Key, URenderAsset* Asset)
 {
-	Asset->SetPath(Key); 
+	Asset->SetPath(Key);
 	AssetMap[Key] = Asset;
 }
 
-UTexture2D* UAssetManager::LoadTexture(const FString& InPath)
+UTexture2D* UAssetManager::LoadTexture(const FString& InPath, bool bGenerateMips)
 {
 	if (URenderAsset** Found = AssetMap.FindOrNull(InPath))
 	{
@@ -322,12 +322,13 @@ UTexture2D* UAssetManager::LoadTexture(const FString& InPath)
 	D3D11_TEXTURE2D_DESC Desc{};
 	Desc.Width = Data.Width;
 	Desc.Height = Data.Height;
-	Desc.MipLevels = 1;
 	Desc.ArraySize = 1;
 	Desc.Format = Data.Format;              // 로더가 정한 포맷 (.hdr이면 float)
 	Desc.SampleDesc.Count = 1;
-	Desc.Usage = D3D11_USAGE_IMMUTABLE;
-	Desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+	Desc.MipLevels = bGenerateMips ? 0 : 1;
+	Desc.Usage = bGenerateMips ? D3D11_USAGE_DEFAULT : D3D11_USAGE_IMMUTABLE;
+	Desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | (bGenerateMips ? D3D11_BIND_RENDER_TARGET : 0);
+	Desc.MiscFlags = bGenerateMips ? D3D11_RESOURCE_MISC_GENERATE_MIPS : 0;
 
 	TUniquePtr<FTexture2D> Resource = RenderCommand::CreateTexture2D(Desc, Data);
 
@@ -349,7 +350,7 @@ UFont* UAssetManager::LoadFontAtlas(const FString& JsonPath, const FString& Atla
 		return nullptr;
 	}
 
-	Font->AtlasTexture = LoadTexture(AtlasTexturePath);
+	Font->AtlasTexture = LoadTexture(AtlasTexturePath, false);
 	if (!Font->AtlasTexture)
 	{
 		return nullptr;
@@ -378,7 +379,7 @@ UStaticMesh* UAssetManager::LoadObjStaticMesh(const FString& Path)
 	return Mesh;
 }
 
-FLODGenerateResult UAssetManager::GenerateStaticMeshLODs(UStaticMesh& Mesh,const FLODGenerateRequest& Request)
+FLODGenerateResult UAssetManager::GenerateStaticMeshLODs(UStaticMesh& Mesh, const FLODGenerateRequest& Request)
 {
 	TArray<FStaticMeshData> Generated;
 	FLODGenerateResult Result = FStaticMeshLODGenerator::Generate(Mesh.GetMeshData(), Generated);
@@ -404,14 +405,14 @@ FLODGenerateResult UAssetManager::GenerateStaticMeshLODs(UStaticMesh& Mesh,const
 		Resource.Data = std::move(Data);
 
 		Resource.VertexBuffer = RenderCommand::CreateStaticVertexBuffer(
-				Resource.Data.Vertices.GetData(),
-				sizeof(FVertexPNCT) *
-				static_cast<uint32>(Resource.Data.Vertices.Num()),
-				sizeof(FVertexPNCT));
+			Resource.Data.Vertices.GetData(),
+			sizeof(FVertexPNCT) *
+			static_cast<uint32>(Resource.Data.Vertices.Num()),
+			sizeof(FVertexPNCT));
 
 		Resource.IndexBuffer = RenderCommand::CreateStaticIndexBuffer(
-				Resource.Data.Indices.GetData(),
-				static_cast<uint32>(Resource.Data.Indices.Num()));
+			Resource.Data.Indices.GetData(),
+			static_cast<uint32>(Resource.Data.Indices.Num()));
 
 		if (!Resource.VertexBuffer || !Resource.IndexBuffer)
 		{

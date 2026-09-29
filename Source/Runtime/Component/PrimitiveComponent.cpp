@@ -49,7 +49,7 @@ void UPrimitiveComponent::BeginPlay()
 }
 
 
-void UPrimitiveComponent::SubmitToRenderQueue(TQueue<FRenderPacket>& RenderQueue)
+void UPrimitiveComponent::SubmitToRenderQueue(TArray<FRenderPacket>& RenderQueue)
 {
 	//if (Mesh && Material)
 	//{

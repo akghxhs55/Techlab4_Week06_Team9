@@ -49,7 +49,7 @@ bool UBillboardComponent::LineTraceComponentForView(
 }
 
 // 기본 카메라용 행렬을 구해 공통 렌더 패킷 제출 경로로 전달한다.
-void UBillboardComponent::SubmitToRenderQueue(TQueue<FRenderPacket>& RenderQueue)
+void UBillboardComponent::SubmitToRenderQueue(TArray<FRenderPacket>& RenderQueue)
 {
 	// 렌더러가 역참조하므로 둘 중 하나라도 없으면 보내지 않는다
 	if (QuadMesh == nullptr || Material == nullptr)
@@ -63,7 +63,7 @@ void UBillboardComponent::SubmitToRenderQueue(TQueue<FRenderPacket>& RenderQueue
 }
 
 // View별 Billboard 행렬과 Material을 렌더 패킷에 담는다.
-void UBillboardComponent::SubmitToRenderQueue(TQueue<FRenderPacket>& RenderQueue, const FMatrix& BillboardWorldMatrix)
+void UBillboardComponent::SubmitToRenderQueue(TArray<FRenderPacket>& RenderQueue, const FMatrix& BillboardWorldMatrix)
 {
 	if (QuadMesh == nullptr || Material == nullptr)
 		return;
@@ -72,7 +72,7 @@ void UBillboardComponent::SubmitToRenderQueue(TQueue<FRenderPacket>& RenderQueue
 	Packet.mesh = QuadMesh;
 	Packet.material = Material;
 	Packet.model = BillboardWorldMatrix;
-	RenderQueue.Enqueue(Packet);
+	RenderQueue.Add(Packet);
 }
 
 void UBillboardComponent::Serialize(json& Handle, bool bIsLoading)

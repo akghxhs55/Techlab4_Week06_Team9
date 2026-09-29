@@ -277,7 +277,7 @@ void UEditorEngine::RenderMultipleViewports()
 		if (!bActive)
 			continue;
 
-		TQueue<FRenderPacket> RenderQueue;
+		TArray<FRenderPacket> RenderQueue;
 		{
 			SCOPE_CYCLE_COUNTER(STAT_BuildRenderQueue);
 			MultipleViewportsAdapter.BuildRenderQueue(ViewIndex, RenderQueue);
@@ -350,7 +350,7 @@ void UEditorEngine::UpdateGizmoAndPicking()
 }
 
 // View 행렬로 Scene·Grid·Gizmo·텍스트·Outline을 렌더한다.
-void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& ViewRenderingInfo, const FMatrix& ViewProjection, const FVector& ViewCameraLocation, const FVector& ViewCameraForward, TQueue<FRenderPacket>& RenderQueue)
+void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& ViewRenderingInfo, const FMatrix& ViewProjection, const FVector& ViewCameraLocation, const FVector& ViewCameraForward, TArray<FRenderPacket>& RenderQueue)
 {
 	RenderCommand::BeginRenderPass(ViewRenderingInfo);
 	if (SettingsPanel->GetSettings().bDrawBatchLine)

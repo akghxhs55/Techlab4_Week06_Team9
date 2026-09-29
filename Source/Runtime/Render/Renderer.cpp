@@ -23,13 +23,13 @@ bool FRenderer::Init()
 }
 
 // 카메라의 ViewProjection을 공통 렌더 경로로 전달한다.
-void FRenderer::RenderAll(TQueue<FRenderPacket>& InQueue, UCameraComponent* CameraComponent)
+void FRenderer::RenderAll(TArray<FRenderPacket>& InQueue, UCameraComponent* CameraComponent)
 {
 	RenderAll(InQueue, CameraComponent->GetViewProjectionMatrix());
 }
 
 // 불투명 우선·반투명 거리순으로 정렬해 View 행렬과 Section 범위로 그린다.
-void FRenderer::RenderAll(TQueue<FRenderPacket>& InQueue, const FMatrix& ViewProjection)
+void FRenderer::RenderAll(TArray<FRenderPacket>& InQueue, const FMatrix& ViewProjection)
 {
 	RenderQueueSorting(InQueue, ViewProjection);
 	RenderOpaque(ViewProjection);
@@ -49,17 +49,12 @@ void FRenderer::RenderTranslucent(const FMatrix& ViewProjection)
 	FirstTranslucentIndex = 0;
 }
 
-void FRenderer::RenderQueueSorting(TQueue<FRenderPacket>& InQueue, const FMatrix& ViewProjection)
+void FRenderer::RenderQueueSorting(TArray<FRenderPacket>& InQueue, const FMatrix& ViewProjection)
 {
 	SCOPE_CYCLE_COUNTER(STAT_RenderQueueSorting);
 
-	RenderPackets.Reset();
-
-	while (InQueue.IsEmpty() == false)
-	{
-		RenderPackets.Add(InQueue.Peek());
-		InQueue.Dequeue();
-	}
+	std::swap(RenderPackets, InQueue);
+	InQueue.Reset();
 
 	std::sort(
 		RenderPackets.begin(),

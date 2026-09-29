@@ -27,8 +27,8 @@ public:
 	virtual FString GetMaterialSlotName(int32 SlotIndex) const override;
 	virtual UMaterial* GetDefaultMaterial(int32 SlotIndex) const override;
 
-	void SubmitToRenderQueue(TQueue<FRenderPacket>& Queue) override;
-	void SubmitToRenderQueue(TQueue<FRenderPacket>& Queue, uint32 LODIndex);
+	void SubmitToRenderQueue(TArray<FRenderPacket>& Queue) override;
+	void SubmitToRenderQueue(TArray<FRenderPacket>& Queue, uint32 LODIndex);
 
 private:
 	UStaticMesh* StaticMesh = nullptr;

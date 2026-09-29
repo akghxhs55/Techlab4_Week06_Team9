@@ -636,7 +636,7 @@ std::size_t FMultipleViewportsAdapter::GetVisibleObjectCount(const int32 ViewInd
 }
 
 // 가시 ID를 컴포넌트로 역매핑해 큐를 구성한다. 생존 목록·상수는 프레임 공통, Billboard·정렬 거리는 View별이다.
-void FMultipleViewportsAdapter::BuildRenderQueue(const int32 ViewIndex, TQueue<FRenderPacket>& OutQueue)
+void FMultipleViewportsAdapter::BuildRenderQueue(const int32 ViewIndex, TArray<FRenderPacket>& OutQueue)
 {
     OutQueue.Reset();
     if (!IsViewActive(ViewIndex)) return;

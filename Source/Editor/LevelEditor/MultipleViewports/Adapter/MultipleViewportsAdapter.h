@@ -90,7 +90,7 @@ public:
     bool HasCapturedParticle() const { return bCapturedParticle; }
 
     // View별 가시 ID를 엔진 컴포넌트로 역매핑해 렌더 큐를 구성한다.
-    void BuildRenderQueue(int32 ViewIndex, TQueue<FRenderPacket>& OutQueue);
+    void BuildRenderQueue(int32 ViewIndex, TArray<FRenderPacket>& OutQueue);
     // 활성 View Ray를 World·Component 피킹으로 전달하고 마지막 결과를 보관한다.
     FPickHit PickActiveView(FVector2 LocalMousePosition, UWorld& World);
     // 마지막 Hit Component의 Owner를 찾아 Outliner 선택에 반영한다.

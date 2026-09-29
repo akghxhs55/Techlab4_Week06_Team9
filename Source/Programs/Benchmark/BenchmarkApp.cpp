@@ -213,6 +213,7 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 	const FMatrix Projection = Camera->GetProjectionMatrix();
 	const FFrustumPlanes Frustum = ExtractFrustumPlanes(ViewProjection);
 
+
 	const float ScaleX = Projection.M[1][0];
 	const float ScaleY = Projection.M[2][1];
 
@@ -228,7 +229,7 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 	LODView.NearZ = Camera->GetNearZ();
 	LODView.bOrthographic = Camera->GetIsOrthogonal();
 
-	TQueue<FRenderPacket> RenderQueue;
+	TArray<FRenderPacket> RenderQueue;
 	{
 		World->GatherRenderPackets(RenderQueue, &LODView, &Frustum);
 	}

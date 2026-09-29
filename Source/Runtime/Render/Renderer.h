@@ -21,10 +21,10 @@ public:
 	bool Init();
 
 	// 기존 단일 카메라의 ViewProjection으로 렌더 큐 전체를 그린다.
-	void RenderAll(TQueue<FRenderPacket>& InQueue, UCameraComponent* CameraComponent);
+	void RenderAll(TArray<FRenderPacket>& InQueue, UCameraComponent* CameraComponent);
 
 	// Adapter가 계산한 ViewProjection을 직접 받아 View별 렌더 큐를 그린다.
-	void RenderAll(TQueue<FRenderPacket>& InQueue, const FMatrix& ViewProjection);
+	void RenderAll(TArray<FRenderPacket>& InQueue, const FMatrix& ViewProjection);
 
 	// 큐를 정렬해 불투명 패킷만 그린다. 반투명은 RenderTranslucent 호출 전까지 보관한다.
 	void RenderOpaque(const FMatrix& ViewProjection);
@@ -33,7 +33,7 @@ public:
 	void RenderTranslucent(const FMatrix& ViewProjection);
 
 	// 큐를 Material, Opaque, Mesh에 따라 정렬한다
-	void RenderQueueSorting(TQueue<FRenderPacket>& InQueue, const FMatrix& ViewProjection);
+	void RenderQueueSorting(TArray<FRenderPacket>& InQueue, const FMatrix& ViewProjection);
 
 private:
 	// FIFO 소비용 배열의 용량만 재사용하며 매 View의 패킷 값은 새로 채운다.
