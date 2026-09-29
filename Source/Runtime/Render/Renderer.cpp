@@ -13,6 +13,7 @@
 #include <algorithm>
 
 DECLARE_CYCLE_STAT("Draw Render Packets", STAT_DrawRenderPackets);
+DECLARE_CYCLE_STAT("Render Queue Sorting", STAT_RenderQueueSorting);
 
 bool FRenderer::Init()
 {
@@ -50,6 +51,8 @@ void FRenderer::RenderTranslucent(const FMatrix& ViewProjection)
 
 void FRenderer::RenderQueueSorting(TQueue<FRenderPacket>& InQueue, const FMatrix& ViewProjection)
 {
+	SCOPE_CYCLE_COUNTER(STAT_RenderQueueSorting);
+
 	RenderPackets.Reset();
 
 	while (InQueue.IsEmpty() == false)
