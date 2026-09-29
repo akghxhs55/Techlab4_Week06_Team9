@@ -24,34 +24,34 @@ namespace
 		if (!MeshData || !MeshData->Vertices.Num() || !MeshData->Indices.Num())
 			return nullptr;
 
-		TUniquePtr<FVertexBuffer> VB = RenderCommand::CreateStaticVertexBuffer(MeshData->Vertices.GetData(), sizeof(FVertexPNCT) * static_cast<uint32>(MeshData->Vertices.size()), sizeof(FVertexPNCT));
-		TUniquePtr<FIndexBuffer> IB = RenderCommand::CreateStaticIndexBuffer(MeshData->Indices.GetData(), static_cast<uint32>(MeshData->Indices.size()));
-
-		if (VB == nullptr || IB == nullptr) return nullptr;
-
-		UStaticMesh* Mesh = FObjectFactory::ConstructObject<UStaticMesh>();
-
-		// Cooked Data 보관
-		Mesh->MeshData = *MeshData;
+		FStaticMeshData Optimized = *MeshData;
 
 		// Mesh에 MaterialSlot 없을 경우 Default Material 할당
-		if (Mesh->MeshData.MaterialSlots.IsEmpty())
+		if (Optimized.MaterialSlots.IsEmpty())
 		{
 			FStaticMaterialSlot DefaultSlot;
 			DefaultSlot.Name = "Default";
-			Mesh->MeshData.MaterialSlots.Add(DefaultSlot);
+			Optimized.MaterialSlots.Add(DefaultSlot);
 		}
 
 		// Mesh에 Section이 없을 경우 전체 메쉬을 섹션 하나로 세팅
-		if (Mesh->MeshData.Sections.IsEmpty())
+		if (Optimized.Sections.IsEmpty())
 		{
 			FStaticMeshSection DefaultSection;
 			DefaultSection.StartIndex = 0;
-			DefaultSection.IndexCount = static_cast<uint32>(Mesh->MeshData.Indices.Num());
+			DefaultSection.IndexCount = static_cast<uint32>(Optimized.Indices.Num());
 			DefaultSection.MaterialSlotIndex = 0;
 
-			Mesh->MeshData.Sections.Add(DefaultSection);
+			Optimized.Sections.Add(DefaultSection);
 		}
+
+		Optimized.OptimizeTriangleOrderForVertexCache();
+		TUniquePtr<FVertexBuffer> VB = RenderCommand::CreateStaticVertexBuffer(Optimized.Vertices.GetData(), sizeof(FVertexPNCT) * static_cast<uint32>(Optimized.Vertices.size()), sizeof(FVertexPNCT));
+		TUniquePtr<FIndexBuffer> IB = RenderCommand::CreateStaticIndexBuffer(Optimized.Indices.GetData(), static_cast<uint32>(Optimized.Indices.size()));
+		if (VB == nullptr || IB == nullptr) return nullptr;
+
+		UStaticMesh* Mesh = FObjectFactory::ConstructObject<UStaticMesh>();
+		Mesh->MeshData = std::move(Optimized);
 
 		// Vertex/Index GPU 업로드
 		Mesh->VertexBuffer = std::move(VB);
@@ -403,6 +403,7 @@ FLODGenerateResult UAssetManager::GenerateStaticMeshLODs(UStaticMesh& Mesh, cons
 	{
 		FStaticMeshLODResource Resource;
 		Resource.Data = std::move(Data);
+		Resource.Data.OptimizeTriangleOrderForVertexCache();
 
 		Resource.VertexBuffer = RenderCommand::CreateStaticVertexBuffer(
 			Resource.Data.Vertices.GetData(),

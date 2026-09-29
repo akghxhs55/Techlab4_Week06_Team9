@@ -66,5 +66,8 @@ struct FStaticMeshData
 	// 실패하면 이유를 OutError에 담는다. 로그는 호출한 쪽이 경로와 함께 남긴다.
 	bool Validate(FString& OutError) const;
 
+	// 각 material section 안의 삼각형을 vertex 재사용이 가까워지도록 재배열한다.
+	void OptimizeTriangleOrderForVertexCache();
+
 	void BuildTriangleBVH();
 };

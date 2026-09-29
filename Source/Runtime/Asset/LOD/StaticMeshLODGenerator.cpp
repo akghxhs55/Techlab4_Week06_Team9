@@ -17,7 +17,7 @@ namespace
 {
     // 원본 LOD0의 삼각형 수에 곱한다.
     constexpr double TargetRatios[4] = {
-        1.0, 0.70, 0.25, 0.1
+        1.0, 0.7, 0.25, 0.1
     };
 
     struct FQuadric
@@ -411,7 +411,7 @@ namespace
                 ++GeometryVertexCounts[GeometryID[I]];
         }
 
-        // LOD1~2에서는 UV/normal 이음매의 분리된 렌더 정점 위치를 고정한다.
+        // LOD1에서만 UV/normal 이음매의 분리된 렌더 정점 위치를 고정한다.
         if (LOD <= 2)
         {
             for (uint32 I = 0; I < Work.Vertices.size(); ++I)
@@ -451,7 +451,7 @@ namespace
 
         for (const auto& [Key, Uses] : EdgeUses)
         {
-            // 비다양체는 항상 보호하고 열린 경계는 LOD2까지만 보호한다.
+            // 비다양체는 항상 보호하고 열린 경계는 LOD1에서만 보호한다.
             bool bProtect = Uses.size() >= 3 || (LOD <= 2 && Uses.size() == 1);
 
             if (Uses.size() == 2)
