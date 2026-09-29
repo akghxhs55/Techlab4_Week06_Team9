@@ -165,6 +165,80 @@ namespace
         return Best;
     }
 
+    bool TryFindBestPointOnQEM(const FVector& A, const FVector& B,
+        const FQuadric& QA, const FQuadric& QB, FEdgePlacement& Out)
+    {
+        FQuadric Q = QA;
+        Q += QB;
+
+        // Q의 왼쪽 위 3x3에 대해 H * p = -b를 푼다.
+        double M[3][4]{};
+        double Scale = 0.0;
+        for (int I = 0; I < 3; ++I)
+        {
+            for (int J = 0; J < 3; ++J)
+            {
+                M[I][J] = Q.M[I][J];
+                Scale = std::max(Scale, std::abs(M[I][J]));
+            }
+            M[I][3] = -Q.M[I][3];
+        }
+
+        if (!std::isfinite(Scale) || Scale == 0.0) return false;
+
+        for (int Col = 0; Col < 3; ++Col)
+        {
+            int Pivot = Col;
+            for (int Row = Col + 1; Row < 3; ++Row)
+            {
+                if (std::abs(M[Row][Col]) > std::abs(M[Pivot][Col])) Pivot = Row;
+            }
+            if (std::abs(M[Pivot][Col]) <= Scale * 1e-12) return false;
+
+            if (Pivot != Col)
+            {
+                for (int J = 0; J < 4; ++J)
+                    std::swap(M[Col][J], M[Pivot][J]);
+            }
+
+            for (int Row = Col + 1; Row < 3; ++Row)
+            {
+                const double Factor = M[Row][Col] / M[Col][Col];
+                for (int J = Col; J < 4; ++J)
+                    M[Row][J] -= Factor * M[Col][J];
+            }
+        }
+
+        double X[3]{};
+        for (int I = 2; I >= 0; --I)
+        {
+            double Value = M[I][3];
+            for (int J = I + 1; J < 3; ++J)
+                Value -= M[I][J] * X[J];
+            X[I] = Value / M[I][I];
+            if (!std::isfinite(X[I])) return false;
+        }
+
+        const FVector Position(
+            static_cast<float>(X[0]),
+            static_cast<float>(X[1]),
+            static_cast<float>(X[2]));
+        if (!std::isfinite(Position.X) ||
+            !std::isfinite(Position.Y) ||
+            !std::isfinite(Position.Z))
+            return false;
+
+        // 간선 밖 위치에서도 UV와 Color는 간선에 투영한 T로 보간한다.
+        const FVector Direction = B - A;
+        const float LengthSquared = Direction.Dot(Direction);
+        const float T = LengthSquared > 1e-20f
+            ? std::clamp((Position - A).Dot(Direction) / LengthSquared, 0.0f, 1.0f)
+            : 0.0f;
+
+        Out = { Position, T, Q.Evaluate(Position) };
+        return std::isfinite(Out.Cost);
+    }
+
     struct FWorkTriangle
     {
         uint32 V[3]{};
@@ -297,50 +371,90 @@ namespace
         return FVector::Cross(B - A, C - A).Normalized();
     }
 
-    const FLODSourceVertex& SourceEndpoint( const FEdgeUse& Use, uint32 PositionID, const FStaticMeshData& Source)
+    void MarkProtectedVertices(const FStaticMeshData& Source, FWorkMesh& Work,
+        uint32 LOD, FLODGenerateResult& Result)
     {
-        const FLODSourceVertex& A = Source.LODSourceVertices[Use.RenderA];
+        constexpr float HardEdgeCosine[4] = { 0.0f, 0.6f, 0.6f, 0.0f };
 
-        if (static_cast<uint32>(A.PositionIndex) == PositionID) return A;
+        for (FWorkVertex& Vertex : Work.Vertices)
+        {
+            if (Vertex.bAlive) Vertex.bProtected = false;
+        }
 
-        return Source.LODSourceVertices[Use.RenderB];
-    }
+        // 현재 살아 있는 렌더 정점을 원본 기하 위치별로 묶는다.
+        // 원본 위치를 잃은 정점은 각각 별개의 기하 위치로 취급한다.
+        std::unordered_map<int32, uint32> SourceToGeometry;
+        std::vector<uint32> GeometryID(Work.Vertices.size());
+        uint32 NextGeometryID = 0;
+        for (uint32 I = 0; I < Work.Vertices.size(); ++I)
+        {
+            if (!Work.Vertices[I].bAlive || Work.Vertices[I].Faces.empty())
+                continue;
 
-    void MarkProtectedVertices(const FStaticMeshData& Source, FWorkMesh& Work, FLODGenerateResult& Result)
-    {
+            const int32 SourceID = Work.Vertices[I].SourcePositionIndex;
+            if (SourceID < 0)
+            {
+                GeometryID[I] = NextGeometryID++;
+            }
+            else
+            {
+                auto [It, bInserted] = SourceToGeometry.try_emplace(SourceID, NextGeometryID);
+                if (bInserted) ++NextGeometryID;
+                GeometryID[I] = It->second;
+            }
+        }
+
+        std::vector<uint32> GeometryVertexCounts(NextGeometryID, 0);
+        for (uint32 I = 0; I < Work.Vertices.size(); ++I)
+        {
+            if (Work.Vertices[I].bAlive && !Work.Vertices[I].Faces.empty())
+                ++GeometryVertexCounts[GeometryID[I]];
+        }
+
+        // LOD1~2에서는 UV/normal 이음매의 분리된 렌더 정점 위치를 고정한다.
+        if (LOD <= 2)
+        {
+            for (uint32 I = 0; I < Work.Vertices.size(); ++I)
+            {
+                if (Work.Vertices[I].bAlive && !Work.Vertices[I].Faces.empty() &&
+                    GeometryVertexCounts[GeometryID[I]] > 1)
+                    Work.Vertices[I].bProtected = true;
+            }
+        }
+
         std::unordered_map<uint64, std::vector<FEdgeUse>> EdgeUses;
 
-        // 각 삼각형의 기하 edge 3개를 수집한다.
+        // 현재 살아 있는 삼각형의 기하 edge만 수집한다.
         for (uint32 TriangleID = 0; TriangleID < Work.Triangles.size(); ++TriangleID)
         {
             const FWorkTriangle& Face = Work.Triangles[TriangleID];
+            if (!Face.bAlive) continue;
 
             for (uint32 Edge = 0; Edge < 3; ++Edge)
             {
                 const uint32 RenderA = Face.V[Edge];
                 const uint32 RenderB = Face.V[(Edge + 1) % 3];
+                const uint32 GeometryA = GeometryID[RenderA];
+                const uint32 GeometryB = GeometryID[RenderB];
 
-                const int32 PositionA = Source.LODSourceVertices[RenderA].PositionIndex;
-                const int32 PositionB = Source.LODSourceVertices[RenderB].PositionIndex;
+                if (GeometryA == GeometryB)
+                {
+                    Work.Vertices[RenderA].bProtected = true;
+                    Work.Vertices[RenderB].bProtected = true;
+                    continue;
+                }
 
-                // 원본 topology ID가 없는 입력은 2~3단계의
-                // Generate() 입력 검사에서 미리 거부해야 한다.
-                if (PositionA < 0 || PositionB < 0) continue;
-
-                const uint64 Key = MakeGeometricEdgeKey(static_cast<uint32>(PositionA),static_cast<uint32>(PositionB));
-
-                EdgeUses[Key].push_back({TriangleID, RenderA, RenderB});
+                const uint64 Key = MakeGeometricEdgeKey(GeometryA, GeometryB);
+                EdgeUses[Key].push_back({ TriangleID, RenderA, RenderB });
             }
         }
 
-        // 초기값: 60도 이상 꺾이면 hard edge.
-        constexpr float HardEdgeCosine = 0.6f;
-
         for (const auto& [Key, Uses] : EdgeUses)
         {
-            bool bProtect = Uses.size() != 2;
+            // 비다양체는 항상 보호하고 열린 경계는 LOD2까지만 보호한다.
+            bool bProtect = Uses.size() >= 3 || (LOD <= 2 && Uses.size() == 1);
 
-            if (!bProtect)
+            if (Uses.size() == 2)
             {
                 const FEdgeUse& U0 = Uses[0];
                 const FEdgeUse& U1 = Uses[1];
@@ -348,30 +462,35 @@ namespace
                 const FWorkTriangle& F0 = Work.Triangles[U0.TriangleID];
                 const FWorkTriangle& F1 = Work.Triangles[U1.TriangleID];
 
-                const uint32 PositionA = static_cast<uint32>(Key >> 32);
-                const uint32 PositionB = static_cast<uint32>(Key & 0xffffffffu);
+                const uint32 GeometryA = static_cast<uint32>(Key >> 32);
+                const uint32 GeometryB = static_cast<uint32>(Key);
+                auto RenderAt = [&](const FEdgeUse& Use, uint32 Geometry)
+                    {
+                        return GeometryID[Use.RenderA] == Geometry ? Use.RenderA : Use.RenderB;
+                    };
 
-                const auto& A0 = SourceEndpoint(U0, PositionA, Source);
-                const auto& A1 = SourceEndpoint(U1, PositionA, Source);
-                const auto& B0 = SourceEndpoint(U0, PositionB, Source);
-                const auto& B1 = SourceEndpoint(U1, PositionB, Source);
+                const uint32 A0 = RenderAt(U0, GeometryA);
+                const uint32 A1 = RenderAt(U1, GeometryA);
+                const uint32 B0 = RenderAt(U0, GeometryB);
+                const uint32 B1 = RenderAt(U1, GeometryB);
 
                 const bool bMaterialBoundary = F0.MaterialSlotIndex != F1.MaterialSlotIndex;
-                const bool bUVSeam = A0.UVIndex != A1.UVIndex || B0.UVIndex != B1.UVIndex;
+                const bool bUVSeam =
+                    Source.LODSourceVertices[A0].UVIndex != Source.LODSourceVertices[A1].UVIndex ||
+                    Source.LODSourceVertices[B0].UVIndex != Source.LODSourceVertices[B1].UVIndex;
 
-                // OBJ의 authored normal이 서로 다르면 보수적으로 보호.
-                // normal이 아예 없는 OBJ는 아래 면 각도로 판단한다.
                 const bool bNormalDiscontinuity =
-                    (A0.NormalIndex >= 0 &&
-                        A1.NormalIndex >= 0 &&
-                        A0.NormalIndex != A1.NormalIndex) ||
-                    (B0.NormalIndex >= 0 &&
-                        B1.NormalIndex >= 0 &&
-                        B0.NormalIndex != B1.NormalIndex);
+                    (Source.LODSourceVertices[A0].NormalIndex >= 0 &&
+                        Source.LODSourceVertices[A1].NormalIndex >= 0 &&
+                        Source.LODSourceVertices[A0].NormalIndex != Source.LODSourceVertices[A1].NormalIndex) ||
+                    (Source.LODSourceVertices[B0].NormalIndex >= 0 &&
+                        Source.LODSourceVertices[B1].NormalIndex >= 0 &&
+                        Source.LODSourceVertices[B0].NormalIndex != Source.LODSourceVertices[B1].NormalIndex);
 
                 const float FaceDot = GetFaceNormal(F0, Work).Dot(GetFaceNormal(F1, Work));
-                const bool bHardEdge = FaceDot < HardEdgeCosine || bNormalDiscontinuity;
-                bProtect = bMaterialBoundary || bUVSeam || bHardEdge;
+                bProtect = bProtect ||
+                    (LOD <= 2 && (bMaterialBoundary || bUVSeam || bNormalDiscontinuity)) ||
+                    FaceDot < HardEdgeCosine[LOD];
             }
 
             if (!bProtect) continue;
@@ -410,43 +529,6 @@ namespace
 
     using FCollapseHeap = std::priority_queue<FCollapseCandidate, std::vector<FCollapseCandidate>, FGreaterCollapseCost>;
 
-    void PushCandidate(uint32 A, uint32 B, const FWorkMesh& Work, FCollapseHeap& Heap)
-    {
-        if (A > B) std::swap(A, B);
-
-        const FWorkVertex& VA = Work.Vertices[A];
-        const FWorkVertex& VB = Work.Vertices[B];
-
-        if (!VA.bAlive || !VB.bAlive || (VA.bProtected && VB.bProtected)) return;
-        if (!VA.Neighbors.contains(B)) return;
-
-        FEdgePlacement Placement;
-        if (VA.bProtected || VB.bProtected)
-        {
-            const bool bPinA = VA.bProtected;
-            const FVector PinnedPosition =  bPinA ? VA.Vertex.Position : VB.Vertex.Position;
-
-            FQuadric Combined = VA.Quadric;
-            Combined += VB.Quadric;
-
-            Placement = {
-                PinnedPosition,
-                bPinA ? 0.0f : 1.0f,
-                Combined.Evaluate(PinnedPosition)
-            };
-        }
-        else
-        {
-            Placement = FindBestPointOnEdge(
-                VA.Vertex.Position, VB.Vertex.Position,
-                VA.Quadric, VB.Quadric);
-        }
-
-        if (!std::isfinite(Placement.Cost))return;
-
-        Heap.push({A, B, VA.Revision, VB.Revision, Placement});
-    }
-
     std::vector<uint32> SharedFaces(uint32 A, uint32 B, const FWorkMesh& Work)
     {
         std::vector<uint32> Result;
@@ -464,7 +546,9 @@ namespace
     {
         const std::vector<uint32> Shared = SharedFaces(A, B, Work);
 
-        if (Shared.size() != 2) return false;
+        if ((Shared.size() != 1 && Shared.size() != 2) ||
+            Shared.size() >= Work.LiveTriangles)
+            return false;
 
         std::unordered_set<uint32> OppositeVertices;
 
@@ -478,7 +562,7 @@ namespace
             }
         }
 
-        if (OppositeVertices.size() != 2) return false;
+        if (OppositeVertices.size() != Shared.size()) return false;
 
         std::unordered_set<uint32> CommonNeighbors;
 
@@ -519,7 +603,7 @@ namespace
             const bool bHasA = Face.V[0] == A || Face.V[1] == A || Face.V[2] == A;
             const bool bHasB = Face.V[0] == B || Face.V[1] == B || Face.V[2] == B;
 
-            // A-B를 공유하는 두 면은 제거되므로 검사하지 않는다.
+            // A-B를 공유하는 면은 제거되므로 검사하지 않는다.
             if (bHasA && bHasB) continue;
 
             FVector OldPositions[3];
@@ -550,6 +634,77 @@ namespace
         }
 
         return ECollapseCheck::Allowed;
+    }
+
+    bool FindBestValidPlacement(uint32 A, uint32 B, const FWorkMesh& Work,
+        FEdgePlacement& Out)
+    {
+        const FWorkVertex& VA = Work.Vertices[A];
+        const FWorkVertex& VB = Work.Vertices[B];
+        if (VA.bProtected && VB.bProtected) return false;
+
+        FQuadric Q = VA.Quadric;
+        Q += VB.Quadric;
+
+        bool bFound = false;
+        auto Consider = [&](const FEdgePlacement& Placement)
+            {
+                if (!std::isfinite(Placement.Cost)) return;
+
+                const FCollapseCandidate Probe{
+                    A, B, VA.Revision, VB.Revision, Placement
+                };
+                if (CheckCollapse(Probe, Work) != ECollapseCheck::Allowed)
+                    return;
+
+                if (!bFound || Placement.Cost < Out.Cost)
+                {
+                    Out = Placement;
+                    bFound = true;
+                }
+            };
+
+        const FVector& PositionA = VA.Vertex.Position;
+        const FVector& PositionB = VB.Vertex.Position;
+
+        if (VA.bProtected || VB.bProtected)
+        {
+            const bool bPinA = VA.bProtected;
+            const FVector& Position = bPinA ? PositionA : PositionB;
+            Consider({ Position, bPinA ? 0.0f : 1.0f, Q.Evaluate(Position) });
+        }
+        else
+        {
+            // 열린 렌더 경계는 간선 밖의 QEM 위치로 옮기지 않는다.
+            if (SharedFaces(A, B, Work).size() != 1)
+            {
+                FEdgePlacement QEMPlacement;
+                if (TryFindBestPointOnQEM(PositionA, PositionB,
+                    VA.Quadric, VB.Quadric, QEMPlacement))
+                    Consider(QEMPlacement);
+            }
+
+            Consider(FindBestPointOnEdge(PositionA, PositionB,
+                VA.Quadric, VB.Quadric));
+            Consider({ PositionA, 0.0f, Q.Evaluate(PositionA) });
+            Consider({ PositionB, 1.0f, Q.Evaluate(PositionB) });
+        }
+
+        return bFound;
+    }
+
+    void PushCandidate(uint32 A, uint32 B, const FWorkMesh& Work, FCollapseHeap& Heap)
+    {
+        if (A > B) std::swap(A, B);
+
+        const FWorkVertex& VA = Work.Vertices[A];
+        const FWorkVertex& VB = Work.Vertices[B];
+        if (!VA.bAlive || !VB.bAlive || !VA.Neighbors.contains(B)) return;
+
+        FEdgePlacement Placement;
+        if (!FindBestValidPlacement(A, B, Work, Placement)) return;
+
+        Heap.push({ A, B, VA.Revision, VB.Revision, Placement });
     }
 
     void ApplyCollapse(const FCollapseCandidate& Candidate, FWorkMesh& Work, FCollapseHeap& Heap)
@@ -854,109 +1009,72 @@ FLODGenerateResult FStaticMeshLODGenerator::Generate(const FStaticMeshData& LOD0
         return Result;
     }
 
-    MarkProtectedVertices(LOD0, Work, Result);
+    bool bReachedAllTargets = true;
 
-    FCollapseHeap Heap;
-
-    for (uint32 A = 0; A < Work.Vertices.size(); ++A)
+    for (uint32 LOD = 1; LOD <= 3; ++LOD)
     {
-        for (uint32 B : Work.Vertices[A].Neighbors)
+        // 이전 단계의 Work를 이어 쓰되 살아남은 메시로 보호 상태를 다시 계산한다.
+        // 보호 상태가 바뀌므로 각 단계의 후보 힙도 다시 만든다.
+        MarkProtectedVertices(LOD0, Work, LOD, Result);
+
+        FCollapseHeap Heap;
+        for (uint32 A = 0; A < Work.Vertices.size(); ++A)
         {
-            if (A < B) PushCandidate(A, B, Work, Heap);
-        }
-    }
-
-    uint32 NextLOD = 1;
-
-    while (NextLOD <= 3 && !Heap.empty())
-    {
-        const FCollapseCandidate Candidate = Heap.top();
-        Heap.pop();
-
-        const FWorkVertex& VA = Work.Vertices[Candidate.A];
-        const FWorkVertex& VB = Work.Vertices[Candidate.B];
-
-        // ApplyCollapse() 전 상태에서 계산한 오래된 후보는 버린다.
-        if (!VA.bAlive || !VB.bAlive || VA.Revision != Candidate.RevisionA ||
-            VB.Revision != Candidate.RevisionB)
-        {
-            continue;
-        }
-
-        const ECollapseCheck Check = CheckCollapse(Candidate, Work);
-
-        if (Check == ECollapseCheck::Topology)
-        {
-            ++Result.RejectedTopology;
-            continue;
-        }
-
-        if (Check == ECollapseCheck::Flip)
-        {
-            ++Result.RejectedFlips;
-            continue;
-        }
-
-        ApplyCollapse(Candidate, Work, Heap);
-
-        // Collapse 하나가 목표를 여러 개 통과할 수도 있으므로 while.
-        while (NextLOD <= 3 && Work.LiveTriangles <= Result.TargetTriangles[NextLOD])
-        {
-            FStaticMeshData Snapshot = BuildLODMesh(Work, LOD0);
-
-            FString Error;
-            if (!Snapshot.Validate(Error))
+            if (!Work.Vertices[A].bAlive) continue;
+            for (uint32 B : Work.Vertices[A].Neighbors)
             {
-                Result.FailureReason = Error;
-                OutLODs.Reset();
-                return Result;
+                if (A < B) PushCandidate(A, B, Work, Heap);
+            }
+        }
+
+        // 빈 메시를 만들지 않도록 적어도 한 삼각형은 남긴다.
+        const uint32 StopAt = std::max(1u, Result.TargetTriangles[LOD]);
+        while (Work.LiveTriangles > StopAt && !Heap.empty())
+        {
+            const FCollapseCandidate Candidate = Heap.top();
+            Heap.pop();
+
+            const FWorkVertex& VA = Work.Vertices[Candidate.A];
+            const FWorkVertex& VB = Work.Vertices[Candidate.B];
+
+            if (!VA.bAlive || !VB.bAlive ||
+                VA.Revision != Candidate.RevisionA ||
+                VB.Revision != Candidate.RevisionB)
+                continue;
+
+            const ECollapseCheck Check = CheckCollapse(Candidate, Work);
+            if (Check == ECollapseCheck::Topology)
+            {
+                ++Result.RejectedTopology;
+                continue;
+            }
+            if (Check == ECollapseCheck::Flip)
+            {
+                ++Result.RejectedFlips;
+                continue;
             }
 
-            Result.ActualTriangles[NextLOD] = Work.LiveTriangles;
-
-            OutLODs.Add(std::move(Snapshot));
-
-            ++NextLOD;
+            ApplyCollapse(Candidate, Work, Heap);
         }
-    }
 
-    if (NextLOD != 4)
-    {
-        // 마지막 성공 LOD보다 더 줄어든 상태라면 그 결과도 저장한다.
-        if (Work.LiveTriangles > 0 &&
-            Work.LiveTriangles < Result.ActualTriangles[NextLOD - 1])
+        if (Work.LiveTriangles > Result.TargetTriangles[LOD])
+            bReachedAllTargets = false;
+
+        FStaticMeshData Snapshot = BuildLODMesh(Work, LOD0);
+        FString Error;
+        if (!Snapshot.Validate(Error))
         {
-            FStaticMeshData Snapshot = BuildLODMesh(Work, LOD0);
-            FString Error;
-            if (!Snapshot.Validate(Error))
-            {
-                Result.FailureReason = Error;
-                OutLODs.Reset();
-                return Result;
-            }
-
-            Result.ActualTriangles[NextLOD] = Work.LiveTriangles;
-            OutLODs.Add(std::move(Snapshot));
-            ++NextLOD;
+            Result.FailureReason = Error;
+            OutLODs.Reset();
+            return Result;
         }
 
-        // 더 줄일 수 없으면 직전 메시로 남은 슬롯을 채운다.
-        while (NextLOD <= 3)
-        {
-            FStaticMeshData Snapshot =
-                NextLOD == 1 ? LOD0 : OutLODs.Last();
-
-            Result.ActualTriangles[NextLOD] =
-                Result.ActualTriangles[NextLOD - 1];
-            OutLODs.Add(std::move(Snapshot));
-            ++NextLOD;
-        }
-
-        Result.bSuccess = true;
-        Result.FailureReason = "Fixed target not reached; best effort LOD used";
-        return Result;
+        Result.ActualTriangles[LOD] = Work.LiveTriangles;
+        OutLODs.Add(std::move(Snapshot));
     }
 
     Result.bSuccess = true;
+    if (!bReachedAllTargets)
+        Result.FailureReason = "Fixed target not reached; best effort LOD used";
     return Result;
 }

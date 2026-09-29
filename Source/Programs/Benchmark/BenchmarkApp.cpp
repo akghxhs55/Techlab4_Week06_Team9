@@ -58,7 +58,7 @@ bool UBenchmarkEngine::Init()
 		return false;
 
 	FLODGenerateRequest Request;
-	Request.ScreenThresholds = { 0.22f, 0.01f, 0.005f };
+	Request.ScreenThresholds = { 0.25f, 0.01f, 0.005f };
 	Request.bSaveToAsset = false; // 현재 저장 경로가 미구현
 
 	auto GenerateFor = [&](UStaticMesh* Asset)
