@@ -150,24 +150,24 @@ void UWorld::ClearWorld()
 
 void UWorld::GatherRenderPackets(TQueue<FRenderPacket>& RenderQueue, const FLODViewContext* LODView, const FFrustumPlanes* Frustum)
 {
-	TArray<int32> VisibleIndices;
+	TArray<FPrimitiveSceneProxy*> VisibleProxies;
 	{
-		SCOPE_CYCLE_COUNTER(STAT_FrustumCull);
-		VisibleIndices.Reset();                       // UWorld 멤버로 두어 용량 재사용
+		SCOPE_CYCLE_COUNTER(STAT_FrustumCull);          
 		const int32 Count = Scene.Proxies.Num();
-		for (int32 i = 0; i < Count; ++i)
-		{
-			if (!Scene.PrimitiveFlags[i]) continue;
-			if (Frustum && !IsAABBInFrustum(Scene.PrimitiveBounds[i], *Frustum)) continue;
-			VisibleIndices.Add(i);
-		}
+		Scene.BVH.Query(
+			[&](const FBox& Bounds) {
+				return !Frustum || IsAABBInFrustum(MakeWorldBounds(Bounds), *Frustum);
+			},
+			[&](UPrimitiveComponent* Component) {
+				if (Component && Component->IsVisible())
+					VisibleProxies.Add(Component->GetSceneProxy());
+			});
 	}
 
 	{
 		SCOPE_CYCLE_COUNTER(STAT_GatherElements);
-		for (const int32 i : VisibleIndices)
+		for (FPrimitiveSceneProxy* Proxy : VisibleProxies)
 		{
-			FPrimitiveSceneProxy* Proxy = Scene.Proxies[i];
 			const FMatrix& World = Proxy->GetLocalToWorld();
 
 			if (LODView)
