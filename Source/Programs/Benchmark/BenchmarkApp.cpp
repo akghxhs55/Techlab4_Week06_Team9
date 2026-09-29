@@ -209,9 +209,24 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 	EditorControlsPanel->DeltaTime = DeltaTime;
 	EditorUI->Tick(DeltaTime);
 
-	const FLODViewContext LODView{ Camera->GetViewProjectionMatrix(), Width, Height };
 	const FMatrix ViewProjection = Camera->GetViewProjectionMatrix();
+	const FMatrix Projection = Camera->GetProjectionMatrix();
 	const FFrustumPlanes Frustum = ExtractFrustumPlanes(ViewProjection);
+
+	const float ScaleX = Projection.M[1][0];
+	const float ScaleY = Projection.M[2][1];
+
+	// LOD에 카메라 정보 저장
+	FLODViewContext LODView{ ViewProjection, Width, Height };
+	LODView.CameraPosition = Camera->GetWorldLocation();
+	LODView.CameraForward = Camera->GetWorldRotation()
+		.Quaternion()
+		.RotateVector(FVector(1.0f, 0.0f, 0.0f))
+		.Normalized();
+	LODView.ProjectionScaleSquared =
+		std::max(ScaleX * ScaleX, ScaleY * ScaleY);
+	LODView.NearZ = Camera->GetNearZ();
+	LODView.bOrthographic = Camera->GetIsOrthogonal();
 
 	TQueue<FRenderPacket> RenderQueue;
 	{

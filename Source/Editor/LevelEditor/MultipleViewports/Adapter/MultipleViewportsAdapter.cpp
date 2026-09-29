@@ -12,6 +12,7 @@
 #include "Core/Stats/EditorStats.h"
 #include "Editor/Outliner/OutlinerPanel.h"
 #include "Editor/Rendering/GridRenderer.h"
+#include "Engine/PrimitiveSceneProxy.h"
 #include "Engine/World.h"
 #include "Input/InputSystem.h"
 #include "UObject/UObjectIterator.h"
@@ -642,6 +643,24 @@ void FMultipleViewportsAdapter::BuildRenderQueue(const int32 ViewIndex, TQueue<F
     {
         CullForView(RenderObjects, PrepareView(ViewIndex).Frustum, VisibleIds[ViewIndex]);
     }
+    const FRect& Rect = GetViewRect(ViewIndex);
+    const FViewCamera& ViewCamera = Views.Cameras[ViewIndex];
+    const FMatrix Projection = BuildProjectionMatrix(
+        ViewCamera.Projection, Rect.Width / Rect.Height);
+    const float ScaleX = Projection.M[1][0];
+    const float ScaleY = Projection.M[2][1];
+
+    FLODViewContext LODContext{
+        GetEngineViewProjection(ViewIndex),
+        static_cast<uint32>(Rect.Width),
+        static_cast<uint32>(Rect.Height)
+    };
+    LODContext.CameraPosition = GetEngineCameraLocation(ViewIndex);
+    LODContext.CameraForward = GetEngineCameraForward(ViewIndex);
+    LODContext.ProjectionScaleSquared = std::max(ScaleX * ScaleX, ScaleY * ScaleY);
+    LODContext.NearZ = ViewCamera.Projection.NearClip;
+    LODContext.bOrthographic = ViewCamera.Projection.Mode == EProjectionMode::Orthographic;
+
     for (const ObjectId Id : VisibleIds[ViewIndex])
     {
         const auto Found = PrimitiveById.Find(Id);
@@ -694,16 +713,10 @@ void FMultipleViewportsAdapter::BuildRenderQueue(const int32 ViewIndex, TQueue<F
             if (!Mesh)
                 continue;
 
-            const FRect& Rect = GetViewRect(ViewIndex);
-            const FLODViewContext Context{ GetEngineViewProjection(ViewIndex),
-                static_cast<uint32>(Rect.Width),
-                static_cast<uint32>(Rect.Height)
-            };
-
-            const uint32 LOD = SelectStaticMeshLOD(
-                *Mesh,
-                StaticComponent->GetWorldMatrix(),
-                Context);
+            const FPrimitiveSceneProxy* Proxy = StaticComponent->GetSceneProxy();
+            const uint32 LOD = Proxy
+                ? SelectStaticMeshLOD(*Mesh, Proxy->GetBounds(), LODContext)
+                : 0u;
 
             StaticComponent->SubmitToRenderQueue(OutQueue, LOD);
         }

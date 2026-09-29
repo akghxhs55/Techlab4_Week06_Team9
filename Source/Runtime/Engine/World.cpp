@@ -179,7 +179,7 @@ void UWorld::GatherRenderPackets(TQueue<FRenderPacket>& RenderQueue, const FLODV
 					{
 						const uint32 LOD = SelectStaticMeshLOD(
 							*Mesh,
-							World,
+							Proxy->GetBounds(),
 							*LODView);
 
 						Component->SubmitToRenderQueue(RenderQueue, LOD);
