@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include "FBox.h"
+#include "Box.h"
 
 template <typename T>
 class TBVH
