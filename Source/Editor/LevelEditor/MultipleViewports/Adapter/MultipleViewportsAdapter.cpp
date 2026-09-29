@@ -447,9 +447,12 @@ void FMultipleViewportsAdapter::CaptureWorld(UWorld& World)
     bCapturedBillboard = false;
     bCapturedParticle = false;
 
-    for (TObjectIterator<UPrimitiveComponent> It; It; ++It)
+    const FScene& Scene = World.GetScene();
+    const int32 Count = Scene.Proxies.Num();
+    for (int32 i = 0; i < Count;++i)
     {
-        UPrimitiveComponent* Primitive = *It;
+        if (!Scene.PrimitiveFlags[i]) continue;
+        UPrimitiveComponent* Primitive = Scene.Proxies[i]->GetComponent();
         if (!Primitive || !Primitive->IsVisible() || !Primitive->GetOwner() ||
             Primitive->GetOwner()->GetWorld() != &World) continue;
         const ObjectId Id = Primitive->GetUUID();

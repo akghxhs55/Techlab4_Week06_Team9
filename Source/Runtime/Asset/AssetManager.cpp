@@ -107,7 +107,18 @@ UAssetManager& UAssetManager::Get()
 	return *Instance;
 }
 
-void UAssetManager::ScanAssets(const fs::path& AssetRoot)
+void UAssetManager::Init(const FAssetLoadProgress& OnProgress)
+{
+	FGeometryGenerator::CreateDefaultMeshDatas();
+	// 머티리얼이 참조하므로 반드시 먼저 만든다
+	Get().CreateDefaultTextures();
+	Get().CreateDefaultMaterial();
+	Get().ScanAssets("Assets", OnProgress);
+	Get().CreateDefaultMeshes();
+	Get().CreateParticleMaterial();
+}
+
+void UAssetManager::ScanAssets(const fs::path& AssetRoot, const FAssetLoadProgress& OnProgress)
 {
 	if (!fs::exists(AssetRoot))
 	{
@@ -115,14 +126,27 @@ void UAssetManager::ScanAssets(const fs::path& AssetRoot)
 		return;
 	}
 
+	TArray<fs::path> Files;
 	for (const fs::directory_entry& Entry : fs::recursive_directory_iterator(AssetRoot))
 	{
-		if (!Entry.is_regular_file()) continue;
+		if (Entry.is_regular_file())
+		{
+			Files.Add(Entry.path());
+		}
+	}
 
-		FString Key = fs::relative(Entry.path(), AssetRoot).generic_string();
-		FString Path = Entry.path().generic_string();
+	const int32 Total = Files.Num();
+	for (int32 i = 0; i < Total; ++i)
+	{
+		FString Key = fs::relative(Files[i], AssetRoot).generic_string();
+		FString Path = Files[i].generic_string();
 		AssetPathMap.Add(Key, Path);
 		LoadAsset(Key, Path);
+
+		if (OnProgress)
+		{
+			OnProgress(i + 1, Total, Key);
+		}
 	}
 }
 
@@ -148,17 +172,6 @@ void UAssetManager::LoadAsset(const FString& Key, const FString& Path)
 	{
 		LoadObjStaticMesh(Path);
 	}
-}
-
-void UAssetManager::Init()
-{
-	FGeometryGenerator::CreateDefaultMeshDatas();
-	// 머티리얼이 참조하므로 반드시 먼저 만든다
-	Get().CreateDefaultTextures();
-	Get().CreateDefaultMaterial();
-	Get().ScanAssets("Assets");
-	Get().CreateDefaultMeshes();
-	Get().CreateParticleMaterial();
 }
 
 void UAssetManager::CreateDefaultTextures()

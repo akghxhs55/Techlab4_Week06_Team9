@@ -1,4 +1,4 @@
-#include "EnginePCH.h"
+﻿#include "EnginePCH.h"
 #include "JsonArchive.h"
 
 #include "Engine/World.h"
@@ -110,6 +110,7 @@ bool FJsonArchive::LoadWorld(UWorld* World, const FString& Path)
 			UStaticMesh* Mesh = UAssetManager::GetAssetByPath<UStaticMesh>(PrimJson["ObjStaticMeshAsset"].get<FString>());
 			Actor->GetStaticMeshComponent()->SetStaticMesh(Mesh);
 		}
+		World->GetScene().BuildBVH();
 
 		return true;
 	}
@@ -254,6 +255,8 @@ bool FJsonArchive::LoadWorld(UWorld* World, const FString& Path)
 
 	//// SpawnActor하면서 증가했을 UUID를 저장 당시 값으로 복원
 	//FEngineStatics::NextUUID = SavedNextUUID;
+
+	World->GetScene().BuildBVH();
 
 	return true;
 }

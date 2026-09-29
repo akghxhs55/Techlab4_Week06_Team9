@@ -4,20 +4,31 @@ struct FBox
 {
 	FVector Min;
 	FVector Max;
+	
 
 	FBox GetWorldAABB(const FMatrix& M) const
 	{
-		FVector Center = (Min + Max) * 0.5f;
-		FVector Extent = (Max - Min) * 0.5f;
+		FVectorRegister Minreg = VectorSIMD::LoadFloat3(&Min.X);
+		FVectorRegister Maxreg = VectorSIMD::LoadFloat3(&Max.X);
+		FVectorRegister Centerreg = VectorSIMD::Mul(VectorSIMD::Add(Minreg, Maxreg), VectorSIMD::SetVal(0.5f));
+		FVectorRegister Extentreg = VectorSIMD::Mul(VectorSIMD::Sub(Maxreg, Minreg), VectorSIMD::SetVal(0.5f));
 
 		// 중심은 그냥 변환
-		FVector4 C = FVector4(Center, 1.0f) * M;
+		float center[4];
+		VectorSIMD::Store(center, Centerreg);
+		FVector4 C = FVector4(center[0], center[1], center[2], 1.0f) * M;
 
 		// 범위는 회전 부분의 절댓값으로 변환
+		FVectorRegister Ereg = VectorSIMD::Add(
+			VectorSIMD::Add(
+				VectorSIMD::Mul(VectorSIMD::SplatX(Extentreg), VectorSIMD::Abs(VectorSIMD::Load(M.M[0]))),
+				VectorSIMD::Mul(VectorSIMD::SplatY(Extentreg), VectorSIMD::Abs(VectorSIMD::Load(M.M[1])))
+			),
+			VectorSIMD::Mul(VectorSIMD::SplatZ(Extentreg), VectorSIMD::Abs(VectorSIMD::Load(M.M[2])))
+		);
+
 		FVector E;
-		E.X = Extent.X * fabsf(M.M[0][0]) + Extent.Y * fabsf(M.M[1][0]) + Extent.Z * fabsf(M.M[2][0]);
-		E.Y = Extent.X * fabsf(M.M[0][1]) + Extent.Y * fabsf(M.M[1][1]) + Extent.Z * fabsf(M.M[2][1]);
-		E.Z = Extent.X * fabsf(M.M[0][2]) + Extent.Y * fabsf(M.M[1][2]) + Extent.Z * fabsf(M.M[2][2]);
+		VectorSIMD::StoreFloat3(&E.X, Ereg);
 
 		return FBox{ FVector(C.X, C.Y, C.Z) - E, FVector(C.X, C.Y, C.Z) + E };
 	}

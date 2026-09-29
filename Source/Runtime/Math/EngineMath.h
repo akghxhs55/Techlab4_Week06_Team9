@@ -12,6 +12,7 @@
 #include "MatrixRegister.h"
 
 #define PI 3.141592f
+#define INDEX_NONE -1
 
 namespace FMath
 {

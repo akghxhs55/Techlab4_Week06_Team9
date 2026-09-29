@@ -16,9 +16,12 @@
 #include "Render/Swapchain.h"
 #include "Render/Texture2D.h"
 #include "Core/SplashScreen.h"
+#include "Core/Stats/LightweightStats.h"
 
 namespace
 {
+	DECLARE_CYCLE_STAT("Present", STAT_Present); // Actor 틱 측정
+
 	// 이 간격마다 FPS 평균을 갱신한다.
 	constexpr double FrameStatsWindowSeconds = 0.5;
 }
@@ -79,9 +82,15 @@ bool FEngineLoop::PreInit(HINSTANCE hInstance, UClass* EngineClass)
 	}
 
 	FSplashScreen::SetText(L"Loading Assets...");
-	FSplashScreen::SetProgress(0.3f);
 	FRenderResourceManager::Init();
-	UAssetManager::Init();
+
+	constexpr float AssetStart = 0.1f;
+	constexpr float AssetEnd = 0.8f;
+	UAssetManager::Init([](int32 Loaded, int32 Total, const FString& Path)
+		{
+			FSplashScreen::SetText("Loading " + Path);
+			FSplashScreen::SetProgress(AssetStart + (AssetEnd - AssetStart) * Loaded / Total);
+		});
 
 	FSplashScreen::SetText(L"Initializing Engine...");
 	FSplashScreen::SetProgress(0.8f);
@@ -128,7 +137,10 @@ bool FEngineLoop::Tick()
 	}
 
 	GEngine->Tick(EngineTimer::GetDeltaTime());
-	Swapchain->SwapBuffers(Config.SyncInterval);
+	{
+		SCOPE_CYCLE_COUNTER(STAT_Present);
+		Swapchain->SwapBuffers(Config.SyncInterval);
+	}
 
 	// EngineTimer는 DeltaTime을 0.1초로 자르므로 표시용 시간은 사이클로 따로 잰다.
 	const uint64 CurrentCycles = FPlatformTime::GetCycles64();
@@ -138,7 +150,6 @@ bool FEngineLoop::Tick()
 	return bIsRunning;
 }
 
-// 엔진 → 공용 자원 → UObject → GEngine → Device 순으로 정리한다.
 // UObject(에셋 포함)의 GPU 자원은 Device가 살아 있을 때 해제한다.
 void FEngineLoop::Exit()
 {

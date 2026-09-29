@@ -6,6 +6,7 @@
 #include "Asset/LOD/StaticMeshLODGenerator.h"
 
 #include <filesystem>
+#include <functional>
 
 enum class EAssetType
 {
@@ -26,12 +27,13 @@ private:
 	UAssetManager(const UAssetManager& src) =  delete;
 	UAssetManager& operator= (const UAssetManager& src) = delete;
 
+	using FAssetLoadProgress = std::function<void(int32 Loaded, int32 Total, const FString& Path)>;
 public:
 	static UAssetManager& Get();
-	static void Init();
+	static void Init(const FAssetLoadProgress& OnProgress = nullptr);
 	static void Shutdown();
 
-	void ScanAssets(const fs::path& AssetRoot);
+	void ScanAssets(const fs::path& AssetRoot, const FAssetLoadProgress& OnProgress);
 	void LoadAsset(const FString& Key, const FString& Path);
 
 	void CreateDefaultTextures();

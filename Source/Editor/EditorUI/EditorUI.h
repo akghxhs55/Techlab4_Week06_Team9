@@ -7,7 +7,7 @@
 class FEditorUI
 {
 public:
-	bool Init();
+	bool Init(bool bInUseDockSpace = true, bool bInPassthruCentralNode = false);
 	void Tick(float DeltaTime);
 	void OnRender();
 
@@ -28,6 +28,9 @@ public:
 	void SetSaveSceneAsCallback(std::function<void()> InCallback) { OnSaveSceneAs = InCallback; }
 
 private:
+	bool bUseDockSpace = true;
+	bool bPassthruCentralNode = false;
+
 	void DrawMainMenuBar();
 
 	TArray<TUniquePtr<IEditorPanel>> Panels;

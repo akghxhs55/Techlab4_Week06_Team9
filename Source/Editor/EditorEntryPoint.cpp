@@ -1,6 +1,5 @@
 #include "EnginePCH.h"
 
-// Source/Editor/main.cpp  — exe. 여기서만 구체 타입을 안다.
 #include "Launch/EntryPoint.h"
 
 #include "Editor/HitoriEd/EditorEngine.h"

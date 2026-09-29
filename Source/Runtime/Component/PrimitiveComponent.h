@@ -7,6 +7,8 @@
 #include "Render/GeometryGenerator.h"
 #include "Collision/HitResult.h"
 
+class FPrimitiveSceneProxy;
+
 enum class EPrimitiveType
 {
 	Sphere,
@@ -26,7 +28,7 @@ class UPrimitiveComponent :public USceneComponent
 	// (빌보드는 단일 머티리얼, 스태틱 메시는 슬롯별 덮어쓰기) 각자 등록한다.
 	REFLECT_START(ClassName)
 		PROPERTY(bVisible)
-		REFLECT_END()
+	REFLECT_END()
 public:
 	UPrimitiveComponent();
 	virtual ~UPrimitiveComponent();
@@ -60,9 +62,13 @@ public:
 		return Data ? Data->AABB : Super::CalcLocalBounds();
 	}
 
+	FPrimitiveSceneProxy* GetSceneProxy() const { return SceneProxy; }
+
 protected:
 	bool TraceMesh(const FRay& WorldRay, const FStaticMeshData& Mesh, const FMatrix& WorldMatrix, FHitResult& OutResult);
 	bool bVisible = true;
 
-	/*TArray<UMaterial* MaterialOverride = nullptr;*/
+private:
+	friend class FScene;
+	FPrimitiveSceneProxy* SceneProxy = nullptr;
 };

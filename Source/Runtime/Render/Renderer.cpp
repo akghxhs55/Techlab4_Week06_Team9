@@ -13,6 +13,7 @@
 #include <algorithm>
 
 DECLARE_CYCLE_STAT("Draw Render Packets", STAT_DrawRenderPackets);
+DECLARE_CYCLE_STAT("Render Queue Sorting", STAT_RenderQueueSorting);
 
 bool FRenderer::Init()
 {
@@ -50,6 +51,8 @@ void FRenderer::RenderTranslucent(const FMatrix& ViewProjection)
 
 void FRenderer::RenderQueueSorting(TQueue<FRenderPacket>& InQueue, const FMatrix& ViewProjection)
 {
+	SCOPE_CYCLE_COUNTER(STAT_RenderQueueSorting);
+
 	RenderPackets.Reset();
 
 	while (InQueue.IsEmpty() == false)
@@ -69,7 +72,8 @@ void FRenderer::RenderQueueSorting(TQueue<FRenderPacket>& InQueue, const FMatrix
 			if (bFirstTranslucent != bSecondTranslucent) { return !bFirstTranslucent; }
 			if (bFirstTranslucent) { return First.CameraToParticleDistance > Second.CameraToParticleDistance; }
 			if (First.material != Second.material) { return std::less<UMaterial*>{}(First.material, Second.material); }
-			return std::less<UStaticMesh*>{}( First.mesh, Second.mesh);
+			if (First.mesh != Second.mesh) { return std::less<UStaticMesh*>{}(First.mesh, Second.mesh); }
+			return std::less<uint8>{}(First.LODIndex, Second.LODIndex);
 		});
 
 	// 정렬 결과 반투명은 뒤쪽에 모이므로 첫 반투명 위치에서 두 패스를 나눈다.

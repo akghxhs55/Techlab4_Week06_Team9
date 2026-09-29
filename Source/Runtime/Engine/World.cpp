@@ -1,4 +1,4 @@
-#include "EnginePCH.h"
+﻿#include "EnginePCH.h"
 #include "World.h"
 #include "Level.h"
 
@@ -19,6 +19,16 @@
 #include "Asset/LOD/StaticMeshLODSelector.h"
 
 #include "Math/Frustum.h"
+
+#include "Core/Stats/LightweightStats.h"
+
+DECLARE_CYCLE_STAT("Actor Tick", STAT_ActorTick); // Actor 틱 측정
+DECLARE_CYCLE_STAT("Update All Transforms", STAT_UpdateAllTransforms); // 각 Transform의 Update 시간 측정
+DECLARE_CYCLE_STAT("Gather Render Packets", STAT_GatherRenderPackets);
+DECLARE_CYCLE_STAT("Frustum Cull", STAT_FrustumCull);
+DECLARE_CYCLE_STAT("Gather Elements", STAT_GatherElements);
+
+
 
 UWorld::~UWorld()
 {
@@ -73,6 +83,12 @@ AActor* UWorld::SpawnActor(UClass* Class, FName InName, const FTransform* Transf
 		NewActor->GetRootComponent()->SetTransform(SpawnTransform);
 	}
 
+	for (UActorComponent* Component : NewActor->GetComponents())
+	{
+		if (UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Component))
+			Scene.AddPrimitive(Primitive);
+	}
+
 	// 4. Level->Actors에 등록
 	PersistentLevel->AddActor(NewActor);
 
@@ -90,20 +106,27 @@ void UWorld::Tick(float DeltaTime)
 		BeginPlayList.Dequeue();
 	}
 
-	for (ULevel* Level : Levels)
 	{
-		for (AActor* Actor : Level->GetActors())
+		SCOPE_CYCLE_COUNTER(STAT_ActorTick);
+		for (ULevel* Level : Levels)
 		{
-			Actor->Tick(DeltaTime);
+			for (AActor* Actor : Level->GetActors())
+			{
+				Actor->Tick(DeltaTime);
+			}
+			PathTracker.Tick(Level->GetActors(), DeltaTime);
 		}
-		PathTracker.Tick(Level->GetActors(), DeltaTime);
+
+		if (MainCamera)
+		{
+			MainCamera->Tick(DeltaTime);
+		}
 	}
 
-	if (MainCamera)
 	{
-		MainCamera->Tick(DeltaTime);
+		SCOPE_CYCLE_COUNTER(STAT_UpdateAllTransforms);
+		Scene.UpdateAllTransforms();
 	}
-
 }
 
 void UWorld::ClearWorld()
@@ -127,43 +150,88 @@ void UWorld::ClearWorld()
 
 void UWorld::GatherRenderPackets(TQueue<FRenderPacket>& RenderQueue, const FLODViewContext* LODView, const FFrustumPlanes* Frustum)
 {
-	for (TObjectIterator<UPrimitiveComponent> Itr; Itr; ++Itr)
+	TArray<FPrimitiveSceneProxy*> VisibleProxies;
 	{
-		if (!*Itr || !Itr->IsVisible())
-			continue;
+		SCOPE_CYCLE_COUNTER(STAT_FrustumCull);          
+		const int32 Count = Scene.Proxies.Num();
+		Scene.BVH.Query(
+			[&](const FBox& Bounds) {
+				return !Frustum || IsAABBInFrustum(MakeWorldBounds(Bounds), *Frustum);
+			},
+			[&](UPrimitiveComponent* Component) {
+				if (Component && Component->IsVisible())
+					VisibleProxies.Add(Component->GetSceneProxy());
+			});
+	}
 
-		if (Frustum)
+	{
+		SCOPE_CYCLE_COUNTER(STAT_GatherElements);
+		for (FPrimitiveSceneProxy* Proxy : VisibleProxies)
 		{
-			const FBox Box = Itr->CalcBounds(); 
-			const FAABB Bounds{
-				(Box.Min + Box.Max) * 0.5f,
-				(Box.Max - Box.Min) * 0.5f
-			};
-			if (!IsAABBInFrustum(Bounds, *Frustum))
-				continue;
-		}
+			const FMatrix& World = Proxy->GetLocalToWorld();
 
-		if (LODView)
-		{
-			if (auto* Component = Cast<UStaticMeshComponent>(*Itr))
+			if (LODView)
 			{
-				if (UStaticMesh* Mesh =
-					Component->GetStaticMesh())
+				if (auto* Component = Cast<UStaticMeshComponent>(Proxy->GetComponent()))
 				{
-					const uint32 LOD = SelectStaticMeshLOD(
+					if (UStaticMesh* Mesh =
+						Component->GetStaticMesh())
+					{
+						const uint32 LOD = SelectStaticMeshLOD(
 							*Mesh,
-							Component->GetWorldMatrix(),
+							World,
 							*LODView);
 
-					Component->SubmitToRenderQueue(RenderQueue, LOD);
-					continue;
+						Component->SubmitToRenderQueue(RenderQueue, LOD);
+						continue;
+					}
 				}
 			}
-		}
 
-		Itr->SubmitToRenderQueue(RenderQueue);
+			Proxy->GetComponent()->SubmitToRenderQueue(RenderQueue);
+		}
 	}
 }
+
+//void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderArray, const FLODViewContext* LODView, const FFrustumPlanes* Frustum)
+//{
+//	for (TObjectIterator<UPrimitiveComponent> Itr; Itr; ++Itr)
+//	{
+//		if (!*Itr || !Itr->IsVisible())
+//			continue;
+//
+//		if (Frustum)
+//		{
+//			const FBox Box = Itr->CalcBounds();
+//			const FAABB Bounds{
+//				(Box.Min + Box.Max) * 0.5f,
+//				(Box.Max - Box.Min) * 0.5f
+//			};
+//			if (!IsAABBInFrustum(Bounds, *Frustum))
+//				continue;
+//		}
+//
+//		if (LODView)
+//		{
+//			if (auto* Component = Cast<UStaticMeshComponent>(*Itr))
+//			{
+//				if (UStaticMesh* Mesh =
+//					Component->GetStaticMesh())
+//				{
+//					const uint32 LOD = SelectStaticMeshLOD(
+//						*Mesh,
+//						Component->GetWorldMatrix(),
+//						*LODView);
+//
+//					Component->SubmitToRenderQueue(RenderQueue, LOD);
+//					continue;
+//				}
+//			}
+//		}
+//
+//		Itr->SubmitToRenderQueue(RenderQueue);
+//	}
+//}
 
 // 메인 카메라 생성
 void UWorld::CreateMainCamera()
@@ -262,19 +330,32 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 	FBillboardTraceTransform ResolveBillboard, const void* ViewContext)
 {
 	OutHit = FHitResult();
-	for (TObjectIterator<UPrimitiveComponent> It; It; ++It)
+
+	const auto TraceComponent = [&](UPrimitiveComponent* Component)
 	{
-		if (!It->IsVisible() || !It->GetOwner() || It->GetOwner()->GetWorld() != this) continue;
+		if (!Component || !Component->IsVisible())
+			return;
+
 		FHitResult Hit;
-		bool bHit = false;
-		UBillboardComponent* Billboard = Cast<UBillboardComponent>(*It);
+		bool bHit;
+
+		UBillboardComponent* Billboard = Cast<UBillboardComponent>(Component);
 		if (Billboard && ResolveBillboard)
 			bHit = Billboard->LineTraceComponentForView(WorldRay, Hit, ResolveBillboard(*Billboard, ViewContext));
 		else
-			bHit = It->LineTraceComponent(WorldRay, Hit);
+			bHit = Component->LineTraceComponent(WorldRay, Hit);
 		if (bHit && Hit.HitComponent && Hit.Distance >= 0.0f && Hit.Distance < OutHit.Distance)
 			OutHit = Hit;
-	}
+	};
+
+	Scene.BVH.Query(
+		[&](const FBox& Bounds)
+		{
+			float BoundsT;
+			return RayIntersectsAABB(WorldRay, Bounds.Min, Bounds.Max, BoundsT) && BoundsT <= OutHit.Distance;
+		}, 
+		TraceComponent);
+
 	return OutHit.HitComponent != nullptr;
 }
 
