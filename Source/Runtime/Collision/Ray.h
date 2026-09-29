@@ -25,6 +25,7 @@ bool RayIntersectsAABB(const FRay& Ray, const FVector& BoxMin, const FVector& Bo
 bool RayIntersectsTriangle(const FRay& Ray, const FVector& v1, const FVector& v2, const FVector& v3, float& OutT);
 
 bool RayIntersectsMesh(const FRay& LocalRay, const FStaticMeshData& Mesh, float& OutT);
+bool RayIntersectsMeshInsideAABB(const FRay& LocalRay, const FStaticMeshData& Mesh, float& OutT); // AABB 검사를 생략하는 버전
 
 FVector2 WorldToScreen(const FVector& WorldPos, const FMatrix& ViewProj, int ScreenW, int ScreenH);
 

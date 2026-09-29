@@ -375,11 +375,13 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 		if (UBillboardComponent* Billboard = Cast<UBillboardComponent>(Component);
 			Billboard && ResolveBillboard)
 		{
-			bHit = Billboard->LineTraceComponentForView(WorldRay, Hit, ResolveBillboard(*Billboard, ViewContext));
+			bHit = ResolveBillboard 
+				? Billboard->LineTraceComponentForView(WorldRay, Hit, ResolveBillboard(*Billboard, ViewContext))
+				: Billboard->LineTraceComponent(WorldRay, Hit);
 		}
 		else
 		{
-			bHit = Component->LineTraceComponent(WorldRay, Hit);
+			bHit = Component->LineTraceComponentInsideAABB(WorldRay, Hit);
 		}
 
 		if (!bHit ||

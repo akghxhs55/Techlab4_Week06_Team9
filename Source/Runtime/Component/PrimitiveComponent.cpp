@@ -1,4 +1,4 @@
-#include "EnginePCH.h"
+﻿#include "EnginePCH.h"
 #include "PrimitiveComponent.h"
 #include "../Render/Renderer.h"
 #include "Asset/AssetManager.h"
@@ -71,6 +71,12 @@ bool UPrimitiveComponent::LineTraceComponent(const FRay& WorldRay, FHitResult& O
 	return Mesh && TraceMesh(WorldRay, *Mesh, GetWorldMatrix(), OutHit);
 }
 
+bool UPrimitiveComponent::LineTraceComponentInsideAABB(const FRay& WorldRay, FHitResult& OutHit)
+{
+	const FStaticMeshData* Mesh = GetMeshData();
+	return Mesh && TraceMeshInsideAABB(WorldRay, *Mesh, GetWorldMatrix(), OutHit);
+}
+
 void UPrimitiveComponent::OnTransformDirty()
 {
 	if (SceneProxy)
@@ -86,10 +92,15 @@ bool UPrimitiveComponent::TraceMesh(const FRay& WorldRay, const FStaticMeshData&
 		return false;
 	}
 
+	return TraceMeshInsideAABB(WorldRay, Mesh, WorldMatrix, OutResult);
+}
+
+bool UPrimitiveComponent::TraceMeshInsideAABB(const FRay& WorldRay, const FStaticMeshData& Mesh, const FMatrix& WorldMatrix, FHitResult& OutResult)
+{
 	FRay LocalRay = ToLocalRay(WorldRay, WorldMatrix);
 	float T;
 
-	if (!RayIntersectsMesh(LocalRay, Mesh, T)) return false;
+	if (!RayIntersectsMeshInsideAABB(LocalRay, Mesh, T)) return false;
 
 	OutResult.HitComponent = this;
 	OutResult.Distance = T;

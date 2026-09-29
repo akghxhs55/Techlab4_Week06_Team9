@@ -63,13 +63,7 @@ bool RayIntersectsTriangle(const FRay& Ray, const FVector& v1, const FVector& v2
     FVectorRegister edge1 = VectorSIMD::Sub(VectorSIMD::LoadFloat3(&v2.X), VectorSIMD::LoadFloat3(&v1.X));
     FVectorRegister edge2 = VectorSIMD::Sub(VectorSIMD::LoadFloat3(&v3.X), VectorSIMD::LoadFloat3(&v1.X));
 
-    const FVectorRegister normal = VectorSIMD::Cross3(edge1, edge2);
     FVectorRegister RayVector = VectorSIMD::LoadFloat3(&Ray.Direction.X);
-    if (VectorSIMD::Dot(normal,RayVector) > 0.0f) // 내적의 결과가 양수면 뒷면임
-    {
-        return false;
-    }
-
     const FVectorRegister rayCrossVec = VectorSIMD::Cross3(RayVector, edge2);
     float det = VectorSIMD::Dot(rayCrossVec, edge1);
     if (fabs(det) < epsilon)
@@ -118,9 +112,15 @@ bool RayIntersectsMesh(const FRay& LocalRay, const FStaticMeshData& Mesh, float&
         return false;
     }
 
+    return RayIntersectsMeshInsideAABB(LocalRay, Mesh, OutT);
+}
+
+// AABB 검사를 생략하는 버전
+bool RayIntersectsMeshInsideAABB(const FRay& LocalRay, const FStaticMeshData& Mesh, float& OutT)
+{
     bool bHit = false;
     float NearestT = FLT_MAX;
-    
+
     if (Mesh.TriangleBVH)
     {
         bHit = Mesh.TriangleBVH->TraceClosest(
@@ -128,16 +128,16 @@ bool RayIntersectsMesh(const FRay& LocalRay, const FStaticMeshData& Mesh, float&
             {
                 return RayIntersectsAABB(LocalRay, Bounds.Min, Bounds.Max, OutEnterT);
             },
-			[&](const FMeshTriangleElement& Element, float& OutNearestT)
+            [&](const FMeshTriangleElement& Element, float& OutNearestT)
             {
                 float T = FLT_MAX;
                 if (RayIntersectsTriangle(
-                	LocalRay,
-                	Mesh.Vertices[Mesh.Indices[Element.TriangleIndex * 3]].Position, 
-                	Mesh.Vertices[Mesh.Indices[Element.TriangleIndex * 3 + 1]].Position, 
-                	Mesh.Vertices[Mesh.Indices[Element.TriangleIndex * 3 + 2]].Position,
-                	T) &&
-                	T < OutNearestT)
+                    LocalRay,
+                    Mesh.Vertices[Mesh.Indices[Element.TriangleIndex * 3]].Position,
+                    Mesh.Vertices[Mesh.Indices[Element.TriangleIndex * 3 + 1]].Position,
+                    Mesh.Vertices[Mesh.Indices[Element.TriangleIndex * 3 + 2]].Position,
+                    T) &&
+                    T < OutNearestT)
                 {
                     OutNearestT = T;
                     return true;
