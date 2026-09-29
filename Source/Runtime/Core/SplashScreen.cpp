@@ -233,6 +233,12 @@ void FSplashScreen::Show(HINSTANCE hInstance, const FString& ImagePath)
 	GSplash.WindowReady.wait(Lock, [] {return GSplash.bWindowCreated;});
 }
 
+void FSplashScreen::SetText(const FString& Text)
+{
+	std::wstring WString(Text.begin(), Text.end());
+	SetText(WString);
+}
+
 void FSplashScreen::SetText(const std::wstring& Text)
 {
 	HWND hWnd;

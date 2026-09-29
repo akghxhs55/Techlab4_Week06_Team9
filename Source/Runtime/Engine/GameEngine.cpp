@@ -20,8 +20,6 @@ bool UGameEngine::Init()
 {
 	if (!Super::Init()) return false;
 
-
-
 	return true;
 }
 

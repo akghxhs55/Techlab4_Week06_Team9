@@ -13,6 +13,7 @@
 #include <algorithm>
 
 DECLARE_CYCLE_STAT("Draw Render Packets", STAT_DrawRenderPackets);
+DECLARE_CYCLE_STAT("Render Opaque Packet Copy", STAT_RenderOpaque);
 
 bool FRenderer::Init()
 {
@@ -50,6 +51,9 @@ void FRenderer::RenderTranslucent(const FMatrix& ViewProjection)
 
 void FRenderer::RenderQueueSorting(TQueue<FRenderPacket>& InQueue, const FMatrix& ViewProjection)
 {
+	SCOPE_CYCLE_COUNTER(STAT_RenderOpaque);
+
+	// 재질·UV 처리와 정렬은 유지하고 View 사이의 임시 배열 할당만 줄인다.
 	RenderPackets.Reset();
 
 	while (InQueue.IsEmpty() == false)

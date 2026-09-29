@@ -65,6 +65,12 @@ AActor* UWorld::SpawnActor(UClass* Class, FName InName, const FTransform* Transf
 	NewActor->World = this;
 	NewActor->Level = PersistentLevel;
 
+	for (UActorComponent* Component : NewActor->GetComponents())
+	{
+		if (UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Component))
+			Scene.AddPrimitive(Primitive);
+	}
+
 	// 3. Transform 적용
 	const FTransform SpawnTransform = Transform ? *Transform : FTransform::Identity;
 
@@ -127,32 +133,25 @@ void UWorld::ClearWorld()
 
 void UWorld::GatherRenderPackets(TQueue<FRenderPacket>& RenderQueue, const FLODViewContext* LODView, const FFrustumPlanes* Frustum)
 {
-	for (TObjectIterator<UPrimitiveComponent> Itr; Itr; ++Itr)
+	const int32 Count = Scene.Proxies.Num();
+	for(int32 i = 0; i<Count ;++i)
 	{
-		if (!*Itr || !Itr->IsVisible())
-			continue;
+		if (!Scene.PrimitiveFlags[i]) continue;
+		if (Frustum && !IsAABBInFrustum(Scene.PrimitiveBounds[i], *Frustum)) continue;
 
-		if (Frustum)
-		{
-			const FBox Box = Itr->CalcBounds(); 
-			const FAABB Bounds{
-				(Box.Min + Box.Max) * 0.5f,
-				(Box.Max - Box.Min) * 0.5f
-			};
-			if (!IsAABBInFrustum(Bounds, *Frustum))
-				continue;
-		}
+		FPrimitiveSceneProxy* Proxy = Scene.Proxies[i];
+		const FMatrix& World = Proxy->GetLocalToWorld();
 
 		if (LODView)
 		{
-			if (auto* Component = Cast<UStaticMeshComponent>(*Itr))
+			if (auto* Component = Cast<UStaticMeshComponent>(Proxy->GetComponent()))
 			{
 				if (UStaticMesh* Mesh =
 					Component->GetStaticMesh())
 				{
 					const uint32 LOD = SelectStaticMeshLOD(
 							*Mesh,
-							Component->GetWorldMatrix(),
+							World,
 							*LODView);
 
 					Component->SubmitToRenderQueue(RenderQueue, LOD);
@@ -161,9 +160,49 @@ void UWorld::GatherRenderPackets(TQueue<FRenderPacket>& RenderQueue, const FLODV
 			}
 		}
 
-		Itr->SubmitToRenderQueue(RenderQueue);
+		Proxy->GetComponent()->SubmitToRenderQueue(RenderQueue);
 	}
 }
+
+//void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderArray, const FLODViewContext* LODView, const FFrustumPlanes* Frustum)
+//{
+//	for (TObjectIterator<UPrimitiveComponent> Itr; Itr; ++Itr)
+//	{
+//		if (!*Itr || !Itr->IsVisible())
+//			continue;
+//
+//		if (Frustum)
+//		{
+//			const FBox Box = Itr->CalcBounds();
+//			const FAABB Bounds{
+//				(Box.Min + Box.Max) * 0.5f,
+//				(Box.Max - Box.Min) * 0.5f
+//			};
+//			if (!IsAABBInFrustum(Bounds, *Frustum))
+//				continue;
+//		}
+//
+//		if (LODView)
+//		{
+//			if (auto* Component = Cast<UStaticMeshComponent>(*Itr))
+//			{
+//				if (UStaticMesh* Mesh =
+//					Component->GetStaticMesh())
+//				{
+//					const uint32 LOD = SelectStaticMeshLOD(
+//						*Mesh,
+//						Component->GetWorldMatrix(),
+//						*LODView);
+//
+//					Component->SubmitToRenderQueue(RenderQueue, LOD);
+//					continue;
+//				}
+//			}
+//		}
+//
+//		Itr->SubmitToRenderQueue(RenderQueue);
+//	}
+//}
 
 // 메인 카메라 생성
 void UWorld::CreateMainCamera()

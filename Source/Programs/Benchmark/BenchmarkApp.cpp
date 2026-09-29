@@ -99,6 +99,8 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 		World->Tick(DeltaTime);
 	}
 
+	World->GetScene().UpdateAllTransforms();
+
 	const uint32 Width = GetEngineLoop().GetViewportWidth();
 	const uint32 Height = GetEngineLoop().GetViewportHeight();
 	if (Width == 0 || Height == 0)
@@ -111,7 +113,8 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 	const FMatrix ViewProjection = Camera->GetViewProjectionMatrix();
 	const FFrustumPlanes Frustum = ExtractFrustumPlanes(ViewProjection);
 
-
+	TArray<FRenderPacket> RenderPackets;
+	RenderPackets.Reserve(100000);
 	TQueue<FRenderPacket> RenderQueue;
 	{
 		SCOPE_CYCLE_COUNTER(STAT_GatherRenderPackets);

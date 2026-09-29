@@ -9,6 +9,7 @@
 #include "Render/Renderer.h"
 #include "PathTracker.h"
 #include "Math/Frustum.h"
+#include "Engine/Scene.h"
 
 #include "Camera/CameraActor.h"
 
@@ -41,6 +42,7 @@ public:
 	void ClearWorld();
 
 	void GatherRenderPackets(TQueue<FRenderPacket>& RenderQueue, const FLODViewContext* LODView = nullptr, const FFrustumPlanes* Frustum = nullptr);
+	void GatherRenderPackets(TArray<FRenderPacket>& RenderArray, const FLODViewContext* LODView = nullptr, const FFrustumPlanes* Frustum = nullptr);
 
 	void CreateMainCamera();
 
@@ -70,6 +72,7 @@ public:
 	void BeginPlay();
 	void EndPlay();
 
+	FScene& GetScene() { return Scene; }
 private:
 	TQueue<AActor*> BeginPlayList;
 	
@@ -81,4 +84,6 @@ private:
 	ULevel* PersistentLevel = nullptr;
 	ULevel* CurrentLevel = nullptr;
 	TArray<ULevel*> Levels;
+
+	FScene Scene;
 };

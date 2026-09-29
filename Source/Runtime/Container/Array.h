@@ -10,6 +10,8 @@ template<typename T>
 class TArray
 {
 public:
+	using ElementType = T;
+
 	TArray() = default;
 	~TArray() = default;
 
@@ -55,9 +57,19 @@ public:
 
 	void Reserve(uint32 Number);
 
+	bool Find(const ElementType& Item, int32& Index) const
+	{
+		Index = Find(Item);
+		return Index != -1;
+	};
+	int32 Find(const ElementType& Item) const
+	{
+		return std::find(Item.begin(), Item.end(), Item) - Item.begin();
+	}
+
 	int32 Num() const;
 	int32 Max() const;
-	
+
 	bool IsEmpty() const;
 
 	void Reset();

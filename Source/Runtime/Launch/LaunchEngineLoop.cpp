@@ -79,9 +79,15 @@ bool FEngineLoop::PreInit(HINSTANCE hInstance, UClass* EngineClass)
 	}
 
 	FSplashScreen::SetText(L"Loading Assets...");
-	FSplashScreen::SetProgress(0.3f);
 	FRenderResourceManager::Init();
-	UAssetManager::Init();
+
+	constexpr float AssetStart = 0.1f;
+	constexpr float AssetEnd = 0.8f;
+	UAssetManager::Init([](int32 Loaded, int32 Total, const FString& Path)
+		{
+			FSplashScreen::SetText("Loading " + Path);
+			FSplashScreen::SetProgress(AssetStart + (AssetEnd - AssetStart) * Loaded / Total);
+		});
 
 	FSplashScreen::SetText(L"Initializing Engine...");
 	FSplashScreen::SetProgress(0.8f);

@@ -35,6 +35,7 @@ void GetObjectsOfClass(const UClass* ClassToLookFor, TArray<UObject*>& Results, 
 {
 	if (!ClassToLookFor) return;
 
+	Results.Reserve(Results.Num() + GUObjectArray.Num());
 	//Class에 해당하는 Objects 리스트를 가져온다.
 	if (const TSet<UObject*>* Objects = GetClassToObjects().Find(ClassToLookFor))
 	{
