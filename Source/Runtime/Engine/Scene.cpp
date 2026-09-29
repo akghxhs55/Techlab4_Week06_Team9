@@ -9,6 +9,7 @@ void FScene::AddPrimitive(UPrimitiveComponent* Component)
 	Proxy->Scene = this;
 	Proxy->PackedIndex = Proxies.Num();
 	Component->SceneProxy = Proxy;
+	MarkDirty(Proxy);
 
 	Proxies.Add(Proxy);
 	PrimitiveBounds.Add(FAABB{});
@@ -33,6 +34,12 @@ void FScene::RemovePrimitive(UPrimitiveComponent* Component)
 	if (Index < static_cast<uint32>(Proxies.Num()))
 		Proxies[Index]->PackedIndex = static_cast<int32>(Index);
 
+	if (Proxy->bQueuedForUpdate)
+	{
+		const int32 Found = DirtyProxies.Find(Proxy);   // 프로젝트 TArray의 Find 이름에 맞게
+		if (Found != INDEX_NONE) DirtyProxies.RemoveAtSwap(Found);
+	}
+
 	Component->SceneProxy = nullptr;
 	delete Proxy;
 
@@ -41,30 +48,38 @@ void FScene::RemovePrimitive(UPrimitiveComponent* Component)
 
 void FScene::UpdateAllTransforms()
 {
-	bool bBoundsChanged = false;
-
-	const int32 Count = Proxies.Num();
-	for (int32 i = 0; i < Count; ++i)
+	for (FPrimitiveSceneProxy* Proxy : DirtyProxies)
 	{
-		FPrimitiveSceneProxy* Proxy = Proxies[i];
 		Proxy->UpdateTransform();
-
-		const FAABB& Bounds = Proxy->GetBounds();
-		if (PrimitiveBounds[i].Center != Bounds.Center || PrimitiveBounds[i].Extent != Bounds.Extent)
-		{
-			bBoundsChanged = true;
-		}
-
-		PrimitiveBounds[i] = Proxy->GetBounds();
-		PrimitiveFlags[i] = Proxy->GetComponent()->IsVisible() ? 1 : 0;
+		PrimitiveBounds[Proxy->PackedIndex] = Proxy->GetBounds();
+		PrimitiveFlags[Proxy->PackedIndex] = Proxy->GetComponent()->IsVisible() ? 1 : 0;
+		Proxy->bQueuedForUpdate = false;
 	}
+	//const int32 Count = Proxies.Num();
+	//for (int32 i = 0; i < Count; ++i)
+	//{
+	//	FPrimitiveSceneProxy* Proxy = Proxies[i];
+	//	Proxy->UpdateTransform();
+
+	//	const FAABB& Bounds = Proxy->GetBounds();
+	//	if (PrimitiveBounds[i].Center != Bounds.Center || PrimitiveBounds[i].Extent != Bounds.Extent)
+	//	{
+	//		bBoundsChanged = true;
+	//	}
+
+	//	PrimitiveBounds[i] = Proxy->GetBounds();
+	//	PrimitiveFlags[i] = Proxy->GetComponent()->IsVisible() ? 1 : 0;
+	//}
+
+	const bool bAnyMoved = DirtyProxies.Num() > 0;
+	DirtyProxies.Reset();
 
 	if (bElementListChanged)
 	{
 		BuildBVH();
 		bElementListChanged = false;
 	}
-	else if (bBoundsChanged)
+	else if (bAnyMoved)
 	{
 		BVH.Refit();
 	}
@@ -83,4 +98,11 @@ void FScene::BuildBVH()
 	}
 
 	BVH.Build(std::span(Components.GetData(), Components.Num()));
+}
+
+void FScene::MarkDirty(FPrimitiveSceneProxy* Proxy)
+{
+	if (Proxy->bQueuedForUpdate) return;            // 중복 추가 방지
+	Proxy->bQueuedForUpdate = true;
+	DirtyProxies.Add(Proxy);
 }
