@@ -150,7 +150,6 @@ bool FEngineLoop::Tick()
 	return bIsRunning;
 }
 
-// 엔진 → 공용 자원 → UObject → GEngine → Device 순으로 정리한다.
 // UObject(에셋 포함)의 GPU 자원은 Device가 살아 있을 때 해제한다.
 void FEngineLoop::Exit()
 {

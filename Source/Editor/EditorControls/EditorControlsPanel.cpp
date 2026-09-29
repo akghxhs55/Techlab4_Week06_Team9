@@ -93,10 +93,14 @@ void FEditorControlsPanel::OnRender()
 
 	//////////////////////////////////////////////////////
 
-	ImGui::Dummy(ImVec2(0.0f, SectionGap));
-	ImGui::SeparatorText("Gizmo");
+	// Gizmo가 없는 앱(Benchmark 등)에서는 이 섹션을 통째로 건너뛴다.
+	if (Gizmo)
+	{
+		ImGui::Dummy(ImVec2(0.0f, SectionGap));
+		ImGui::SeparatorText("Gizmo");
+	}
 
-	if (ImGui::BeginTable("GizmoControls", 2))
+	if (Gizmo && ImGui::BeginTable("GizmoControls", 2))
 	{
 		ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, 70.0f);
 		ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
