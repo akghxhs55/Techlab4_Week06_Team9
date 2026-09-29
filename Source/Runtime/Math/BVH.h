@@ -2,6 +2,8 @@
 
 #include "Box.h"
 
+enum class EBVHCullResult : uint8 { Outside, Intersect, Inside };
+
 template <typename T>
 class TBVH
 {
@@ -12,6 +14,7 @@ public:
 	{
 		QueryStack.Reserve(MaxDepth + 1);
 		TraceStack.Reserve(MaxDepth + 1);
+		CullStack.Reserve(MaxDepth + 1);
 	}
 
 	void Build(std::span<const T> InElements);
@@ -21,6 +24,11 @@ public:
 
 	template <typename TBoundsPredicate, typename TVisitor>
 	void Query(TBoundsPredicate&& BoundsTest, TVisitor&& Visitor) const;
+
+	// Classify(const FBox&, uint32& Mask) -> EBVHCullResult.
+	// Inside인 노드는 하위 원소를 검사 없이 모두 방문하고, Mask는 부모에서 통과한 평면을 자식에게 넘긴다.
+	template <typename TClassify, typename TVisitor>
+	void QueryCull(uint32 InitialMask, TClassify&& Classify, TVisitor&& Visitor) const;
 
 	template <typename TBoundsPredicate, typename TRayHit>
 	bool TraceClosest(TBoundsPredicate&& BoundsTrace, TRayHit&& LeafTrace, float& OutNearestT) const;
@@ -37,6 +45,8 @@ private:
 
 		uint32 FirstElement = 0;
 		uint32 ElementCount = 0;
+		// Partition이 원소를 제자리에서 나누므로 하위 트리 원소는 [FirstElement, FirstElement + SubtreeCount)에 연속한다.
+		uint32 SubtreeCount = 0;
 
 		bool IsLeaf() const
 		{
@@ -63,6 +73,12 @@ private:
 		float EnterT;
 	};
 
+	struct FCullStackEntry
+	{
+		uint32 Index;
+		uint32 Mask;
+	};
+
 	static constexpr uint32 InvalidIndex = std::numeric_limits<uint32>::max();
 	static constexpr uint32 MaxDepth = 32;
 	static constexpr uint32 MinSplitSize = 8;
@@ -84,6 +100,7 @@ private:
 
 	mutable TArray<uint32> QueryStack;
 	mutable TArray<FStackEntry> TraceStack;
+	mutable TArray<FCullStackEntry> CullStack;
 };
 
 template <typename T>
@@ -156,6 +173,68 @@ void TBVH<T>::Query(TBoundsPredicate&& BoundsTest, TVisitor&& Visitor) const
 			if (Node.RightChild != InvalidIndex)
 			{
 				QueryStack.Add(Node.RightChild);
+			}
+		}
+	}
+}
+
+template <typename T>
+template <typename TClassify, typename TVisitor>
+void TBVH<T>::QueryCull(uint32 InitialMask, TClassify&& Classify, TVisitor&& Visitor) const
+{
+	if (Nodes.IsEmpty())
+	{
+		return;
+	}
+
+	CullStack.Reset();
+	CullStack.Add({ 0, InitialMask });
+	while (!CullStack.IsEmpty())
+	{
+		const FCullStackEntry Entry = CullStack.Last();
+		CullStack.RemoveLast();
+
+		const FNode& Node = Nodes[Entry.Index];
+
+		uint32 Mask = Entry.Mask;
+		const EBVHCullResult Result = Mask ? Classify(Node.Bounds, Mask) : EBVHCullResult::Inside;
+		if (Result == EBVHCullResult::Outside)
+		{
+			continue;
+		}
+
+		if (Result == EBVHCullResult::Inside)
+		{
+			// 완전히 안쪽인 노드는 하위 원소를 개별 검사 없이 모두 방문한다.
+			const uint32 End = Node.FirstElement + Node.SubtreeCount;
+			for (uint32 i = Node.FirstElement; i < End; ++i)
+			{
+				Visitor(Elements[i].Value);
+			}
+			continue;
+		}
+
+		if (Node.IsLeaf())
+		{
+			for (uint32 i = 0; i < Node.ElementCount; ++i)
+			{
+				const FElement& Element = Elements[Node.FirstElement + i];
+				uint32 ElementMask = Mask;
+				if (Classify(Element.Bounds, ElementMask) != EBVHCullResult::Outside)
+				{
+					Visitor(Element.Value);
+				}
+			}
+		}
+		else
+		{
+			if (Node.LeftChild != InvalidIndex)
+			{
+				CullStack.Add({ Node.LeftChild, Mask });
+			}
+			if (Node.RightChild != InvalidIndex)
+			{
+				CullStack.Add({ Node.RightChild, Mask });
 			}
 		}
 	}
@@ -262,6 +341,7 @@ uint32 TBVH<T>::BuildNode(uint32 First, uint32 Count, uint32 Depth)
 
 	Node.FirstElement = First;
 	Node.ElementCount = Count;
+	Node.SubtreeCount = Count;
 	Node.Bounds = ComputeBounds(First, Count);
 
 	if (Count <= MinSplitSize || Depth >= MaxDepth)

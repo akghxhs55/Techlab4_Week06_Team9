@@ -7,6 +7,7 @@
 
 AActor::AActor()
 {
+    PrimaryActorTick.Target = this;
 }
 
 AActor::~AActor()
@@ -28,17 +29,33 @@ void AActor::BeginPlay()
 	//	World->AddPrimitive(Cast<UPrimitiveComponent>(RootComponent));
 	//}
 
-	for (UActorComponent* Component : Components) 
+	for (UActorComponent* Component : Components)
 	{
 		Component->BeginPlay();
 	}
+
+	RegisterAllActorTickFunctions(true);
 }
 
-void AActor::Tick(float DeltaTime)
+void AActor::RegisterAllActorTickFunctions(bool bRegister)
 {
+	if (bRegister && !World)
+		return;
+
+	// bCanEverTick이 꺼진 함수는 등록하지 않으므로 정적 메시 액터는 매 프레임 순회 대상에서 빠진다.
+	auto Apply = [&](FTickFunction& Function)
+	{
+		if (bRegister)
+			Function.RegisterTickFunction(World->GetTickTaskManager());
+		else
+			Function.UnRegisterTickFunction();
+	};
+
+	Apply(PrimaryActorTick);
 	for (UActorComponent* Component : Components)
 	{
-		Component->TickComponent(DeltaTime);
+		if (Component)
+			Apply(Component->PrimaryComponentTick);
 	}
 }
 

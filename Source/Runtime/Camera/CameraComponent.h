@@ -11,7 +11,7 @@ class UCameraComponent : public USceneComponent
 	DECLARE_CLASS(UCameraComponent, USceneComponent)
 
 public:
-	UCameraComponent() = default;
+	UCameraComponent() { PrimaryComponentTick.bCanEverTick = true; }   // 이동·회전 입력을 매 프레임 처리한다
 
 	// 매 프레임 카메라 입력/이동 처리
 	virtual void TickComponent(float DeltaTime) override;

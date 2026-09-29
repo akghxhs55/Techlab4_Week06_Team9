@@ -14,6 +14,9 @@ const float UParticleSubUVComponent::MAX_NORMALIZED_VALUE = 1.0f;
 
 UParticleSubUVComponent::UParticleSubUVComponent()
 {
+	// 파티클 시뮬레이션을 매 프레임 진행한다.
+	PrimaryComponentTick.bCanEverTick = true;
+
 	ColSize = 8;
 	RowSize = 8;
 	FrameRate = 12.0f;

@@ -24,10 +24,11 @@ public:
 	TArray<FAABB> PrimitiveBounds;
 	TArray<uint8> PrimitiveFlags;
 
-	TBVH<UPrimitiveComponent*> BVH{
-		[](const UPrimitiveComponent* Component) -> FBox
+	// 컬링 결과로 프록시를 바로 내보내 컴포넌트를 역참조하지 않는다. 경계는 Build/Refit 때만 계산한다.
+	TBVH<FPrimitiveSceneProxy*> BVH{
+		[](const FPrimitiveSceneProxy* Proxy) -> FBox
 		{
-			return Component->CalcBounds();
+			return Proxy->GetComponent()->CalcBounds();
 		}
 	};
 	bool bElementListChanged = false;

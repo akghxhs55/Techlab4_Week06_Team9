@@ -46,7 +46,7 @@ public:
 	void CreateMainCamera();
 
 	// 카메라 Get/Set
-	void SetMainCamera(ACameraActor* Camera) { MainCamera = Camera; }
+	void SetMainCamera(ACameraActor* Camera);
 	ACameraActor* GetMainCamera() const { return MainCamera; }
 	
 	// Level
@@ -72,7 +72,11 @@ public:
 	void EndPlay();
 
 	FScene& GetScene() { return Scene; }
+	FTickTaskManager& GetTickTaskManager() { return TickTaskManager; }
 private:
+	// 등록된 Tick 함수만 실행한다. Actor보다 먼저 사라져도 남은 함수와의 연결을 스스로 끊는다.
+	FTickTaskManager TickTaskManager;
+
 	TQueue<AActor*> BeginPlayList;
 	
 	//메인 카메라 
@@ -85,4 +89,7 @@ private:
 	TArray<ULevel*> Levels;
 
 	FScene Scene;
+
+	// GatherRenderPackets가 매 프레임 채우는 컬링 결과. 용량을 재사용한다.
+	TArray<FPrimitiveSceneProxy*> VisibleProxies;
 };

@@ -110,18 +110,12 @@ void UWorld::Tick(float DeltaTime)
 
 	{
 		SCOPE_CYCLE_COUNTER(STAT_ActorTick);
+		// 모든 Actor를 도는 대신 등록된 Tick 함수(메인 카메라 포함)만 실행한다.
+		TickTaskManager.RunAllTickGroups(DeltaTime);
+
 		for (ULevel* Level : Levels)
 		{
-			for (AActor* Actor : Level->GetActors())
-			{
-				Actor->Tick(DeltaTime);
-			}
 			PathTracker.Tick(Level->GetActors(), DeltaTime);
-		}
-
-		if (MainCamera)
-		{
-			MainCamera->Tick(DeltaTime);
 		}
 	}
 
@@ -152,18 +146,27 @@ void UWorld::ClearWorld()
 
 void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODViewContext* LODView, const FFrustumPlanes* Frustum)
 {
-	TArray<FPrimitiveSceneProxy*> VisibleProxies;
+	// 멤버로 두어 매 프레임 용량을 재사용한다.
+	VisibleProxies.Reset();
 	{
 		SCOPE_CYCLE_COUNTER(STAT_FrustumCull);
-		const int32 Count = Scene.Proxies.Num();
-		Scene.BVH.Query(
-			[&](const FBox& Bounds) {
-				return !Frustum || IsAABBInFrustum(MakeWorldBounds(Bounds), *Frustum);
-			},
-			[&](UPrimitiveComponent* Component) {
-				if (Component && Component->IsVisible())
-					VisibleProxies.Add(Component->GetSceneProxy());
-			});
+		// 컬링 단계에서는 프록시 포인터만 모으고, 컴포넌트 역참조(가시성 확인)는 어차피 컴포넌트를 읽는 Gather로 미룬다.
+		const auto Visit = [&](FPrimitiveSceneProxy* Proxy) { VisibleProxies.Add(Proxy); };
+
+		if (Frustum)
+		{
+			Scene.BVH.QueryCull(
+				FrustumAllPlanesMask,
+				[Frustum](const FBox& Bounds, uint32& Mask)
+				{
+					return static_cast<EBVHCullResult>(ClassifyBoxInFrustum(Bounds, *Frustum, Mask));
+				},
+				Visit);
+		}
+		else
+		{
+			Scene.BVH.QueryCull(0, [](const FBox&, uint32&) { return EBVHCullResult::Inside; }, Visit);
+		}
 	}
 
 	RenderQueue.Reserve(VisibleProxies.Num());
@@ -172,11 +175,13 @@ void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODV
 		SCOPE_CYCLE_COUNTER(STAT_GatherElements);
 		for (FPrimitiveSceneProxy* Proxy : VisibleProxies)
 		{
-			const FMatrix& World = Proxy->GetLocalToWorld();
+			UPrimitiveComponent* Primitive = Proxy->GetComponent();
+			if (!Primitive || !Primitive->IsVisible())
+				continue;
 
 			if (LODView)
 			{
-				if (auto* Component = Cast<UStaticMeshComponent>(Proxy->GetComponent()))
+				if (auto* Component = Cast<UStaticMeshComponent>(Primitive))
 				{
 					if (UStaticMesh* Mesh =
 						Component->GetStaticMesh())
@@ -195,7 +200,7 @@ void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODV
 				}
 			}
 
-			Proxy->GetComponent()->SubmitToRenderQueue(RenderQueue);
+			Primitive->SubmitToRenderQueue(RenderQueue);
 		}
 	}
 }
@@ -257,6 +262,26 @@ void UWorld::CreateMainCamera()
 	MainCamera->World = this;
 	MainCamera->Level = nullptr;
 	MainCamera->GetCameraComponent()->SetRelativeLocation(FVector(-5.0f, -5.0f, 5.0f));
+
+	// 메인 카메라는 Level에 속하지 않아 BeginPlay를 거치지 않으므로 여기서 등록한다.
+	MainCamera->RegisterAllActorTickFunctions(true);
+}
+
+void UWorld::SetMainCamera(ACameraActor* Camera)
+{
+	if (MainCamera == Camera)
+		return;
+
+	if (MainCamera)
+		MainCamera->RegisterAllActorTickFunctions(false);
+
+	MainCamera = Camera;
+
+	if (MainCamera)
+	{
+		MainCamera->World = this;
+		MainCamera->RegisterAllActorTickFunctions(true);
+	}
 }
 
 int32 UWorld::GetActorNum()
@@ -371,8 +396,8 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 	};
 
 	Scene.BVH.TraceClosest(
-		[&](const FBox& Bounds, float& OutEnterT) { return RayIntersectsAABB(WorldRay, Bounds.Min, Bounds.Max, OutEnterT); }, 
-		TraceComponent,
+		[&](const FBox& Bounds, float& OutEnterT) { return RayIntersectsAABB(WorldRay, Bounds.Min, Bounds.Max, OutEnterT); },
+		[&](FPrimitiveSceneProxy* Proxy, float& OutNearestT) { return TraceComponent(Proxy->GetComponent(), OutNearestT); },
 		NearestT);
 
 	return OutHit.HitComponent != nullptr;

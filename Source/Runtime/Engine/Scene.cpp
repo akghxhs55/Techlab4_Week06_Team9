@@ -90,14 +90,15 @@ void FScene::BuildBVH()
 	BVH.Clear();
 	// BillboardComponents.Reset();
 
-	TArray<UPrimitiveComponent*> Components;
-	for (int32 i = 0; i < Proxies.Num(); ++i)
+	TArray<FPrimitiveSceneProxy*> Elements;
+	Elements.Reserve(Proxies.Num());
+	for (FPrimitiveSceneProxy* Proxy : Proxies)
 	{
-		if (Proxies[i]->GetComponent())
-			Components.Add(Proxies[i]->GetComponent());
+		if (Proxy && Proxy->GetComponent())
+			Elements.Add(Proxy);
 	}
 
-	BVH.Build(std::span(Components.GetData(), Components.Num()));
+	BVH.Build(std::span(Elements.GetData(), Elements.Num()));
 }
 
 void FScene::MarkDirty(FPrimitiveSceneProxy* Proxy)
