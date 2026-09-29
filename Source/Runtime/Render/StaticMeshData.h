@@ -2,7 +2,7 @@
 
 #include "Vertex.h"
 #include "BVH.h"
-#include "FBox.h"
+#include "Box.h"
 
 // Cooked obj Data의 Section 구조체
 struct FStaticMeshSection

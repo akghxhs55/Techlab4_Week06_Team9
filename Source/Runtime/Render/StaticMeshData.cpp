@@ -57,7 +57,7 @@ bool FStaticMeshData::Validate(FString& OutError) const
 void FStaticMeshData::BuildTriangleBVH()
 {
 	TArray<FMeshTriangleElement> Elements;
-	for (uint32 i = 0; i + 2 < Indices.Num(); i += 3)
+	for (int32 i = 0; i + 2 < Indices.Num(); i += 3)
 	{
 		FMeshTriangleElement Element;
 		Element.TriangleIndex = i / 3;

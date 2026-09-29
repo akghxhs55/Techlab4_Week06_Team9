@@ -80,7 +80,7 @@ void TBVH<T>::Build(std::span<T const> InElements)
 		return;
 	}
 
-	Elements.Reserve(InElements.size());
+	Elements.Reserve(static_cast<uint32>(InElements.size()));
 	for (const T& Element : InElements)
 	{
 		Elements.Emplace(Element, BoundsGetter(Element));
