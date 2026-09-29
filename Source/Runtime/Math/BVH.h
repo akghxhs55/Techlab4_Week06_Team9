@@ -10,8 +10,8 @@ public:
 
 	explicit TBVH(FBoundsGetter BoundsGetter) : BoundsGetter(std::move(BoundsGetter))
 	{
-		QueryStack.Reserve(MaxDepth);
-		TraceStack.Reserve(MaxDepth);
+		QueryStack.Reserve(MaxDepth + 1);
+		TraceStack.Reserve(MaxDepth + 1);
 	}
 
 	void Build(std::span<const T> InElements);
@@ -32,7 +32,6 @@ private:
 	{
 		FBox Bounds;
 
-		uint32 Parent = InvalidIndex;
 		uint32 LeftChild = InvalidIndex;
 		uint32 RightChild = InvalidIndex;
 
@@ -284,16 +283,8 @@ uint32 TBVH<T>::BuildNode(uint32 First, uint32 Count, uint32 Depth)
 
 	const uint32 LeftChild = BuildNode(First, Middle - First, Depth + 1);
 	const uint32 RightChild = BuildNode(Middle, First + Count - Middle, Depth + 1);
-	if (LeftChild != InvalidIndex)
-	{
-		Nodes[LeftChild].Parent = Index;
-	}
-	if (RightChild != InvalidIndex)
-	{
-		Nodes[RightChild].Parent = Index;
-	}
 
-	FNode& FinalNode = Nodes[Index]; // Nodes가 변경되어 참조가 무효화되는 경우 방ㅂ지
+	FNode& FinalNode = Nodes[Index]; // Nodes가 변경되어 참조가 무효화되는 경우 방지
 	FinalNode.LeftChild = LeftChild;
 	FinalNode.RightChild = RightChild;
 	FinalNode.ElementCount = 0;

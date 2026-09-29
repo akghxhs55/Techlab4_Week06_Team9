@@ -4,6 +4,10 @@
 #include "Asset/AssetManager.h"
 #include "Render/RenderCommand.h"
 
+
+#include "Engine/PrimitiveSceneProxy.h"
+#include "Engine/Scene.h"
+
 namespace
 {
 	FString PrimitiveTypeToString(EPrimitiveType Type)
@@ -65,6 +69,12 @@ bool UPrimitiveComponent::LineTraceComponent(const FRay& WorldRay, FHitResult& O
 {
 	const FStaticMeshData* Mesh = GetMeshData();
 	return Mesh && TraceMesh(WorldRay, *Mesh, GetWorldMatrix(), OutHit);
+}
+
+void UPrimitiveComponent::OnTransformDirty()
+{
+	if (SceneProxy)
+		SceneProxy->GetScene()->MarkDirty(SceneProxy);
 }
 
 bool UPrimitiveComponent::TraceMesh(const FRay& WorldRay, const FStaticMeshData& Mesh, const FMatrix& WorldMatrix, FHitResult& OutResult)

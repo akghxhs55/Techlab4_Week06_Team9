@@ -64,6 +64,8 @@ public:
 
 	FPrimitiveSceneProxy* GetSceneProxy() const { return SceneProxy; }
 
+	virtual void OnTransformDirty() override;
+
 protected:
 	bool TraceMesh(const FRay& WorldRay, const FStaticMeshData& Mesh, const FMatrix& WorldMatrix, FHitResult& OutResult);
 	bool bVisible = true;

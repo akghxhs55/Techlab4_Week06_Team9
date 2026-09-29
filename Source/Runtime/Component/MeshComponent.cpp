@@ -6,7 +6,6 @@
 #include "Render/Texture2D.h"
 #include "Serialization/TypeSerializer.h"
 
-
 UMeshComponent::UMeshComponent()
 {
 }

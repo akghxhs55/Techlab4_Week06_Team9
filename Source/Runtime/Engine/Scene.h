@@ -16,7 +16,11 @@ public:
 
 	void BuildBVH();
 
+	void MarkDirty(FPrimitiveSceneProxy* Proxy);
+	
+
 	TArray<FPrimitiveSceneProxy*> Proxies;
+	TArray<FPrimitiveSceneProxy*> DirtyProxies;
 	TArray<FAABB> PrimitiveBounds;
 	TArray<uint8> PrimitiveFlags;
 
@@ -27,4 +31,6 @@ public:
 		}
 	};
 	bool bElementListChanged = false;
+
+	
 };

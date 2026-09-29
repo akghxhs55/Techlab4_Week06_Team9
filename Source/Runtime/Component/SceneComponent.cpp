@@ -102,3 +102,12 @@ FMatrix USceneComponent::GetWorldMatrix() const
 	return LocalMatrix;
 }
 
+void USceneComponent::MarkTransformDirty()
+{
+	OnTransformDirty();         
+
+	for (USceneComponent* Child : AttachChildren)
+		Child->MarkTransformDirty();      // 부모가 움직이면 자식의 월드 행렬도 바뀐다
+}
+
+

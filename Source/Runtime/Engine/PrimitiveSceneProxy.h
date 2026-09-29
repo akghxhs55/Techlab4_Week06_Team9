@@ -26,4 +26,5 @@ private:
 	FAABB Bounds;
 	int32 PackedIndex = INDEX_NONE;
 
+	bool bQueuedForUpdate = false;
 };
