@@ -30,21 +30,13 @@ void FRenderer::RenderAll(TQueue<FRenderPacket>& InQueue, UCameraComponent* Came
 // 불투명 우선·반투명 거리순으로 정렬해 View 행렬과 Section 범위로 그린다.
 void FRenderer::RenderAll(TQueue<FRenderPacket>& InQueue, const FMatrix& ViewProjection)
 {
-	RenderOpaque(InQueue, ViewProjection);
+	RenderQueueSorting(InQueue, ViewProjection);
+	RenderOpaque(ViewProjection);
 	RenderTranslucent(ViewProjection);
 }
 
-// 큐를 정렬해 불투명 패킷만 그리고, 반투명 패킷은 RenderTranslucent를 위해 남겨 둔다.
-void FRenderer::RenderOpaque(TQueue<FRenderPacket>& InQueue, const FMatrix& ViewProjection)
+void FRenderer::RenderOpaque(const FMatrix& ViewProjection)
 {
-	// 재질·UV 처리와 정렬은 유지하고 View 사이의 임시 배열 할당만 줄인다.
-	RenderPackets.Reset();
-	while (InQueue.IsEmpty() == false)
-	{
-		RenderPackets.Add(InQueue.Peek());
-		InQueue.Dequeue();
-	}
-
 	DrawPackets(0, FirstTranslucentIndex, ViewProjection);
 }
 
@@ -54,6 +46,40 @@ void FRenderer::RenderTranslucent(const FMatrix& ViewProjection)
 	DrawPackets(FirstTranslucentIndex, static_cast<uint32>(RenderPackets.size()), ViewProjection);
 	RenderPackets.Reset();
 	FirstTranslucentIndex = 0;
+}
+
+void FRenderer::RenderQueueSorting(TQueue<FRenderPacket>& InQueue, const FMatrix& ViewProjection)
+{
+	RenderPackets.Reset();
+
+	while (InQueue.IsEmpty() == false)
+	{
+		RenderPackets.Add(InQueue.Peek());
+		InQueue.Dequeue();
+	}
+
+	std::stable_sort(
+		RenderPackets.begin(),
+		RenderPackets.end(),
+		[](const FRenderPacket& First, const FRenderPacket& Second) -> bool
+		{
+			const bool bFirstTranslucent = First.material->BlendState != EBlendState::Opaque;
+			const bool bSecondTranslucent = Second.material->BlendState != EBlendState::Opaque;
+
+			if (bFirstTranslucent != bSecondTranslucent) { return !bFirstTranslucent; }
+			if (bFirstTranslucent) { return First.CameraToParticleDistance > Second.CameraToParticleDistance; }
+			if (First.material != Second.material) { return std::less<UMaterial*>{}(First.material, Second.material); }
+			return std::less<UStaticMesh*>{}( First.mesh, Second.mesh);
+		});
+
+	// 정렬 결과 반투명은 뒤쪽에 모이므로 첫 반투명 위치에서 두 패스를 나눈다.
+	FirstTranslucentIndex = 0;
+	while (FirstTranslucentIndex < RenderPackets.size()
+		&& (RenderPackets[FirstTranslucentIndex].material == nullptr
+			|| RenderPackets[FirstTranslucentIndex].material->BlendState == EBlendState::Opaque))
+	{
+		++FirstTranslucentIndex;
+	}
 }
 
 // 정렬된 패킷 중 [Begin, End) 범위를 View 행렬과 Section 범위로 그린다.

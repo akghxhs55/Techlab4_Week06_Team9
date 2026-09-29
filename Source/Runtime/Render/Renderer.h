@@ -27,16 +27,20 @@ public:
 	void RenderAll(TQueue<FRenderPacket>& InQueue, const FMatrix& ViewProjection);
 
 	// 큐를 정렬해 불투명 패킷만 그린다. 반투명은 RenderTranslucent 호출 전까지 보관한다.
-	void RenderOpaque(TQueue<FRenderPacket>& InQueue, const FMatrix& ViewProjection);
+	void RenderOpaque(const FMatrix& ViewProjection);
 
 	// RenderOpaque가 보관한 반투명 패킷을 먼 것부터 그린다.
 	void RenderTranslucent(const FMatrix& ViewProjection);
+
+	// 큐를 Material, Opaque, Mesh에 따라 정렬한다
+	void RenderQueueSorting(TQueue<FRenderPacket>& InQueue, const FMatrix& ViewProjection);
 
 private:
 	// FIFO 소비용 배열의 용량만 재사용하며 매 View의 패킷 값은 새로 채운다.
 	TArray<FRenderPacket> RenderPackets;
 	// 정렬된 RenderPackets에서 반투명 패킷이 시작되는 위치
 	uint32 FirstTranslucentIndex = 0;
+	uint32 FirstMaterialIndex = 0;
 	TUniquePtr<FConstantBuffer> PerObjectCB;
 	UMaterial* LastMaterial;
 	UStaticMesh* LastMesh;
