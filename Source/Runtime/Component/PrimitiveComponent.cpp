@@ -69,6 +69,13 @@ bool UPrimitiveComponent::LineTraceComponent(const FRay& WorldRay, FHitResult& O
 
 bool UPrimitiveComponent::TraceMesh(const FRay& WorldRay, const FStaticMeshData& Mesh, const FMatrix& WorldMatrix, FHitResult& OutResult)
 {
+	FBox MeshBox = Mesh.AABB.GetWorldAABB(WorldMatrix);
+	float BoxT;
+	if (!RayIntersectsAABB(WorldRay, MeshBox.Min, MeshBox.Max, BoxT))
+	{
+		return false;
+	}
+
 	FRay LocalRay = ToLocalRay(WorldRay, WorldMatrix);
 	float T;
 
