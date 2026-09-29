@@ -49,7 +49,7 @@ bool UBenchmarkEngine::Init()
 		return false;
 
 	FLODGenerateRequest Request;
-	Request.ScreenThresholds = { 0.15f, 0.07f, 0.01f };
+	Request.ScreenThresholds = { 0.18f, 0.10f, 0.01f };
 	Request.bSaveToAsset = false; // 현재 저장 경로가 미구현
 
 	auto GenerateFor = [&](UStaticMesh* Asset)
@@ -138,7 +138,11 @@ void UBenchmarkEngine::PreExit()
 {
 	Super::PreExit();
 
-	ImGuiRenderer->Shutdown();
+	if (ImGuiRenderer)
+	{
+		ImGuiRenderer->Shutdown();
+		ImGuiRenderer.reset();
+	}
 }
 
 void UBenchmarkEngine::DrawProfileOverlay()
