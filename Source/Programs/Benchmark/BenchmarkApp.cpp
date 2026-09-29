@@ -20,8 +20,6 @@ namespace
 	void DrawTimeCell(double Milliseconds);
 }
 
-DECLARE_CYCLE_STAT("World Tick", STAT_WorldTick);
-DECLARE_CYCLE_STAT("Gather Render Packets", STAT_GatherRenderPackets);
 DECLARE_CYCLE_STAT("ImGui Render", STAT_ImGuiRender);
 
 FEngineConfig UBenchmarkEngine::GetConfig() const
@@ -94,12 +92,7 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	{
-		SCOPE_CYCLE_COUNTER(STAT_WorldTick);
-		World->Tick(DeltaTime);
-	}
-
-	World->GetScene().UpdateAllTransforms();
+	World->Tick(DeltaTime);
 
 	const uint32 Width = GetEngineLoop().GetViewportWidth();
 	const uint32 Height = GetEngineLoop().GetViewportHeight();
@@ -113,11 +106,8 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 	const FMatrix ViewProjection = Camera->GetViewProjectionMatrix();
 	const FFrustumPlanes Frustum = ExtractFrustumPlanes(ViewProjection);
 
-	TArray<FRenderPacket> RenderPackets;
-	RenderPackets.Reserve(100000);
 	TQueue<FRenderPacket> RenderQueue;
 	{
-		SCOPE_CYCLE_COUNTER(STAT_GatherRenderPackets);
 		World->GatherRenderPackets(RenderQueue, &LODView, &Frustum);
 	}
 

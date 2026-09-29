@@ -16,7 +16,6 @@ public:
 	const FAABB GetBounds() const { return Bounds; }
 	const FMatrix& GetLocalToWorld() const { return LocalToWorld; }
 
-
 	FScene* GetScene() const { return Scene; }
 private:
 	friend class FScene;

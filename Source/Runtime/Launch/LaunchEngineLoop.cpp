@@ -16,9 +16,12 @@
 #include "Render/Swapchain.h"
 #include "Render/Texture2D.h"
 #include "Core/SplashScreen.h"
+#include "Core/Stats/LightweightStats.h"
 
 namespace
 {
+	DECLARE_CYCLE_STAT("Present", STAT_Present); // Actor 틱 측정
+
 	// 이 간격마다 FPS 평균을 갱신한다.
 	constexpr double FrameStatsWindowSeconds = 0.5;
 }
@@ -134,7 +137,10 @@ bool FEngineLoop::Tick()
 	}
 
 	GEngine->Tick(EngineTimer::GetDeltaTime());
-	Swapchain->SwapBuffers(Config.SyncInterval);
+	{
+		SCOPE_CYCLE_COUNTER(STAT_Present);
+		Swapchain->SwapBuffers(Config.SyncInterval);
+	}
 
 	// EngineTimer는 DeltaTime을 0.1초로 자르므로 표시용 시간은 사이클로 따로 잰다.
 	const uint64 CurrentCycles = FPlatformTime::GetCycles64();

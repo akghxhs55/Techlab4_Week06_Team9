@@ -20,6 +20,16 @@
 
 #include "Math/Frustum.h"
 
+#include "Core/Stats/LightweightStats.h"
+
+DECLARE_CYCLE_STAT("Actor Tick", STAT_ActorTick); // Actor 틱 측정
+DECLARE_CYCLE_STAT("Update All Transforms", STAT_UpdateAllTransforms); // 각 Transform의 Update 시간 측정
+DECLARE_CYCLE_STAT("Gather Render Packets", STAT_GatherRenderPackets);
+DECLARE_CYCLE_STAT("Frustum Cull", STAT_FrustumCull);
+DECLARE_CYCLE_STAT("Gather Elements", STAT_GatherElements);
+
+
+
 UWorld::~UWorld()
 {
 
@@ -65,18 +75,18 @@ AActor* UWorld::SpawnActor(UClass* Class, FName InName, const FTransform* Transf
 	NewActor->World = this;
 	NewActor->Level = PersistentLevel;
 
-	for (UActorComponent* Component : NewActor->GetComponents())
-	{
-		if (UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Component))
-			Scene.AddPrimitive(Primitive);
-	}
-
 	// 3. Transform 적용
 	const FTransform SpawnTransform = Transform ? *Transform : FTransform::Identity;
 
 	if (NewActor->GetRootComponent())
 	{
 		NewActor->GetRootComponent()->SetTransform(SpawnTransform);
+	}
+
+	for (UActorComponent* Component : NewActor->GetComponents())
+	{
+		if (UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Component))
+			Scene.AddPrimitive(Primitive);
 	}
 
 	// 4. Level->Actors에 등록
@@ -96,20 +106,27 @@ void UWorld::Tick(float DeltaTime)
 		BeginPlayList.Dequeue();
 	}
 
-	for (ULevel* Level : Levels)
 	{
-		for (AActor* Actor : Level->GetActors())
+		SCOPE_CYCLE_COUNTER(STAT_ActorTick);
+		for (ULevel* Level : Levels)
 		{
-			Actor->Tick(DeltaTime);
+			for (AActor* Actor : Level->GetActors())
+			{
+				Actor->Tick(DeltaTime);
+			}
+			PathTracker.Tick(Level->GetActors(), DeltaTime);
 		}
-		PathTracker.Tick(Level->GetActors(), DeltaTime);
+
+		if (MainCamera)
+		{
+			MainCamera->Tick(DeltaTime);
+		}
 	}
 
-	if (MainCamera)
 	{
-		MainCamera->Tick(DeltaTime);
+		SCOPE_CYCLE_COUNTER(STAT_UpdateAllTransforms);
+		Scene.UpdateAllTransforms();
 	}
-
 }
 
 void UWorld::ClearWorld()
@@ -133,34 +150,46 @@ void UWorld::ClearWorld()
 
 void UWorld::GatherRenderPackets(TQueue<FRenderPacket>& RenderQueue, const FLODViewContext* LODView, const FFrustumPlanes* Frustum)
 {
-	const int32 Count = Scene.Proxies.Num();
-	for(int32 i = 0; i<Count ;++i)
+	TArray<int32> VisibleIndices;
 	{
-		if (!Scene.PrimitiveFlags[i]) continue;
-		if (Frustum && !IsAABBInFrustum(Scene.PrimitiveBounds[i], *Frustum)) continue;
-
-		FPrimitiveSceneProxy* Proxy = Scene.Proxies[i];
-		const FMatrix& World = Proxy->GetLocalToWorld();
-
-		if (LODView)
+		SCOPE_CYCLE_COUNTER(STAT_FrustumCull);
+		VisibleIndices.Reset();                       // UWorld 멤버로 두어 용량 재사용
+		const int32 Count = Scene.Proxies.Num();
+		for (int32 i = 0; i < Count; ++i)
 		{
-			if (auto* Component = Cast<UStaticMeshComponent>(Proxy->GetComponent()))
+			if (!Scene.PrimitiveFlags[i]) continue;
+			if (Frustum && !IsAABBInFrustum(Scene.PrimitiveBounds[i], *Frustum)) continue;
+			VisibleIndices.Add(i);
+		}
+	}
+
+	{
+		SCOPE_CYCLE_COUNTER(STAT_GatherElements);
+		for (const int32 i : VisibleIndices)
+		{
+			FPrimitiveSceneProxy* Proxy = Scene.Proxies[i];
+			const FMatrix& World = Proxy->GetLocalToWorld();
+
+			if (LODView)
 			{
-				if (UStaticMesh* Mesh =
-					Component->GetStaticMesh())
+				if (auto* Component = Cast<UStaticMeshComponent>(Proxy->GetComponent()))
 				{
-					const uint32 LOD = SelectStaticMeshLOD(
+					if (UStaticMesh* Mesh =
+						Component->GetStaticMesh())
+					{
+						const uint32 LOD = SelectStaticMeshLOD(
 							*Mesh,
 							World,
 							*LODView);
 
-					Component->SubmitToRenderQueue(RenderQueue, LOD);
-					continue;
+						Component->SubmitToRenderQueue(RenderQueue, LOD);
+						continue;
+					}
 				}
 			}
-		}
 
-		Proxy->GetComponent()->SubmitToRenderQueue(RenderQueue);
+			Proxy->GetComponent()->SubmitToRenderQueue(RenderQueue);
+		}
 	}
 }
 

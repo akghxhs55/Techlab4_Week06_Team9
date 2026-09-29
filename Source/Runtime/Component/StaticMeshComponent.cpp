@@ -3,6 +3,8 @@
 #include "Asset/AssetManager.h"
 #include "Render/RenderCommand.h"
 
+#include "Engine/PrimitiveSceneProxy.h"
+
 
 // StaticMesh 컴포넌트를 초기화한다.
 UStaticMeshComponent::UStaticMeshComponent()
@@ -78,7 +80,7 @@ void UStaticMeshComponent::SubmitToRenderQueue(TQueue<FRenderPacket>& RenderQueu
 
         FRenderPacket Packet;
         Packet.mesh = StaticMesh;
-        Packet.model = GetWorldMatrix();
+        Packet.model = GetSceneProxy()->GetLocalToWorld();
         Packet.material = SectionMaterial;
 
         // 반드시 선택한 LOD의 Section 범위를 사용
