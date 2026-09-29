@@ -39,6 +39,15 @@ FRenderDevice::FRenderDevice()
 		HTR_LOG(Error, "Failed to Create D3D11Device & DeviceContext!");
 	}
 
+	// 오브젝트별 상수를 한 버퍼에 모아 두고 오프셋으로 바인딩하려면 D3D11.1 기능이 필요하다.
+	if (SUCCEEDED(DeviceContext.As(&DeviceContext1)))
+	{
+		D3D11_FEATURE_DATA_D3D11_OPTIONS Options{};
+		if (SUCCEEDED(Device->CheckFeatureSupport(D3D11_FEATURE_D3D11_OPTIONS, &Options, sizeof(Options))))
+			bConstantBufferOffsetting = Options.ConstantBufferOffsetting == TRUE;
+	}
+	HTR_LOG(Info, "Constant buffer offsetting: {}", bConstantBufferOffsetting ? "on" : "off");
+
 	ComPtr<IDXGIDevice1> DXGIDevice;
 	if (SUCCEEDED(Device->QueryInterface(IID_PPV_ARGS(DXGIDevice.GetAddressOf()))))
 	{

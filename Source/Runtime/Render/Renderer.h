@@ -42,6 +42,11 @@ private:
 	uint32 FirstMaterialIndex = 0;
 	TUniquePtr<FConstantBuffer> PerObjectCB;
 	TUniquePtr<FConstantBuffer> ViewCB;
+
+	// 모든 패킷의 World 행렬을 256바이트 칸에 한 번에 올린 버퍼. D3D11.1 오프셋 바인딩을 못 쓰면 PerObjectCB로 돌아간다.
+	TUniquePtr<FConstantBuffer> PerObjectSlotCB;
+	uint32 PerObjectSlotCapacity = 0;
+	bool bUsePerObjectSlots = false;
 	UMaterial* LastMaterial;
 	UStaticMesh* LastMesh;
 
@@ -49,4 +54,6 @@ private:
 	void BindMaterial(UMaterial* material);
 	void UpdateMaterialParams(const FRenderPacket& RenderPacket);
 	void UpdatePerObjectConstants(const FRenderPacket& RenderPacket, const FMatrix& ViewProjection);
+	void EnsurePerObjectSlotCapacity(uint32 SlotCount);
+	void UploadPerObjectConstants();
 };

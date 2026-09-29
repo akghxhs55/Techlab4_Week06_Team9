@@ -63,6 +63,14 @@ public:
 	static void BindVertexBuffer(FVertexBuffer* VertexBuffer);
 	static void BindIndexBuffer(FIndexBuffer* IndexBuffer);
 	static void BindConstantBuffer(uint32 Slot, FConstantBuffer* ConstantBuffer, EShaderBindFlagBits FlagBits);
+
+	// 상수 버퍼의 일부 구간만 바인딩한다. FirstConstant·NumConstants는 16바이트 단위이며 16의 배수여야 한다.
+	static bool SupportsConstantBufferOffsets();
+	static void BindConstantBufferRange(uint32 Slot, FConstantBuffer* ConstantBuffer, uint32 FirstConstant, uint32 NumConstants, EShaderBindFlagBits FlagBits);
+
+	// 한 번의 Map으로 버퍼 전체를 채울 때 쓴다. 반환 포인터에는 순차적으로 쓰기만 해야 한다.
+	static void* MapWriteDiscard(FBuffer* InBuffer);
+	static void Unmap(FBuffer* InBuffer);
 	static void BindShaderResource(uint32 Slot, FTexture2D* Texture2D, EShaderBindFlagBits FlagBits);
 	static void BindShaderResource(uint32 Slot, UTexture2D* Texture2D, EShaderBindFlagBits FlagBits);
 

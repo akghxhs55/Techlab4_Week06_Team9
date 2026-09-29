@@ -57,4 +57,7 @@ private:
 
 	// Benchmark는 SettingsPanel을 두지 않으므로 Grid 옵션만 기본값으로 보관한다.
 	FEditorSettings GridSettings;
+
+	// 지역 변수면 매 프레임 수 MB를 새로 할당·해제해 Gather 시간이 튄다.
+	TArray<FRenderPacket> RenderQueue;
 };

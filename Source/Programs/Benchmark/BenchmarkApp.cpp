@@ -229,10 +229,9 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 	LODView.NearZ = Camera->GetNearZ();
 	LODView.bOrthographic = Camera->GetIsOrthogonal();
 
-	TArray<FRenderPacket> RenderQueue;
-	{
-		World->GatherRenderPackets(RenderQueue, &LODView, &Frustum);
-	}
+	// 멤버 큐를 재사용한다. Renderer와 swap으로 버퍼를 주고받으므로 두 버퍼 모두 용량이 유지된다.
+	RenderQueue.Reset();
+	World->GatherRenderPackets(RenderQueue, &LODView, &Frustum);
 
 	GetEngineLoop().BeginBackbufferPass();
 

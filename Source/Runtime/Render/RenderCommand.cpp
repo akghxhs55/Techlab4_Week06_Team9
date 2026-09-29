@@ -148,6 +148,34 @@ void RenderCommand::BindConstantBuffer(uint32 Slot, FConstantBuffer* ConstantBuf
 
 }
 
+bool RenderCommand::SupportsConstantBufferOffsets()
+{
+	return RenderDevice->GetContext1() != nullptr;
+}
+
+void RenderCommand::BindConstantBufferRange(uint32 Slot, FConstantBuffer* ConstantBuffer, uint32 FirstConstant, uint32 NumConstants, EShaderBindFlagBits FlagBits)
+{
+	ID3D11DeviceContext1* Context = RenderDevice->GetContext1();
+	ID3D11Buffer* Buffer = ConstantBuffer->GetBuffer();
+	if (HasFlag(FlagBits, EShaderBindFlagBits::Vertex))
+		Context->VSSetConstantBuffers1(Slot, 1, &Buffer, &FirstConstant, &NumConstants);
+	if (HasFlag(FlagBits, EShaderBindFlagBits::Pixel))
+		Context->PSSetConstantBuffers1(Slot, 1, &Buffer, &FirstConstant, &NumConstants);
+}
+
+void* RenderCommand::MapWriteDiscard(FBuffer* InBuffer)
+{
+	D3D11_MAPPED_SUBRESOURCE MappedResource{};
+	if (FAILED(RenderDevice->GetContext()->Map(InBuffer->GetBuffer(), 0, D3D11_MAP_WRITE_DISCARD, 0, &MappedResource)))
+		return nullptr;
+	return MappedResource.pData;
+}
+
+void RenderCommand::Unmap(FBuffer* InBuffer)
+{
+	RenderDevice->GetContext()->Unmap(InBuffer->GetBuffer(), 0);
+}
+
 void RenderCommand::BindShaderResource(uint32 Slot, FTexture2D* Texture2D, EShaderBindFlagBits FlagBits)
 {
 	ID3D11ShaderResourceView* SRV = Texture2D->GetSRV();
