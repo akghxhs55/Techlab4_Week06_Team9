@@ -1,10 +1,11 @@
-#include "EnginePCH.h"
+﻿#include "EnginePCH.h"
 #include "TextRenderer.h"
 
 #include "Camera/CameraComponent.h"
 
 #include "Render/RenderCommand.h"
 #include "Render/RenderResourceManager.h"
+#include "Render/Vertex.h"
 
 #include "Font.h"
 

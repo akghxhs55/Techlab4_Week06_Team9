@@ -1,6 +1,9 @@
 ﻿#include "EnginePCH.h"
 #include "Ray.h"
+
+#include <algorithm>
 #include "Math/EngineMath.h"
+#include "Render/StaticMeshData.h"
 
 
 FRay ToLocalRay(const FRay& WorldRay, const FMatrix& WorldMatrix)
@@ -120,13 +123,12 @@ bool RayIntersectsMesh(const FRay& LocalRay, const FStaticMeshData& Mesh, float&
     
     if (Mesh.TriangleBVH)
     {
-        Mesh.TriangleBVH->Query(
-            [&](const FBox& Bounds)
+        bHit = Mesh.TriangleBVH->TraceClosest(
+            [&](const FBox& Bounds, float& OutEnterT)
             {
-                float BoundsT;
-                return RayIntersectsAABB(LocalRay, Bounds.Min, Bounds.Max, BoundsT) && BoundsT < NearestT;
+                return RayIntersectsAABB(LocalRay, Bounds.Min, Bounds.Max, OutEnterT);
             },
-			[&](const FMeshTriangleElement& Element)
+			[&](const FMeshTriangleElement& Element, float& OutNearestT)
             {
                 float T = FLT_MAX;
                 if (RayIntersectsTriangle(
@@ -135,12 +137,15 @@ bool RayIntersectsMesh(const FRay& LocalRay, const FStaticMeshData& Mesh, float&
                 	Mesh.Vertices[Mesh.Indices[Element.TriangleIndex * 3 + 1]].Position, 
                 	Mesh.Vertices[Mesh.Indices[Element.TriangleIndex * 3 + 2]].Position,
                 	T) &&
-                	T < NearestT)
+                	T < OutNearestT)
                 {
-                    NearestT = T;
-                    bHit = true;
+                    OutNearestT = T;
+                    return true;
                 }
-            });
+
+                return false;
+            },
+            NearestT);
     }
     else
     {

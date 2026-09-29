@@ -1,8 +1,8 @@
 ﻿#pragma once
 
 #include "Vertex.h"
-#include "BVH.h"
-#include "Box.h"
+#include "Math/BVH.h"
+#include "Math/Box.h"
 
 // Cooked obj Data의 Section 구조체
 struct FStaticMeshSection

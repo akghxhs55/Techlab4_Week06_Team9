@@ -8,7 +8,11 @@ class TBVH
 public:
 	using FBoundsGetter = std::function<FBox(const T&)>;
 
-	explicit TBVH(FBoundsGetter BoundsGetter) : BoundsGetter(std::move(BoundsGetter)) {}
+	explicit TBVH(FBoundsGetter BoundsGetter) : BoundsGetter(std::move(BoundsGetter))
+	{
+		QueryStack.Reserve(MaxDepth);
+		TraceStack.Reserve(MaxDepth);
+	}
 
 	void Build(std::span<const T> InElements);
 
@@ -17,6 +21,9 @@ public:
 
 	template <typename TBoundsPredicate, typename TVisitor>
 	void Query(TBoundsPredicate&& BoundsTest, TVisitor&& Visitor) const;
+
+	template <typename TBoundsPredicate, typename TRayHit>
+	bool TraceClosest(TBoundsPredicate&& BoundsTrace, TRayHit&& LeafTrace, float& OutNearestT) const;
 
 	void Clear();
 
@@ -51,6 +58,12 @@ private:
 		float Cost = std::numeric_limits<float>::max();
 	};
 
+	struct FStackEntry
+	{
+		uint32 Index;
+		float EnterT;
+	};
+
 	static constexpr uint32 InvalidIndex = std::numeric_limits<uint32>::max();
 	static constexpr uint32 MaxDepth = 32;
 	static constexpr uint32 MinSplitSize = 8;
@@ -69,6 +82,9 @@ private:
 
 	TArray<FNode> Nodes;
 	TArray<FElement> Elements;
+
+	mutable TArray<uint32> QueryStack;
+	mutable TArray<FStackEntry> TraceStack;
 };
 
 template <typename T>
@@ -108,13 +124,11 @@ void TBVH<T>::Query(TBoundsPredicate&& BoundsTest, TVisitor&& Visitor) const
 		return;
 	}
 
-	TArray<uint32> Stack;
-	Stack.Add(0);
-
-	while (!Stack.IsEmpty())
+	QueryStack.Add(0);
+	while (!QueryStack.IsEmpty())
 	{
-		const uint32 Index = Stack.Last();
-		Stack.RemoveLast();
+		const uint32 Index = QueryStack.Last();
+		QueryStack.RemoveLast();
 
 		const FNode& Node = Nodes[Index];
 
@@ -138,14 +152,98 @@ void TBVH<T>::Query(TBoundsPredicate&& BoundsTest, TVisitor&& Visitor) const
 		{
 			if (Node.LeftChild != InvalidIndex)
 			{
-				Stack.Add(Node.LeftChild);
+				QueryStack.Add(Node.LeftChild);
 			}
 			if (Node.RightChild != InvalidIndex)
 			{
-				Stack.Add(Node.RightChild);
+				QueryStack.Add(Node.RightChild);
 			}
 		}
 	}
+}
+
+template <typename T>
+template <typename TBoundsTrace, typename TLeafTrace>
+bool TBVH<T>::TraceClosest(TBoundsTrace&& BoundsTrace, TLeafTrace&& LeafTrace, float& OutNearestT) const
+{
+	if (Nodes.IsEmpty())
+	{
+		return false;
+	}
+
+	float RootEnterT;
+	if (!BoundsTrace(Nodes[0].Bounds, RootEnterT) || RootEnterT >= OutNearestT)
+	{
+		return false;
+	}
+
+	TraceStack.Add({ 0, RootEnterT });
+
+	bool bHit = false;
+	while (!TraceStack.IsEmpty())
+	{
+		const FStackEntry Entry = TraceStack.Last();
+		TraceStack.RemoveLast();
+
+		if (Entry.EnterT >= OutNearestT)
+		{
+			continue;
+		}
+
+		const FNode& Node = Nodes[Entry.Index];
+
+		if (Node.IsLeaf())
+		{
+			for (uint32 i = 0; i < Node.ElementCount; ++i)
+			{
+				const FElement& Element = Elements[Node.FirstElement + i];
+
+				float ElementEnterT;
+				if (!BoundsTrace(Element.Bounds, ElementEnterT) || ElementEnterT >= OutNearestT)
+				{
+					continue;
+				}
+
+				bHit |= LeafTrace(Element.Value, OutNearestT);
+			}
+		}
+		else
+		{
+			float LeftEnterT = std::numeric_limits<float>::max();
+			const bool bLeftHit = Node.LeftChild != InvalidIndex && 
+				BoundsTrace(Nodes[Node.LeftChild].Bounds, LeftEnterT) &&
+				LeftEnterT < OutNearestT;
+
+			float RightEnterT;
+			const bool bRightHit = Node.RightChild != InvalidIndex &&
+				BoundsTrace(Nodes[Node.RightChild].Bounds, RightEnterT) &&
+				RightEnterT < OutNearestT;
+
+			if (bLeftHit && bRightHit)
+			{
+				if (LeftEnterT < RightEnterT)
+				{
+					TraceStack.Add({ Node.RightChild, RightEnterT });
+					TraceStack.Add({ Node.LeftChild, LeftEnterT });
+				}
+				else
+				{
+					TraceStack.Add({ Node.LeftChild, LeftEnterT });
+					TraceStack.Add({ Node.RightChild, RightEnterT });
+				}
+			}
+			else if (bLeftHit)
+			{
+				TraceStack.Add({ Node.LeftChild, LeftEnterT });
+			}
+			else if (bRightHit)
+			{
+				TraceStack.Add({ Node.RightChild, RightEnterT });
+			}
+		}
+	}
+
+	return bHit;
 }
 
 template <typename T>

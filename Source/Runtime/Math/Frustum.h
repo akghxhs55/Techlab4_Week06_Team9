@@ -1,4 +1,6 @@
-#pragma once
+﻿#pragma once
+
+#include "Box.h"
 
 struct FPlane { FVector Normal; float Distance; };
 struct FFrustumPlanes { FPlane Planes[6]; };

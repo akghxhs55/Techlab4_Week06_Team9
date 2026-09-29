@@ -338,7 +338,7 @@ void UBenchmarkEngine::DrawProfileOverlay()
 
 		if (const FCycleStatData* PickingData = FStatRegistry::Find(EditorStats::STAT_PickingTime))
 		{
-			ImGui::Text("Picking Time - Last: %.2f ms, Attempts: %d, Acc.: %.2f ms", PickingData->GetLastMs(), PickingData->CallCount, PickingData->GetTotalMs());
+			ImGui::Text("Picking Time - Last: %.4f ms, Attempts: %d, Acc.: %.4f ms", PickingData->GetLastMs(), PickingData->CallCount, PickingData->GetTotalMs());
 		}
 	}
 	ImGui::End();

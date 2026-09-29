@@ -1,7 +1,8 @@
-#pragma once
+﻿#pragma once
 
 #include "../Math/Transform.h"
 #include "ActorComponent.h"
+#include "Math/Box.h"
 
 class USceneComponent : public UActorComponent
 {

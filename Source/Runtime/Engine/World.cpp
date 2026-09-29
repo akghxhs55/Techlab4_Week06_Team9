@@ -330,31 +330,43 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 	FBillboardTraceTransform ResolveBillboard, const void* ViewContext)
 {
 	OutHit = FHitResult();
+	float NearestT = std::numeric_limits<float>::max();
 
-	const auto TraceComponent = [&](UPrimitiveComponent* Component)
+	const auto TraceComponent = [&](UPrimitiveComponent* Component, float& OutNearestT)
 	{
 		if (!Component || !Component->IsVisible())
-			return;
+			return false;
 
 		FHitResult Hit;
-		bool bHit;
+		bool bHit = false;
 
-		UBillboardComponent* Billboard = Cast<UBillboardComponent>(Component);
-		if (Billboard && ResolveBillboard)
+		if (UBillboardComponent* Billboard = Cast<UBillboardComponent>(Component);
+			Billboard && ResolveBillboard)
+		{
 			bHit = Billboard->LineTraceComponentForView(WorldRay, Hit, ResolveBillboard(*Billboard, ViewContext));
+		}
 		else
+		{
 			bHit = Component->LineTraceComponent(WorldRay, Hit);
-		if (bHit && Hit.HitComponent && Hit.Distance >= 0.0f && Hit.Distance < OutHit.Distance)
-			OutHit = Hit;
+		}
+
+		if (!bHit ||
+			!Hit.HitComponent ||
+			Hit.Distance < 0.0f ||
+			Hit.Distance >= OutNearestT)
+		{
+			return false;
+		}
+
+		OutHit = Hit;
+		OutNearestT = Hit.Distance;
+		return true;
 	};
 
-	Scene.BVH.Query(
-		[&](const FBox& Bounds)
-		{
-			float BoundsT;
-			return RayIntersectsAABB(WorldRay, Bounds.Min, Bounds.Max, BoundsT) && BoundsT <= OutHit.Distance;
-		}, 
-		TraceComponent);
+	Scene.BVH.TraceClosest(
+		[&](const FBox& Bounds, float& OutEnterT) { return RayIntersectsAABB(WorldRay, Bounds.Min, Bounds.Max, OutEnterT); }, 
+		TraceComponent,
+		NearestT);
 
 	return OutHit.HitComponent != nullptr;
 }

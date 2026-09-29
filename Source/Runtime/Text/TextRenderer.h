@@ -1,8 +1,9 @@
-#pragma once
+﻿#pragma once
 
 #include "Render/Buffer.h"
 #include "Render/PipelineState.h"
 
+struct FTextVertex;
 class UFont;
 class UCameraComponent;
 
