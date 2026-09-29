@@ -1,29 +1,8 @@
-#pragma once
+﻿#pragma once
 
 #include "Vertex.h"
-
-struct FBox
-{
-	FVector Min;
-	FVector Max;
-
-	FBox GetWorldAABB(const FMatrix& M) const
-	{
-		FVector Center = (Min + Max) * 0.5f;
-		FVector Extent = (Max - Min) * 0.5f;
-
-		// 중심은 그냥 변환
-		FVector4 C = FVector4(Center, 1.0f) * M;
-
-		// 범위는 회전 부분의 절댓값으로 변환
-		FVector E;
-		E.X = Extent.X * fabsf(M.M[0][0]) + Extent.Y * fabsf(M.M[1][0]) + Extent.Z * fabsf(M.M[2][0]);
-		E.Y = Extent.X * fabsf(M.M[0][1]) + Extent.Y * fabsf(M.M[1][1]) + Extent.Z * fabsf(M.M[2][1]);
-		E.Z = Extent.X * fabsf(M.M[0][2]) + Extent.Y * fabsf(M.M[1][2]) + Extent.Z * fabsf(M.M[2][2]);
-
-		return FBox{ FVector(C.X, C.Y, C.Z) - E, FVector(C.X, C.Y, C.Z) + E };
-	}
-};
+#include "BVH.h"
+#include "FBox.h"
 
 // Cooked obj Data의 Section 구조체
 struct FStaticMeshSection
@@ -47,6 +26,12 @@ struct FLODSourceVertex
 	int32 NormalIndex = -1;
 };
 
+struct FMeshTriangleElement
+{
+	uint32 TriangleIndex; // Indices[TriangleIndex * 3 + 0..2]
+	FBox Bounds;
+};
+
 struct FStaticMeshData
 {
 	TArray<FVertexPNCT> Vertices;
@@ -57,6 +42,8 @@ struct FStaticMeshData
 
 	// LOD0 생성용 CPU 메타데이터. GPU vertex layout에는 포함하지 않는다.
 	TArray<FLODSourceVertex> LODSourceVertices;
+
+	std::optional<TBVH<FMeshTriangleElement>> TriangleBVH;
 
 	// TODO: 나중에 Sections, MaterialSlots 도 Append 해줘야 함.
 	void Append(const FStaticMeshData& Other)
@@ -78,4 +65,6 @@ struct FStaticMeshData
 	// Vertices, Indices, Sections, MaterialSlots가 서로 맞는지 검사한다.
 	// 실패하면 이유를 OutError에 담는다. 로그는 호출한 쪽이 경로와 함께 남긴다.
 	bool Validate(FString& OutError) const;
+
+	void BuildTriangleBVH();
 };

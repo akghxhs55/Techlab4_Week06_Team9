@@ -1,4 +1,4 @@
-#include "EnginePCH.h"
+﻿#include "EnginePCH.h"
 #include "StaticMeshData.h"
 
 #include <format>
@@ -52,4 +52,33 @@ bool FStaticMeshData::Validate(FString& OutError) const
 	}
 
 	return true;
+}
+
+void FStaticMeshData::BuildTriangleBVH()
+{
+	TArray<FMeshTriangleElement> Elements;
+	for (uint32 i = 0; i + 2 < Indices.Num(); i += 3)
+	{
+		FMeshTriangleElement Element;
+		Element.TriangleIndex = i / 3;
+		FVector vertices[3];
+		for (uint32 j = 0; j < 3; ++j)
+		{
+			uint32 index = Indices[i + j];
+			vertices[j] = Vertices[index].Position;
+		}
+		Element.Bounds.Min.X = std::min({ vertices[0].X, vertices[1].X, vertices[2].X });
+		Element.Bounds.Min.Y = std::min({ vertices[0].Y, vertices[1].Y, vertices[2].Y });
+		Element.Bounds.Min.Z = std::min({ vertices[0].Z, vertices[1].Z, vertices[2].Z });
+		Element.Bounds.Max.X = std::max({ vertices[0].X, vertices[1].X, vertices[2].X });
+		Element.Bounds.Max.Y = std::max({ vertices[0].Y, vertices[1].Y, vertices[2].Y });
+		Element.Bounds.Max.Z = std::max({ vertices[0].Z, vertices[1].Z, vertices[2].Z });
+		Elements.Add(Element);
+	}
+
+	TriangleBVH.emplace([](const FMeshTriangleElement& Element) {
+		return Element.Bounds;
+	});
+
+	TriangleBVH->Build(Elements);
 }

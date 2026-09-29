@@ -1,4 +1,4 @@
-#include "EnginePCH.h"
+﻿#include "EnginePCH.h"
 #include "Ray.h"
 #include "Math/EngineMath.h"
 
@@ -118,23 +118,50 @@ bool RayIntersectsMesh(const FRay& LocalRay, const FStaticMeshData& Mesh, float&
     bool bHit = false;
     float NearestT = FLT_MAX;
     
-    for (uint32 i = 0; i + 2 < Mesh.Indices.Num(); i += 3)
+    if (Mesh.TriangleBVH)
     {
-        FVector vertices[3]{};	// 3 vertex
-        for (uint32 j = 0; j < 3; ++j)
+        Mesh.TriangleBVH->Query(
+            [&](const FBox& Bounds)
+            {
+                float BoundsT;
+                return RayIntersectsAABB(LocalRay, Bounds.Min, Bounds.Max, BoundsT) && BoundsT < NearestT;
+            },
+			[&](const FMeshTriangleElement& Element)
+            {
+                float T = FLT_MAX;
+                if (RayIntersectsTriangle(
+                	LocalRay,
+                	Mesh.Vertices[Mesh.Indices[Element.TriangleIndex * 3]].Position, 
+                	Mesh.Vertices[Mesh.Indices[Element.TriangleIndex * 3 + 1]].Position, 
+                	Mesh.Vertices[Mesh.Indices[Element.TriangleIndex * 3 + 2]].Position,
+                	T) &&
+                	T < NearestT)
+                {
+                    NearestT = T;
+                    bHit = true;
+                }
+            });
+    }
+    else
+    {
+        for (uint32 i = 0; i + 2 < Mesh.Indices.Num(); i += 3)
         {
-            uint32 index = Mesh.Indices[i + j];
+            FVector vertices[3]{};	// 3 vertex
+            for (uint32 j = 0; j < 3; ++j)
+            {
+                uint32 index = Mesh.Indices[i + j];
 
-            vertices[j].X = Mesh.Vertices[index].Position.X;
-            vertices[j].Y = Mesh.Vertices[index].Position.Y;
-            vertices[j].Z = Mesh.Vertices[index].Position.Z;
-        }
+                vertices[j].X = Mesh.Vertices[index].Position.X;
+                vertices[j].Y = Mesh.Vertices[index].Position.Y;
+                vertices[j].Z = Mesh.Vertices[index].Position.Z;
+            }
 
-        float T = FLT_MAX;
-        if (RayIntersectsTriangle(LocalRay, vertices[0], vertices[1], vertices[2], T) && T < NearestT)
-        {
-            NearestT = T;
-            bHit = true;
+            float T = FLT_MAX;
+            if (RayIntersectsTriangle(LocalRay, vertices[0], vertices[1], vertices[2], T) && T < NearestT)
+            {
+                NearestT = T;
+                bHit = true;
+            }
         }
     }
 

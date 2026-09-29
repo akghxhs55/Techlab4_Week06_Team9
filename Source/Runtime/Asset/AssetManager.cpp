@@ -1,4 +1,4 @@
-#include "EnginePCH.h"
+﻿#include "EnginePCH.h"
 #include "AssetManager.h"
 #include "Render/Buffer.h"
 #include "Render/Material.h"
@@ -89,6 +89,9 @@ namespace
 			}
 			Mesh->Materials.Add(Material);
 		}
+
+		Mesh->MeshData.BuildTriangleBVH();
+
 		return Mesh;
 	}
 

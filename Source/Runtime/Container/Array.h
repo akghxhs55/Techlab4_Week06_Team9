@@ -48,7 +48,8 @@ public:
 	uint32 Add(const T& data);
 	uint32 Add(T&& data);
 
-	uint32 Emplace(const T& data);
+	template<typename... Args>
+	uint32 Emplace(Args&&... args);
 	uint32 Insert(const T& data, uint32 index);
 	void Append(const TArray<T>& other);
 
@@ -198,12 +199,12 @@ inline uint32 TArray<T>::Add(T&& data)
 	return static_cast<uint32>(mDatas.size()) - 1;
 }
 
-template<typename T>
-inline uint32 TArray<T>::Emplace(const T& data)
+template <typename T>
+template <typename ... Args>
+uint32 TArray<T>::Emplace(Args&&... args)
 {
-	mDatas.emplace_back(data);
-
-	return mDatas.size() - 1;
+	mDatas.emplace_back(std::forward<Args>(args)...);
+	return static_cast<uint32>(mDatas.size()) - 1;
 }
 
 template<typename T>
