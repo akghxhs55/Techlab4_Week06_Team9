@@ -9,7 +9,6 @@
 
 struct FPerObjectConstants
 {
-	FMatrix MVP;
 	FMatrix World;
 };
 
@@ -42,6 +41,7 @@ private:
 	uint32 FirstTranslucentIndex = 0;
 	uint32 FirstMaterialIndex = 0;
 	TUniquePtr<FConstantBuffer> PerObjectCB;
+	TUniquePtr<FConstantBuffer> ViewCB;
 	UMaterial* LastMaterial;
 	UStaticMesh* LastMesh;
 

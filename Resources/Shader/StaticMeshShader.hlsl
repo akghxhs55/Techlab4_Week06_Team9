@@ -1,6 +1,10 @@
-cbuffer constants : register(b0)
+cbuffer Viewconstants : register(b0)
 {
-    matrix MVP;
+    matrix VP;
+};
+
+cbuffer Worldconstants : register(b2)
+{
     matrix World;
 };
 
@@ -40,7 +44,7 @@ PS_INPUT mainVS(VS_INPUT input)
 {
     PS_INPUT output;
 
-    output.position = mul(float4(input.p, 1.0f), MVP);
+    output.position = mul(mul(float4(input.p, 1.0f),World), VP);
     // w=0으로 이동 성분을 빼고 월드 공간으로 보낸다. 비균등 스케일이면 역전치가 필요하다.
     output.normal = mul(float4(input.n, 0.0f), World).xyz;
     output.color = input.c; 

@@ -18,6 +18,7 @@ DECLARE_CYCLE_STAT("Render Queue Sorting", STAT_RenderQueueSorting);
 bool FRenderer::Init()
 {
 	PerObjectCB = RenderCommand::CreateConstantBuffer(sizeof(FPerObjectConstants));
+	ViewCB = RenderCommand::CreateConstantBuffer(sizeof(FMatrix));
 
 	return true;
 }
@@ -51,6 +52,8 @@ void FRenderer::RenderTranslucent(const FMatrix& ViewProjection)
 
 void FRenderer::RenderQueueSorting(TArray<FRenderPacket>& InQueue, const FMatrix& ViewProjection)
 {
+	FMatrix VP = ViewProjection.GetTransposed();
+	RenderCommand::UpdateBufferData(ViewCB.get(), &VP);
 	SCOPE_CYCLE_COUNTER(STAT_RenderQueueSorting);
 
 	std::swap(RenderPackets, InQueue);
@@ -90,8 +93,9 @@ void FRenderer::DrawPackets(uint32 Begin, uint32 End, const FMatrix& ViewProject
 	LastMaterial = nullptr;
 	uint8 LastLODIndex = 0;
 
-	RenderCommand::BindConstantBuffer(0, PerObjectCB.get(), EShaderBindFlagBits::Vertex);
-
+	RenderCommand::BindConstantBuffer(0, ViewCB.get(), EShaderBindFlagBits::Vertex);
+	RenderCommand::BindConstantBuffer(2, PerObjectCB.get(), EShaderBindFlagBits::Vertex);
+	
 	for (uint32 Index = Begin; Index < End; ++Index)
 	{
 		const FRenderPacket& RenderPacket = RenderPackets[Index];
@@ -174,7 +178,6 @@ void FRenderer::UpdatePerObjectConstants(const FRenderPacket& RenderPacket, cons
 
 	FPerObjectConstants Constants;
 
-	Constants.MVP = (RenderPacket.model * ViewProjection).GetTransposed();
 	Constants.World = RenderPacket.model.GetTransposed();
 
 	RenderCommand::UpdateBufferData(PerObjectCB.get(), &Constants);
