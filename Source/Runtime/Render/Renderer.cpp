@@ -143,6 +143,8 @@ void FRenderer::UpdateMaterialParams(const FRenderPacket& RenderPacket)
 	{
 		case EMaterialParamLayout::StaticMesh:
 		{
+			break; // 라이팅 적용 시 제거
+
 			const float TotalTime = EngineTimer::GetTotalTime();
 
 			FStaticMeshMaterialParams Params{};
