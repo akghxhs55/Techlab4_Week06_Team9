@@ -37,6 +37,7 @@ FEngineLoop::~FEngineLoop() = default;
 
 bool FEngineLoop::PreInit(HINSTANCE hInstance, UClass* EngineClass)
 {
+	SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 	if (!EngineClass || !EngineClass->IsChildOf(UEngine::StaticClass()))
 	{
 		return false;

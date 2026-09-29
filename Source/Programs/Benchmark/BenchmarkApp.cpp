@@ -281,9 +281,12 @@ void UBenchmarkEngine::DrawProfileOverlay()
 		ImGuiWindowFlags_NoBackground;
 
 	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
+	const ImGuiViewport* MainViewport = ImGui::GetMainViewport();
+	ImGui::SetNextWindowPos(MainViewport->WorkPos, ImGuiCond_Always);
 	if (ImGui::Begin("Profile", nullptr, Flags))
 	{
-		ImGui::Text("FPS: %.1f", Stats.AverageFPS);
+		ImGui::Text("Resolution: %u x %u", GetEngineLoop().GetViewportWidth(), GetEngineLoop().GetViewportHeight());
+		ImGui::Text("FPS: %.1f (%.2f ms)", Stats.AverageFPS, Stats.AverageFrameMs);
 		ImGui::Text("Frame Time: %.2f ms", Stats.AverageFrameMs);
 
 		ImGui::TextUnformatted("CPU Profile");

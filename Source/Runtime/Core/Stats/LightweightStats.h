@@ -67,7 +67,7 @@ class FStatRegistry
 public:
 	static void EndFrame()
 	{
-		for (const auto& [Name, Cycles]: PendingStatCycles)
+		for (const auto& [Name, Cycles] : PendingStatCycles)
 		{
 			Stats[Name].PushFrame(Cycles);
 		}
@@ -108,17 +108,29 @@ public:
 
 	~FScopeCycleCounter()
 	{
-		if (StatId.IsValidStat())
-			FStatRegistry::AddCycles(StatId, FPlatformTime::GetCycles64() - StartCycles);
+		Finish();
 	}
 
 	// 복사되면 소멸자가 두 번 돌아 같은 측정이 두 번 누적된다.
 	FScopeCycleCounter(const FScopeCycleCounter&) = delete;
 	FScopeCycleCounter& operator=(const FScopeCycleCounter&) = delete;
 
+	uint64 Finish()
+	{
+		if (bFinished) return FinishedCycles;
+		FinishedCycles = FPlatformTime::GetCycles64() - StartCycles;
+		bFinished = true;
+		if (StatId.IsValidStat())
+			FStatRegistry::AddCycles(StatId, FPlatformTime::GetCycles64() - StartCycles);
+		return FinishedCycles;
+	}
+
 private:
 	uint64 StartCycles;
 	TStatId StatId;
+
+	bool bFinished = false;
+	uint64 FinishedCycles = 0;
 };
 
 // 이름 문자열을 inline 배열로 한 번만 만들어 모든 번역 단위가 같은 주소를 보게 한다.
