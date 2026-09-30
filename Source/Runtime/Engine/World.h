@@ -92,8 +92,11 @@ public:
 private:
 	struct alignas(64) FGatherChunk
 	{
-		TArray<FRenderPacket> Packets;
+		TArray<FRenderPacket> Packets;              // 스태틱 묶음에 못 들어가는 것 (반투명 섹션, Renderer 없는 호출)
 		TArray<uint32> SlowPathIndices;
+		std::vector<FStaticDrawGroup> Groups;       // 불투명 스태틱 메시: (머티리얼, 메시, LOD)별 묶음. 항목만 매 프레임 비운다
+		uint32 LastGroup = 0;                       // 바로 전 물체가 들어간 묶음 (연속한 물체는 대개 같은 묶음)
+		uint32 StaticDrawCount = 0;
 		uint32 LODCounts[4] = {};
 		uint64 LODTriangles[4] = {};
 	};

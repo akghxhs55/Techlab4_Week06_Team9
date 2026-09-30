@@ -69,8 +69,9 @@ bool UBenchmarkEngine::Init()
 		return false;
 
 	FLODGenerateRequest Request;
-	// 화면 절반 높이 대비 반지름 비율. 0.06·0.025는 2560x1600 기준 반지름 48px·20px에서 LOD2·LOD3으로 전환한다.
-	Request.ScreenThresholds = { 0.25f, 0.06f, 0.025f };
+	// 화면 절반 높이 대비 반지름 비율. 2560x1600 기준 반지름 약 96px·32px 아래에서 LOD2·LOD3으로 전환한다.
+	// 가까이 가면 사과 대부분이 LOD1(약 2.4k 삼각형)로 잡혀 GPU가 삼각형 처리에 묶이던 것을 줄인다.
+	Request.ScreenThresholds = { 0.4f, 0.12f, 0.04f };
 	Request.bSaveToAsset = false; // 현재 저장 경로가 미구현
 
 	auto GenerateFor = [&](UStaticMesh* Asset)
@@ -511,6 +512,29 @@ void UBenchmarkEngine::DrawProfileOverlay()
 				M.VisibleTriangles / 1'000'000.0, M.TotalTriangles / 1'000'000.0,
 				Percent(M.VisibleTriangles, M.TotalTriangles));
 			ImGui::Text("Measure cost: %.1f ms", M.ElapsedMs);
+			if (M.GPUOccludedDraws > 0)
+				ImGui::Text("GPU occluded draws: %u, False culls: %u (must be 0)", M.GPUOccludedDraws, M.FalseCulls);
+		}
+
+		// GPU 오클루전 컬링: 가림막 깊이 → Hi-Z → 물체별 판정 → CPU로 읽어 Gather 전에 거름
+		FGPUOcclusion& GPUOcclusion = GetEngineLoop().GetRenderer()->GetGPUOcclusion();
+		FGPUOcclusionSettings& Occlusion = GPUOcclusion.GetSettings();
+		ImGui::Checkbox("GPU Occlusion Culling", &Occlusion.bEnabled);
+		if (Occlusion.bEnabled)
+		{
+			ImGui::SameLine();
+			// 끄면 판정만 하고 그대로 그린다. 이 상태에서 Measure Occlusion을 누르면 잘못 가린 수를 검증한다.
+			ImGui::Checkbox("Cull", &Occlusion.bCull);
+			const FGPUOcclusionStats& OS = GPUOcclusion.GetStats();
+			ImGui::Text("Occluders: %u (%.2f M tris, coverage %.1f screens)", OS.Occluders, OS.OccluderTriangles / 1'000'000.0, OS.Coverage);
+			ImGui::Text("Occluded: %u / %u (%.1f %%), GPU wait: %.3f ms", OS.Occluded, OS.Tested,
+				OS.Tested ? 100.0 * OS.Occluded / OS.Tested : 0.0, OS.WaitMs);
+			ImGui::SetNextItemWidth(200.0f);
+			ImGui::SliderFloat("Occluder Coverage", &Occlusion.OccluderCoverage, 0.5f, 64.0f, "%.1f screens", ImGuiSliderFlags_Logarithmic);
+			int MaxOccluders = static_cast<int>(Occlusion.MaxOccluders);
+			ImGui::SetNextItemWidth(200.0f);
+			if (ImGui::SliderInt("Max Occluders", &MaxOccluders, 0, 16384))
+				Occlusion.MaxOccluders = static_cast<uint32>(MaxOccluders);
 		}
 	}
 	ImGui::End();

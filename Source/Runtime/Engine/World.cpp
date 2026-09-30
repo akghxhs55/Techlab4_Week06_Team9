@@ -176,6 +176,32 @@ void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODV
 	}
 
 	RenderStats.TotalPrimitives = Scene.Proxies.Num();
+
+	// GPU 오클루전: 프러스텀을 통과한 물체를 GPU에서 가림 판정하고 결과를 이번 프레임에 받아 온다.
+	// Cull이 켜져 있으면 가려진 물체를 목록에서 빼서 이후 Gather·정렬·드로우를 모두 건너뛴다.
+	// 꺼져 있으면(검증 모드) 목록은 그대로 두고 패킷에 판정만 표시한다.
+	const uint8* OccludedMask = nullptr;
+	if (Renderer && LODView && Renderer->GetGPUOcclusion().GetSettings().bEnabled)
+	{
+		FGPUOcclusion& Occlusion = Renderer->GetGPUOcclusion();
+		if (Occlusion.Run(VisibleProxies.GetData(), VisibleProxies.Num(), *LODView))
+		{
+			const std::vector<uint8>& Occluded = Occlusion.GetOccluded();
+			if (Occlusion.GetSettings().bCull)
+			{
+				uint32 Kept = 0;
+				for (uint32 i = 0; i < VisibleProxies.Num(); ++i)
+					if (!Occluded[i])
+						VisibleProxies[Kept++] = VisibleProxies[i];
+				VisibleProxies.SetNum(Kept);
+			}
+			else
+			{
+				OccludedMask = Occluded.data();
+			}
+		}
+	}
+
 	RenderStats.VisiblePrimitives = VisibleProxies.Num();
 
 	constexpr uint32 ExtraSlots = 4096;
@@ -191,16 +217,23 @@ void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODV
 	if (GatherChunks.Num() < ChunkCount)
 		GatherChunks.SetNum(ChunkCount);     // 늘릴 때만. 줄이지 않아야 배열 용량이 계속 재사용된다.
 
-	for (uint32 c = 0; c < ChunkCount; ++c)
+	for (uint32 c = 0; c < GatherChunks.Num(); ++c)   // 이번에 안 쓰는 조각의 묶음도 비워 둔다 (Renderer에 넘기지 않도록)
 	{
 		FGatherChunk& Chunk = GatherChunks[c];
 		Chunk.Packets.Reset();               // 용량은 유지, 개수만 0
 		Chunk.SlowPathIndices.Reset();
 		std::fill(std::begin(Chunk.LODCounts), std::end(Chunk.LODCounts), 0u);
 		std::fill(std::begin(Chunk.LODTriangles), std::end(Chunk.LODTriangles), 0ull);
+		for (FStaticDrawGroup& Group : Chunk.Groups)
+			Group.Items.clear();             // 용량은 유지
+		Chunk.StaticDrawCount = 0;
 	}
 
-	RenderQueue.Reserve(VisibleProxies.Num());
+	// Renderer가 있으면 불투명 스태틱 메시는 패킷 대신 조각별 묶음에 작은 항목으로 넣는다.
+	// (패킷 128B를 만들고 → RenderQueue로 복사하고 → 5만 개를 정렬하던 과정이 없어진다.)
+	const bool bStaticGroups = Renderer != nullptr;
+	if (Renderer)
+		Renderer->ResetStaticDrawGroups();
 
 	{
 		SCOPE_CYCLE_COUNTER(STAT_GatherElements);
@@ -208,7 +241,32 @@ void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODV
 		Pool.ParallelFor(VisibleCount, ChunkCount, [&](uint32 Begin, uint32 End, uint32 ChunkIndex)
 			{
 				FGatherChunk& Out = GatherChunks[ChunkIndex];      // 이 조각 전용. 다른 스레드는 절대 안 건드림
-				Out.Packets.Reserve(End - Begin);                  // 물체당 대략 1패킷
+
+				// (머티리얼, 메시, LOD) 묶음 찾기. 조합이 몇 개뿐이라 선형 탐색이면 충분하고, 바로 전 묶음을 먼저 본다.
+				const auto FindGroup = [&Out](UMaterial* Material, UStaticMesh* Mesh, uint8 LOD) -> FStaticDrawGroup&
+					{
+						if (Out.LastGroup < Out.Groups.size())
+						{
+							FStaticDrawGroup& Last = Out.Groups[Out.LastGroup];
+							if (Last.Material == Material && Last.Mesh == Mesh && Last.LODIndex == LOD)
+								return Last;
+						}
+						for (uint32 g = 0; g < Out.Groups.size(); ++g)
+						{
+							FStaticDrawGroup& Group = Out.Groups[g];
+							if (Group.Material == Material && Group.Mesh == Mesh && Group.LODIndex == LOD)
+							{
+								Out.LastGroup = g;
+								return Group;
+							}
+						}
+						Out.LastGroup = static_cast<uint32>(Out.Groups.size());
+						FStaticDrawGroup& Group = Out.Groups.emplace_back();
+						Group.Material = Material;
+						Group.Mesh = Mesh;
+						Group.LODIndex = LOD;
+						return Group;
+					};
 
 				for (uint32 VisibleIndex = Begin; VisibleIndex < End; ++VisibleIndex)
 				{
@@ -235,10 +293,19 @@ void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODV
 						Slot = VisibleIndex;
 					}
 
+					const bool bOccludedByGpu = OccludedMask && OccludedMask[VisibleIndex];
 					for (uint32 i = 0; i < CachedLOD.NumSections; ++i)
 					{
 						const FCachedMeshSection& Section = Proxy->GetSection(CachedLOD.FirstSection + i);
 						Out.LODTriangles[LOD] += Section.IndexCount / 3;
+
+						if (bStaticGroups && Section.Material && Section.Material->BlendState == EBlendState::Opaque)
+						{
+							FStaticDrawGroup& Group = FindGroup(Section.Material, Mesh, static_cast<uint8>(LOD));
+							Group.Items.push_back({ Proxy, Slot, Section.StartIndex, Section.IndexCount, bOccludedByGpu ? 1u : 0u });
+							++Out.StaticDrawCount;
+							continue;
+						}
 
 						FRenderPacket& Packet = Out.Packets.AddDefaulted_GetRef();   // 조각 전용 배열에 추가
 						Packet.Proxy = Proxy;
@@ -248,9 +315,23 @@ void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODV
 						Packet.IndexCount = Section.IndexCount;
 						Packet.LODIndex = static_cast<uint8>(LOD);
 						Packet.Slot = Slot;
+						Packet.bOccludedByGpu = bOccludedByGpu;
 					}
 				}
 			});
+
+		// 묶음은 World 메모리 그대로 Renderer에 넘긴다 (복사 없음). 정렬은 Renderer가 묶음 단위로 한다.
+		uint32 StaticDraws = 0;
+		if (Renderer)
+		{
+			for (uint32 c = 0; c < ChunkCount; ++c)
+			{
+				StaticDraws += GatherChunks[c].StaticDrawCount;
+				for (const FStaticDrawGroup& Group : GatherChunks[c].Groups)
+					if (!Group.Items.empty())
+						Renderer->AddStaticDrawGroup(&Group);
+			}
+		}
 
 		uint32 TotalPackets = 0;
 		for (uint32 c = 0; c < ChunkCount; ++c)
@@ -258,7 +339,8 @@ void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODV
 
 		RenderQueue.Reserve(TotalPackets + 256);             // 느린 경로 몫 약간 여유
 		for (uint32 c = 0; c < ChunkCount; ++c)
-			RenderQueue.Append(GatherChunks[c].Packets);      // 조각 순서대로 이어 붙이기
+			if (GatherChunks[c].Packets.Num() > 0)
+				RenderQueue.Append(GatherChunks[c].Packets);  // 조각 순서대로 이어 붙이기
 
 		for (uint32 c = 0; c < ChunkCount; ++c)
 		{
@@ -304,7 +386,7 @@ void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODV
 			}
 
 		if (SlotDest) Renderer->EndObjectConstants();
-		RenderStats.DrawCalls = RenderQueue.Num();
+		RenderStats.DrawCalls = RenderQueue.Num() + StaticDraws;
 		for (uint64 T : RenderStats.LODTriangles) RenderStats.Triangles += T;
 	}
 }
