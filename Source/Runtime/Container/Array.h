@@ -90,6 +90,11 @@ public:
 		return Index >= 0 && Index < mDatas.size();
 	}
 
+	[[nodiscard]] T& AddDefaulted_GetRef()
+	{
+		return mDatas.emplace_back();
+	}
+
 
 private:
 	std::vector<T> mDatas;

@@ -6,11 +6,14 @@
 
 // Todo: subuv
 class UTexture2D;
+class FPrimitiveSceneProxy;
 
 struct FRenderPacket {
+	const FPrimitiveSceneProxy* Proxy = nullptr;
+
 	FMatrix model;
-	UStaticMesh* mesh = nullptr;
-	UMaterial* material = nullptr;
+	UStaticMesh* Mesh = nullptr;
+	UMaterial* Material = nullptr;
 	uint8 LODIndex = 0;
 
 	// 카메라와의 거리 제곱. 반투명 정렬에 사용

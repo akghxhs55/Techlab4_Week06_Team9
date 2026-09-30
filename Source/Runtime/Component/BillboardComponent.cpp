@@ -69,8 +69,8 @@ void UBillboardComponent::SubmitToRenderQueue(TArray<FRenderPacket>& RenderQueue
 		return;
 
 	FRenderPacket Packet;
-	Packet.mesh = QuadMesh;
-	Packet.material = Material;
+	Packet.Mesh = QuadMesh;
+	Packet.Material = Material;
 	Packet.model = BillboardWorldMatrix;
 	RenderQueue.Add(Packet);
 }

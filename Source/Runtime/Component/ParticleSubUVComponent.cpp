@@ -171,8 +171,8 @@ void UParticleSubUVComponent::SubmitToRenderQueue(TArray<FRenderPacket>& RenderQ
 
 		FRenderPacket Packet;
 		Packet.model = WorldMatrix;
-		Packet.mesh = QuadMesh;
-		Packet.material = Material;
+		Packet.Mesh = QuadMesh;
+		Packet.Material = Material;
 
 		FSubUVConstants C;
 		C.CurrentFrame =  Particle.SubUVFrame;
@@ -289,8 +289,8 @@ void UParticleSubUVComponent::SubmitParticleToRenderQueue(
 
 	FRenderPacket Packet;
 	Packet.model = WorldMatrix;
-	Packet.mesh = QuadMesh;
-	Packet.material = Material;
+	Packet.Mesh = QuadMesh;
+	Packet.Material = Material;
 	Packet.CameraToParticleDistance = CameraDistanceSquared;
 	Packet.MaterialParamData = &Constants[ParticleIndex];
 	Packet.MaterialParamDataSize = sizeof(FSubUVConstants);

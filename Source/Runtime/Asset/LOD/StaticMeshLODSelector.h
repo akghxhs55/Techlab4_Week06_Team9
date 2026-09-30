@@ -4,6 +4,7 @@
 #include "Math/Frustum.h"
 #include "Math/Vector.h"
 #include "Core/Types.h"
+#include "Engine/PrimitiveSceneProxy.h"
 
 class UStaticMesh;
 
@@ -21,3 +22,7 @@ struct FLODViewContext
 };
 
 uint32 SelectStaticMeshLOD(const UStaticMesh& Mesh,const FAABB& WorldBounds,const FLODViewContext& View);
+
+// SelectStaticMeshLOD와 같은 판정을 프록시에 캐싱된 값(바운드·LOD 수·임계값 제곱)만으로 한다.
+// Gather 루프에서 물체마다 불리므로 헤더에 인라인으로 두어 호출 비용과 메시 역참조를 없앤다.
+uint32 SelectLOD(const FPrimitiveSceneProxy& Proxy, const FLODViewContext& View);

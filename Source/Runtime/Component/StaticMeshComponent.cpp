@@ -9,7 +9,7 @@
 // StaticMesh 컴포넌트를 초기화한다.
 UStaticMeshComponent::UStaticMeshComponent()
 {
-    StaticMesh = UAssetManager::GetAssetByPath<UStaticMesh>("Cube");
+	StaticMesh = UAssetManager::GetAssetByPath<UStaticMesh>("Cube");
 }
 
 // StaticMesh 컴포넌트의 소멸을 처리한다.
@@ -31,66 +31,68 @@ void UStaticMeshComponent::TickComponent(float DeltaTime)
 
 void UStaticMeshComponent::SetStaticMesh(UStaticMesh* InStaticMesh)
 {
-    if (StaticMesh == InStaticMesh)
-        return;
+	if (StaticMesh == InStaticMesh)
+		return;
 
-    StaticMesh = InStaticMesh;
-    ClearOverrideMaterials();
+	StaticMesh = InStaticMesh;
+	ClearOverrideMaterials();
+	MarkRenderStateDirty();
+	OnTransformDirty();
 }
 
 int32 UStaticMeshComponent::GetNumMaterials() const
 {
-    return StaticMesh ? static_cast<int32>(StaticMesh->GetMeshData().MaterialSlots.Num()) : 0;
+	return StaticMesh ? static_cast<int32>(StaticMesh->GetMeshData().MaterialSlots.Num()) : 0;
 }
 
 FString UStaticMeshComponent::GetMaterialSlotName(int32 SlotIndex) const
 {
-    if (!StaticMesh || SlotIndex < 0 || SlotIndex >= GetNumMaterials())
-        return FString();
-    return StaticMesh->GetMeshData().MaterialSlots[SlotIndex].Name;
+	if (!StaticMesh || SlotIndex < 0 || SlotIndex >= GetNumMaterials())
+		return FString();
+	return StaticMesh->GetMeshData().MaterialSlots[SlotIndex].Name;
 }
 
 UMaterial* UStaticMeshComponent::GetDefaultMaterial(int32 SlotIndex) const
 {
-    return StaticMesh ? StaticMesh->GetMaterial(static_cast<uint32>(SlotIndex)) : nullptr;
+	return StaticMesh ? StaticMesh->GetMaterial(static_cast<uint32>(SlotIndex)) : nullptr;
 }
 
 // 기존 호출 경로는 LOD0를 사용한다.
 void UStaticMeshComponent::SubmitToRenderQueue(TArray<FRenderPacket>& RenderQueue)
 {
-    SubmitToRenderQueue(RenderQueue, 0);
+	SubmitToRenderQueue(RenderQueue, 0);
 }
 
 // 지정한 LOD의 Section으로 패킷을 만든다.
-void UStaticMeshComponent::SubmitToRenderQueue(TArray<FRenderPacket>& RenderQueue,uint32 LODIndex)
+void UStaticMeshComponent::SubmitToRenderQueue(TArray<FRenderPacket>& RenderQueue, uint32 LODIndex)
 {
-    if (!StaticMesh) return;
+	if (!StaticMesh) return;
 
-    // 잘못된 번호가 들어오면 안전하게 LOD0 사용
-    if (LODIndex >= StaticMesh->GetLODCount()) LODIndex = 0;
+	// 잘못된 번호가 들어오면 안전하게 LOD0 사용
+	if (LODIndex >= StaticMesh->GetLODCount()) LODIndex = 0;
 
-    const FStaticMeshData& MeshData = StaticMesh->GetMeshData(LODIndex);
+	const FStaticMeshData& MeshData = StaticMesh->GetMeshData(LODIndex);
 
-    for (const FStaticMeshSection& Section : MeshData.Sections)
-    {
-        UMaterial* SectionMaterial = GetMaterial(
-                static_cast<int32>(Section.MaterialSlotIndex));
+	for (const FStaticMeshSection& Section : MeshData.Sections)
+	{
+		UMaterial* SectionMaterial = GetMaterial(
+			static_cast<int32>(Section.MaterialSlotIndex));
 
-        if (!SectionMaterial) continue;
+		if (!SectionMaterial) continue;
 
-        FRenderPacket Packet;
-        Packet.mesh = StaticMesh;
-        Packet.model = GetSceneProxy()->GetLocalToWorld();
-        Packet.material = SectionMaterial;
+		FRenderPacket Packet;
+		Packet.Mesh = StaticMesh;
+		Packet.model = GetSceneProxy()->GetLocalToWorld();
+		Packet.Material = SectionMaterial;
 
-        // 반드시 선택한 LOD의 Section 범위를 사용
-        Packet.StartIndex = Section.StartIndex;
-        Packet.IndexCount = Section.IndexCount;
+		// 반드시 선택한 LOD의 Section 범위를 사용
+		Packet.StartIndex = Section.StartIndex;
+		Packet.IndexCount = Section.IndexCount;
 
-        // Renderer가 이 번호의 GPU 버퍼를 바인딩한다.
-        Packet.LODIndex = static_cast<uint8>(LODIndex);
-        RenderQueue.Add(Packet);
-    }
+		// Renderer가 이 번호의 GPU 버퍼를 바인딩한다.
+		Packet.LODIndex = static_cast<uint8>(LODIndex);
+		RenderQueue.Add(Packet);
+	}
 }
 
 
@@ -98,26 +100,26 @@ void UStaticMeshComponent::SubmitToRenderQueue(TArray<FRenderPacket>& RenderQueu
 // Section별 Material·Texture와 인덱스 범위를 보존해 패킷을 제출한다.
 void UStaticMeshComponent::SubmitToRenderQueue(TQueue<FRenderPacket>& RenderQueue)
 {
-    if (!StaticMesh)
-        return;
+	if (!StaticMesh)
+		return;
 
-    const FStaticMeshData& MeshData = StaticMesh->GetMeshData();
+	const FStaticMeshData& MeshData = StaticMesh->GetMeshData();
 
-    for (const FStaticMeshSection& Section : MeshData.Sections)
-    {
-        // 슬롯마다 덮어쓰기가 있으면 그것, 없으면 메시(OBJ/MTL)의 기본 머티리얼
-        UMaterial* SectionMaterial = GetMaterial(static_cast<int32>(Section.MaterialSlotIndex));
-        if (!SectionMaterial)
-            continue;
+	for (const FStaticMeshSection& Section : MeshData.Sections)
+	{
+		// 슬롯마다 덮어쓰기가 있으면 그것, 없으면 메시(OBJ/MTL)의 기본 머티리얼
+		UMaterial* SectionMaterial = GetMaterial(static_cast<int32>(Section.MaterialSlotIndex));
+		if (!SectionMaterial)
+			continue;
 
-        FRenderPacket rp;
-        rp.mesh = StaticMesh;
-        rp.model = GetWorldMatrix();
-        rp.StartIndex = Section.StartIndex;
-        rp.IndexCount = Section.IndexCount;
-        rp.material = SectionMaterial;
+		FRenderPacket rp;
+		rp.mesh = StaticMesh;
+		rp.model = GetWorldMatrix();
+		rp.StartIndex = Section.StartIndex;
+		rp.IndexCount = Section.IndexCount;
+		rp.material = SectionMaterial;
 
-        RenderQueue.Enqueue(rp);
-    }
+		RenderQueue.Enqueue(rp);
+	}
 }
 */

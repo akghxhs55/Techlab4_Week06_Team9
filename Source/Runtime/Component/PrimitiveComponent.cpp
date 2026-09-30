@@ -71,6 +71,12 @@ bool UPrimitiveComponent::LineTraceComponent(const FRay& WorldRay, FHitResult& O
 	return Mesh && TraceMesh(WorldRay, *Mesh, GetWorldMatrix(), OutHit);
 }
 
+void UPrimitiveComponent::MarkRenderStateDirty()
+{
+	if (SceneProxy)
+		SceneProxy->GetScene()->MarkRenderStateDirty(SceneProxy);
+}
+
 void UPrimitiveComponent::OnTransformDirty()
 {
 	if (SceneProxy)
@@ -97,3 +103,5 @@ bool UPrimitiveComponent::TraceMesh(const FRay& WorldRay, const FStaticMeshData&
 
 	return true;
 }
+
+

@@ -10,6 +10,7 @@ void FScene::AddPrimitive(UPrimitiveComponent* Component)
 	Proxy->PackedIndex = Proxies.Num();
 	Component->SceneProxy = Proxy;
 	MarkDirty(Proxy);
+	MarkRenderStateDirty(Proxy);
 
 	Proxies.Add(Proxy);
 	PrimitiveBounds.Add(FAABB{});
@@ -40,6 +41,12 @@ void FScene::RemovePrimitive(UPrimitiveComponent* Component)
 		if (Found != INDEX_NONE) DirtyProxies.RemoveAtSwap(Found);
 	}
 
+	if (Proxy->bRenderStateQueued)
+	{
+		const int32 Found = RenderStateDirtyProxies.Find(Proxy);
+		if (Found != INDEX_NONE) RenderStateDirtyProxies.RemoveAtSwap(Found);
+	}
+
 	Component->SceneProxy = nullptr;
 	delete Proxy;
 
@@ -48,6 +55,13 @@ void FScene::RemovePrimitive(UPrimitiveComponent* Component)
 
 void FScene::UpdateAllTransforms()
 {
+	for (FPrimitiveSceneProxy* Proxy : RenderStateDirtyProxies)
+	{
+		Proxy->UpdateRenderState();
+		Proxy->bRenderStateQueued = false;
+	}
+	RenderStateDirtyProxies.Reset();
+
 	for (FPrimitiveSceneProxy* Proxy : DirtyProxies)
 	{
 		Proxy->UpdateTransform();
@@ -55,6 +69,7 @@ void FScene::UpdateAllTransforms()
 		PrimitiveFlags[Proxy->PackedIndex] = Proxy->GetComponent()->IsVisible() ? 1 : 0;
 		Proxy->bQueuedForUpdate = false;
 	}
+	
 	//const int32 Count = Proxies.Num();
 	//for (int32 i = 0; i < Count; ++i)
 	//{
@@ -73,6 +88,7 @@ void FScene::UpdateAllTransforms()
 
 	const bool bAnyMoved = DirtyProxies.Num() > 0;
 	DirtyProxies.Reset();
+	
 
 	if (bElementListChanged)
 	{
@@ -106,4 +122,11 @@ void FScene::MarkDirty(FPrimitiveSceneProxy* Proxy)
 	if (Proxy->bQueuedForUpdate) return;            // 중복 추가 방지
 	Proxy->bQueuedForUpdate = true;
 	DirtyProxies.Add(Proxy);
+}
+
+void FScene::MarkRenderStateDirty(FPrimitiveSceneProxy* Proxy)
+{
+	if (!Proxy || Proxy->bRenderStateQueued) return;
+	Proxy->bRenderStateQueued = true;
+	RenderStateDirtyProxies.Add(Proxy);
 }

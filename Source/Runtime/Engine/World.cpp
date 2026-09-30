@@ -175,6 +175,27 @@ void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODV
 		SCOPE_CYCLE_COUNTER(STAT_GatherElements);
 		for (FPrimitiveSceneProxy* Proxy : VisibleProxies)
 		{
+			if (!Proxy->IsVisible())continue;
+
+			UStaticMesh* Mesh = Proxy->GetMesh();
+			if (Mesh)
+			{
+				const uint32 LOD = LODView ? SelectLOD(*Proxy, *LODView) : 0;
+				const FCachedMeshLOD& CachedLOD = Proxy->GetLOD(LOD);
+
+				for (uint32 i = 0; i < CachedLOD.NumSections; i++)
+				{
+					const FCachedMeshSection& Section = Proxy->GetSection(CachedLOD.FirstSection + i);
+					FRenderPacket& Packet = RenderQueue.AddDefaulted_GetRef();
+					Packet.Proxy = Proxy;
+					Packet.Mesh = Proxy->GetMesh();
+					Packet.Material = Section.Material;
+					Packet.StartIndex = Section.StartIndex;
+					Packet.IndexCount = Section.IndexCount;
+					Packet.LODIndex = (uint8)LOD;
+				}
+				continue;
+			}
 			UPrimitiveComponent* Primitive = Proxy->GetComponent();
 			if (!Primitive || !Primitive->IsVisible())
 				continue;
@@ -365,35 +386,35 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 	float NearestT = std::numeric_limits<float>::max();
 
 	const auto TraceComponent = [&](UPrimitiveComponent* Component, float& OutNearestT)
-	{
-		if (!Component || !Component->IsVisible())
-			return false;
-
-		FHitResult Hit;
-		bool bHit = false;
-
-		if (UBillboardComponent* Billboard = Cast<UBillboardComponent>(Component);
-			Billboard && ResolveBillboard)
 		{
-			bHit = Billboard->LineTraceComponentForView(WorldRay, Hit, ResolveBillboard(*Billboard, ViewContext));
-		}
-		else
-		{
-			bHit = Component->LineTraceComponent(WorldRay, Hit);
-		}
+			if (!Component || !Component->IsVisible())
+				return false;
 
-		if (!bHit ||
-			!Hit.HitComponent ||
-			Hit.Distance < 0.0f ||
-			Hit.Distance >= OutNearestT)
-		{
-			return false;
-		}
+			FHitResult Hit;
+			bool bHit = false;
 
-		OutHit = Hit;
-		OutNearestT = Hit.Distance;
-		return true;
-	};
+			if (UBillboardComponent* Billboard = Cast<UBillboardComponent>(Component);
+				Billboard && ResolveBillboard)
+			{
+				bHit = Billboard->LineTraceComponentForView(WorldRay, Hit, ResolveBillboard(*Billboard, ViewContext));
+			}
+			else
+			{
+				bHit = Component->LineTraceComponent(WorldRay, Hit);
+			}
+
+			if (!bHit ||
+				!Hit.HitComponent ||
+				Hit.Distance < 0.0f ||
+				Hit.Distance >= OutNearestT)
+			{
+				return false;
+			}
+
+			OutHit = Hit;
+			OutNearestT = Hit.Distance;
+			return true;
+		};
 
 	Scene.BVH.TraceClosest(
 		[&](const FBox& Bounds, float& OutEnterT) { return RayIntersectsAABB(WorldRay, Bounds.Min, Bounds.Max, OutEnterT); },

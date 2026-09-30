@@ -51,3 +51,29 @@ uint32 SelectStaticMeshLOD(const UStaticMesh& Mesh,const FAABB& Bounds, const FL
 
     return std::min(DesiredLOD, LODCount - 1);
 }
+
+uint32 SelectLOD(const FPrimitiveSceneProxy& Proxy, const FLODViewContext& View)
+{
+    const uint32 LODCount = Proxy.GetLODCount();
+    if (LODCount <= 1 || View.Width == 0 || View.Height == 0) return 0;
+
+    const FAABB& Bounds = Proxy.GetBounds();
+    const float RadiusSquared = Bounds.Extent.Dot(Bounds.Extent);
+    const float Depth = (Bounds.Center - View.CameraPosition).Dot(View.CameraForward);
+
+    // 구가 근평면에 걸리면 보수적으로 LOD0.
+    const float NearDistance = Depth - View.NearZ;
+    if (NearDistance <= 0.0f || NearDistance * NearDistance <= RadiusSquared) return 0;
+
+    // 화면 크기² = R² * ProjScale² / Depth² 를 나눗셈 없이 임계값² * Depth² 와 비교한다.
+    const float SizeNumerator = RadiusSquared * View.ProjectionScaleSquared;
+    const float DistanceFactor = View.bOrthographic ? 1.0f : Depth * Depth;
+    const float* ThresholdSq = Proxy.GetLODThresholdsSq();
+
+    uint32 DesiredLOD = 3;
+    if (SizeNumerator >= ThresholdSq[0] * DistanceFactor)      DesiredLOD = 0;
+    else if (SizeNumerator >= ThresholdSq[1] * DistanceFactor) DesiredLOD = 1;
+    else if (SizeNumerator >= ThresholdSq[2] * DistanceFactor) DesiredLOD = 2;
+
+    return DesiredLOD < LODCount ? DesiredLOD : LODCount - 1;
+}

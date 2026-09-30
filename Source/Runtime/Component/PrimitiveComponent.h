@@ -64,6 +64,8 @@ public:
 
 	FPrimitiveSceneProxy* GetSceneProxy() const { return SceneProxy; }
 
+	void MarkRenderStateDirty();
+
 	virtual void OnTransformDirty() override;
 
 protected:

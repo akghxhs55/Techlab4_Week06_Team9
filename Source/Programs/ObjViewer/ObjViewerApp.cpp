@@ -214,9 +214,9 @@ void UObjViewerEngine::BuildRenderQueue(TArray<FRenderPacket>& OutArray) const
 	for (const FStaticMeshSection& Section : Mesh->GetMeshData().Sections)
 	{
 		FRenderPacket Packet;
-		Packet.mesh = Mesh;
+		Packet.Mesh = Mesh;
 		Packet.model = FMatrix::Identity;
-		Packet.material = Mesh->GetMaterial(Section.MaterialSlotIndex);
+		Packet.Material = Mesh->GetMaterial(Section.MaterialSlotIndex);
 		Packet.StartIndex = Section.StartIndex;
 		Packet.IndexCount = Section.IndexCount;
 		OutArray.Add(Packet);

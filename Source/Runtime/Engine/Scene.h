@@ -17,10 +17,12 @@ public:
 	void BuildBVH();
 
 	void MarkDirty(FPrimitiveSceneProxy* Proxy);
-	
+	void MarkRenderStateDirty(FPrimitiveSceneProxy* Proxy);
+
 
 	TArray<FPrimitiveSceneProxy*> Proxies;
 	TArray<FPrimitiveSceneProxy*> DirtyProxies;
+	TArray<FPrimitiveSceneProxy*> RenderStateDirtyProxies;
 	TArray<FAABB> PrimitiveBounds;
 	TArray<uint8> PrimitiveFlags;
 
@@ -28,10 +30,11 @@ public:
 	TBVH<FPrimitiveSceneProxy*> BVH{
 		[](const FPrimitiveSceneProxy* Proxy) -> FBox
 		{
-			return Proxy->GetComponent()->CalcBounds();
+			const FAABB& B = Proxy->GetBounds();
+			return FBox{ B.Center - B.Extent, B.Center + B.Extent };
 		}
 	};
 	bool bElementListChanged = false;
 
-	
+
 };

@@ -9,8 +9,11 @@ void FTickFunction::RegisterTickFunction(FTickTaskManager& InManager)
 	if (!bCanEverTick || Manager == &InManager)
 		return;
 
+	//다른 매니저에 등록되어 있다면 빼기
 	UnRegisterTickFunction();
+	//배열에 추가하고 Index 저장
 	InManager.AddTickFunction(this);
+	//Enabled 상태 설정
 	SetTickFunctionEnable(bStartWithTickEnabled);
 }
 
