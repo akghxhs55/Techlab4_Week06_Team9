@@ -21,9 +21,9 @@
 
 namespace
 {
-	DECLARE_CYCLE_STAT("Present", STAT_Present); // Actor 틱 측정
-	DECLARE_CYCLE_STAT("[Loop] Input & Messages", STAT_LoopInputMessages);
-	DECLARE_CYCLE_STAT("[Loop] Engine Tick (Total)", STAT_LoopEngineTick);
+	// CPU Frame이 Present보다 크면 CPU 병목, Present가 크면 CPU가 GPU를 기다리는 GPU 병목이다.
+	DECLARE_CYCLE_STAT("Present", STAT_Present);
+	DECLARE_CYCLE_STAT("CPU Frame (Engine Tick)", STAT_EngineTick);
 
 	// 이 간격마다 FPS 평균을 갱신한다.
 	constexpr double FrameStatsWindowSeconds = 0.5;
@@ -121,12 +121,9 @@ bool FEngineLoop::PreInit(HINSTANCE hInstance, UClass* EngineClass)
 
 bool FEngineLoop::Tick()
 {
-	{
-		SCOPE_CYCLE_COUNTER(STAT_LoopInputMessages);
-		EngineTimer::Tick();
-		FInputSystem::UpdateInputStates();
-		MainWindow->ProcessMessage(bIsRunning);
-	}
+	EngineTimer::Tick();
+	FInputSystem::UpdateInputStates();
+	MainWindow->ProcessMessage(bIsRunning);
 
 	if (Config.bExitOnEscape && FInputSystem::IsKeyPressed(EKeyCode::Escape))
 	{
@@ -147,7 +144,7 @@ bool FEngineLoop::Tick()
 	}
 
 	{
-		SCOPE_CYCLE_COUNTER(STAT_LoopEngineTick);
+		SCOPE_CYCLE_COUNTER(STAT_EngineTick);
 		GEngine->Tick(EngineTimer::GetDeltaTime());
 	}
 	{

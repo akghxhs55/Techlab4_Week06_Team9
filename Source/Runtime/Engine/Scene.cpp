@@ -53,6 +53,24 @@ void FScene::RemovePrimitive(UPrimitiveComponent* Component)
 	bElementListChanged = true;
 }
 
+void FScene::RemoveAllPrimitives()
+{
+	// 하나씩 RemovePrimitive하면 대기열 검색(Find)이 물체 수만큼 반복되므로 통째로 비운다.
+	for (FPrimitiveSceneProxy* Proxy : Proxies)
+	{
+		if (UPrimitiveComponent* Component = Proxy->GetComponent())
+			Component->SceneProxy = nullptr;
+		delete Proxy;
+	}
+	Proxies.Reset();
+	PrimitiveBounds.Reset();
+	PrimitiveFlags.Reset();
+	DirtyProxies.Reset();
+	RenderStateDirtyProxies.Reset();
+	BVH.Clear();
+	bElementListChanged = true;
+}
+
 void FScene::UpdateAllTransforms()
 {
 	for (FPrimitiveSceneProxy* Proxy : RenderStateDirtyProxies)

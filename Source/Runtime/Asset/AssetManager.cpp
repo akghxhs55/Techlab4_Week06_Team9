@@ -381,6 +381,43 @@ UStaticMesh* UAssetManager::LoadObjStaticMesh(const FString& Path)
 	return Mesh;
 }
 
+bool UAssetManager::ReorientStaticMesh(UStaticMesh& Mesh, const std::function<FVector(const FVector&)>& Rotate)
+{
+	if (Mesh.GetLODCount() > 1 || Mesh.MeshData.Vertices.IsEmpty())
+		return false;   // LOD가 이미 옛 방향으로 만들어졌으면 서로 어긋난다
+
+	FStaticMeshData& Data = Mesh.MeshData;
+	FBox Bounds{ FVector(FLT_MAX, FLT_MAX, FLT_MAX), FVector(-FLT_MAX, -FLT_MAX, -FLT_MAX) };
+	for (FVertexPNCT& Vertex : Data.Vertices)
+	{
+		Vertex.Position = Rotate(Vertex.Position);
+		Vertex.Normal = Rotate(Vertex.Normal);
+		Bounds.Min = FVector(std::min(Bounds.Min.X, Vertex.Position.X), std::min(Bounds.Min.Y, Vertex.Position.Y), std::min(Bounds.Min.Z, Vertex.Position.Z));
+		Bounds.Max = FVector(std::max(Bounds.Max.X, Vertex.Position.X), std::max(Bounds.Max.Y, Vertex.Position.Y), std::max(Bounds.Max.Z, Vertex.Position.Z));
+	}
+	Data.AABB = Bounds;
+
+	// 인덱스는 그대로다 (회전은 삼각형 감기 방향을 바꾸지 않는다). 정점 버퍼만 다시 올린다.
+	TUniquePtr<FVertexBuffer> VB = RenderCommand::CreateStaticVertexBuffer(Data.Vertices.GetData(),
+		sizeof(FVertexPNCT) * static_cast<uint32>(Data.Vertices.Num()), sizeof(FVertexPNCT));
+	if (!VB)
+		return false;
+	Mesh.VertexBuffer = std::move(VB);
+
+	Data.BuildTriangleBVH();   // 피킹용 삼각형 BVH도 새 좌표로
+	return true;
+}
+
+void UAssetManager::ForEachObjStaticMesh(const std::function<void(const FString& Key, UStaticMesh& Mesh)>& Func)
+{
+	for (auto& [Key, Asset] : Get().AssetMap)
+	{
+		if (!Asset || !Asset->IsA<UStaticMesh>() || !fs::path(Key).extension().string().ends_with(".obj"))
+			continue;
+		Func(Key, *Cast<UStaticMesh>(Asset));
+	}
+}
+
 FLODGenerateResult UAssetManager::GenerateStaticMeshLODs(UStaticMesh& Mesh, const FLODGenerateRequest& Request)
 {
 	TArray<FStaticMeshData> Generated;

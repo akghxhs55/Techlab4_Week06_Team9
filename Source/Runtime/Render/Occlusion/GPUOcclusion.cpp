@@ -1,4 +1,4 @@
-#include "EnginePCH.h"
+﻿#include "EnginePCH.h"
 #include "GPUOcclusion.h"
 
 #include "Render/Renderer.h"
@@ -19,9 +19,6 @@
 
 DECLARE_CYCLE_STAT("GPU Occlusion (Total)", STAT_GPUOcclusion);
 DECLARE_CYCLE_STAT("  Occ Prepare+Occluders", STAT_GPUOcclusionPrepare);
-DECLARE_CYCLE_STAT("    Occ Fill Items", STAT_GPUOcclusionFill);
-DECLARE_CYCLE_STAT("    Occ Select", STAT_GPUOcclusionSelect);
-DECLARE_CYCLE_STAT("    Occ Draw Occluders", STAT_GPUOcclusionDraw);
 DECLARE_CYCLE_STAT("  Occ Wait GPU", STAT_GPUOcclusionWait);
 
 namespace
@@ -48,7 +45,7 @@ void BuildHiZ(uint3 Id : SV_DispatchThreadID)
 	const uint2 First = Id.xy * 2;
 	uint2 Last = min(First + 1, SrcSize - 1);
 	if (Id.x == DstSize.x - 1) Last.x = SrcSize.x - 1;
-	if (Id.y == DstSize.y - 1) Last.y = SrcSize.y - 1;
+	if (Id.y == DstSize.y - 1) Last.y = SrcSize.y - 1; 
 
 	float MaxDepth = 0.0f;
 	for (uint Y = First.y; Y <= Last.y; ++Y)
@@ -382,7 +379,6 @@ namespace
 // 점수 칸별로 개수와 화면 넓이 합을 조각마다 따로 모아 두면, 가림막 커트라인을 정렬 없이 잡을 수 있다.
 bool FGPUOcclusion::FillItems(const FPrimitiveSceneProxy* const* Proxies, uint32 Count, const FLODViewContext& View)
 {
-	SCOPE_CYCLE_COUNTER(STAT_GPUOcclusionFill);
 	ScoreBuckets.resize(Count);
 	OccluderLODs.resize(Count);
 
@@ -448,7 +444,6 @@ void FGPUOcclusion::DrawOccluders(const FPrimitiveSceneProxy* const* Proxies, co
 	Context->ClearDepthStencilView(OccluderDSV.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
 
 	{
-	SCOPE_CYCLE_COUNTER(STAT_GPUOcclusionSelect);
 	// 가림막 고르기: 화면에 크게 보이는 것부터 넓이를 쌓아, 화면 OccluderCoverage장분을 덮거나 MaxOccluders개가 되면 멈춘다.
 	//  - 가까이 가면 사과 하나하나가 커서 몇백 개면 화면이 덮인다 → 가림막이 적어져 선행 패스가 싸다.
 	//  - 멀리서 보면 사과가 작아 많이 뽑힌다 (여러 겹이 함께 가리므로 많이 필요).
