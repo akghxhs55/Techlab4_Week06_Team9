@@ -90,6 +90,10 @@ public:
 		RenderDevice->GetContext()->IASetPrimitiveTopology(Topology);
 	}
 
+	// 래퍼가 없는 D3D 기능(쿼리 등)을 디버그·측정 코드에서 직접 쓸 때만 사용한다.
+	inline static ID3D11Device* GetDevice() { return RenderDevice->GetDevice(); }
+	inline static ID3D11DeviceContext* GetContext() { return RenderDevice->GetContext(); }
+
 	//inline static void BindTexture(uint32 Slot, UTexture2D* Texture2D, EShaderBindFlagBits FlagBits);
 
 	//inline static void SetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY Topology);

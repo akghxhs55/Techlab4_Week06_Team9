@@ -147,6 +147,7 @@ void UWorld::ClearWorld()
 void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODViewContext* LODView, const FFrustumPlanes* Frustum)
 {
 	// 멤버로 두어 매 프레임 용량을 재사용한다.
+	RenderStats.Reset();
 	VisibleProxies.Reset();
 	{
 		SCOPE_CYCLE_COUNTER(STAT_FrustumCull);
@@ -169,6 +170,9 @@ void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODV
 		}
 	}
 
+	RenderStats.TotalPrimitives = Scene.Proxies.Num();
+	RenderStats.VisiblePrimitives = VisibleProxies.Num();
+
 	RenderQueue.Reserve(VisibleProxies.Num());
 
 	{
@@ -182,10 +186,12 @@ void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODV
 			{
 				const uint32 LOD = LODView ? SelectLOD(*Proxy, *LODView) : 0;
 				const FCachedMeshLOD& CachedLOD = Proxy->GetLOD(LOD);
+				++RenderStats.LODCounts[LOD];
 
 				for (uint32 i = 0; i < CachedLOD.NumSections; i++)
 				{
 					const FCachedMeshSection& Section = Proxy->GetSection(CachedLOD.FirstSection + i);
+					RenderStats.LODTriangles[LOD] += Section.IndexCount / 3;
 					FRenderPacket& Packet = RenderQueue.AddDefaulted_GetRef();
 					Packet.Proxy = Proxy;
 					Packet.Mesh = Proxy->GetMesh();
@@ -223,6 +229,8 @@ void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODV
 
 			Primitive->SubmitToRenderQueue(RenderQueue);
 		}
+		RenderStats.DrawCalls = RenderQueue.Num();
+		for (uint64 T : RenderStats.LODTriangles) RenderStats.Triangles += T;
 	}
 }
 

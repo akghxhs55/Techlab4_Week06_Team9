@@ -19,6 +19,18 @@ class UBillboardComponent;
 
 struct FLODViewContext;
 
+struct FRenderStats
+{
+	uint32 TotalPrimitives = 0;
+	uint32 VisiblePrimitives = 0;
+	uint32 DrawCalls = 0;
+	uint64 Triangles = 0;
+	uint32 LODCounts[4] = {};
+	uint64 LODTriangles[4] = {};
+
+	void Reset() { *this = FRenderStats(); }
+};
+
 class UWorld : public UObject
 {
 	DECLARE_CLASS(UWorld, UObject)
@@ -73,6 +85,8 @@ public:
 
 	FScene& GetScene() { return Scene; }
 	FTickTaskManager& GetTickTaskManager() { return TickTaskManager; }
+
+	const FRenderStats& GetRenderStats() const { return RenderStats; }
 private:
 	// 등록된 Tick 함수만 실행한다. Actor보다 먼저 사라져도 남은 함수와의 연결을 스스로 끊는다.
 	FTickTaskManager TickTaskManager;
@@ -92,4 +106,6 @@ private:
 
 	// GatherRenderPackets가 매 프레임 채우는 컬링 결과. 용량을 재사용한다.
 	TArray<FPrimitiveSceneProxy*> VisibleProxies;
+
+	FRenderStats RenderStats;
 };

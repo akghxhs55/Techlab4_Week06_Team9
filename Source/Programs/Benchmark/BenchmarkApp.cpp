@@ -224,7 +224,7 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 		.Quaternion()
 		.RotateVector(FVector(1.0f, 0.0f, 0.0f))
 		.Normalized();
-	LODView.ProjectionScaleSquared =
+	LODView.ProjectionScaleSquared = 
 		std::max(ScaleX * ScaleX, ScaleY * ScaleY);
 	LODView.NearZ = Camera->GetNearZ();
 	LODView.bOrthographic = Camera->GetIsOrthogonal();
@@ -243,6 +243,13 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 	// 반투명이 Grid 위에 합성되도록 불투명 → Grid → 반투명 순서로 그린다.
 	Renderer->RenderQueueSorting(RenderQueue, ViewProjection);
 	Renderer->RenderOpaque(ViewProjection);
+
+	// Grid가 깊이를 쓰기 전, 불투명만 그려진 깊이 버퍼로 측정한다.
+	if (bMeasureOcclusionRequested)
+	{
+		bMeasureOcclusionRequested = false;
+		LastOcclusionMeasure = Renderer->MeasureOpaqueOcclusion(ViewProjection);
+	}
 
 	GridRenderer->OnRenderBatchGrid(
 		ViewProjection,
@@ -308,6 +315,29 @@ void UBenchmarkEngine::DrawProfileOverlay()
 		ImGui::Text("FPS: %.1f (%.2f ms)", Stats.AverageFPS, Stats.AverageFrameMs);
 		ImGui::Text("Frame Time: %.2f ms", Stats.AverageFrameMs);
 
+		const FRenderStats& RS = World->GetRenderStats();
+		ImGui::Text("Primitives: %u / %u visible", RS.VisiblePrimitives, RS.TotalPrimitives);
+		ImGui::Text("Draw Calls: %u", RS.DrawCalls);
+		ImGui::Text("Triangles: %.2f M", RS.Triangles / 1'000'000.0);
+
+		if (ImGui::BeginTable("LODStats", 4, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_SizingFixedFit))
+		{
+			ImGui::TableSetupColumn("LOD");
+			ImGui::TableSetupColumn("Objects");
+			ImGui::TableSetupColumn("Triangles");
+			ImGui::TableSetupColumn("Tri %");
+			ImGui::TableHeadersRow();
+			for (int i = 0; i < 4; ++i)
+			{
+				ImGui::TableNextRow();
+				ImGui::TableSetColumnIndex(0); ImGui::Text("LOD%d", i);
+				ImGui::TableSetColumnIndex(1); ImGui::Text("%u", RS.LODCounts[i]);
+				ImGui::TableSetColumnIndex(2); ImGui::Text("%.2f M", RS.LODTriangles[i] / 1'000'000.0);
+				ImGui::TableSetColumnIndex(3); ImGui::Text("%.1f %%", RS.Triangles ? 100.0 * RS.LODTriangles[i] / RS.Triangles : 0.0);
+			}
+			ImGui::EndTable();
+		}
+
 		ImGui::TextUnformatted("CPU Profile");
 		ImGui::SameLine();
 		if (ImGui::SmallButton("Reset"))
@@ -354,6 +384,24 @@ void UBenchmarkEngine::DrawProfileOverlay()
 		if (const FCycleStatData* PickingData = FStatRegistry::Find(EditorStats::STAT_PickingTime))
 		{
 			ImGui::Text("Picking Time - Last: %.4f ms, Attempts: %d, Acc.: %.4f ms", PickingData->GetLastMs(), PickingData->CallCount, PickingData->GetTotalMs());
+		}
+
+		// 측정 전용: 불투명 물체 중 최종 화면에 픽셀을 남긴 비율 = 오클루전 컬링으로 얻을 수 있는 상한
+		if (ImGui::SmallButton("Measure Occlusion"))
+		{
+			bMeasureOcclusionRequested = true;
+		}
+		if (const FOcclusionMeasureResult& M = LastOcclusionMeasure; M.bValid)
+		{
+			const auto Percent = [](uint64 Part, uint64 Whole) { return Whole ? 100.0 * Part / Whole : 0.0; };
+			ImGui::Text("Visible Objects: %u / %u (%.1f %%) -> occluded %.1f %%",
+				M.VisibleObjects, M.TotalObjects, Percent(M.VisibleObjects, M.TotalObjects),
+				100.0 - Percent(M.VisibleObjects, M.TotalObjects));
+			ImGui::Text("Visible Draws: %u / %u", M.VisibleDraws, M.TotalDraws);
+			ImGui::Text("Visible Triangles: %.2f M / %.2f M (%.1f %%)",
+				M.VisibleTriangles / 1'000'000.0, M.TotalTriangles / 1'000'000.0,
+				Percent(M.VisibleTriangles, M.TotalTriangles));
+			ImGui::Text("Measure cost: %.1f ms", M.ElapsedMs);
 		}
 	}
 	ImGui::End();

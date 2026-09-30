@@ -13,6 +13,8 @@
 #include "Camera/CameraComponent.h"
 
 #include <algorithm>
+#include <chrono>
+#include <unordered_map>
 
 DECLARE_CYCLE_STAT("Draw Render Packets", STAT_DrawRenderPackets);
 DECLARE_CYCLE_STAT("Render Queue Sorting", STAT_RenderQueueSorting);
@@ -201,6 +203,126 @@ void FRenderer::DrawPackets(uint32 Begin, uint32 End, const FMatrix& ViewProject
 		LastMesh = RenderPacket.Mesh;
 		LastLODIndex = RenderPacket.LODIndex;
 	}
+}
+
+FOcclusionMeasureResult FRenderer::MeasureOpaqueOcclusion(const FMatrix& ViewProjection)
+{
+	FOcclusionMeasureResult Result;
+	const uint32 Count = FirstTranslucentIndex;
+	if (Count == 0)
+		return Result;
+
+	const auto StartTime = std::chrono::high_resolution_clock::now();
+
+	ID3D11Device* Device = RenderCommand::GetDevice();
+	ID3D11DeviceContext* Context = RenderCommand::GetContext();
+
+	// 같은 셰이더·같은 행렬로 다시 그리면 깊이가 비트 단위로 같으므로,
+	// LESS_EQUAL이면 최종 깊이 버퍼에서 이 물체가 이긴 픽셀만 통과한다.
+	if (!DepthLessEqualReadOnly)
+	{
+		D3D11_DEPTH_STENCIL_DESC Desc{};
+		Desc.DepthEnable = TRUE;
+		Desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+		Desc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
+		if (FAILED(Device->CreateDepthStencilState(&Desc, DepthLessEqualReadOnly.GetAddressOf())))
+			return Result;
+	}
+
+	while (OcclusionQueries.Num() < Count)
+	{
+		const D3D11_QUERY_DESC QueryDesc{ D3D11_QUERY_OCCLUSION, 0 };
+		ComPtr<ID3D11Query> Query;
+		if (FAILED(Device->CreateQuery(&QueryDesc, Query.GetAddressOf())))
+			return Result;
+		OcclusionQueries.Add(std::move(Query));
+	}
+
+	RenderCommand::BindConstantBuffer(0, ViewCB.get(), EShaderBindFlagBits::Vertex);
+	if (!bUsePerObjectSlots)
+		RenderCommand::BindConstantBuffer(2, PerObjectCB.get(), EShaderBindFlagBits::Vertex);
+
+	UStaticMesh* BoundMesh = nullptr;
+	UMaterial* BoundMaterial = nullptr;
+	uint8 BoundLOD = 0;
+
+	// 1) 패킷마다 쿼리를 걸고 다시 그린다. DrawPackets와 같은 순서·같은 바인딩을 쓴다.
+	// std::vector<bool>은 비트 압축이라 참조를 못 돌려주므로 uint8을 쓴다.
+	TArray<uint8> bIssued;
+	bIssued.Init(0, Count);
+	for (uint32 Index = 0; Index < Count; ++Index)
+	{
+		const FRenderPacket& Packet = RenderPackets[Index];
+		if (Packet.Mesh == nullptr || Packet.Material == nullptr) continue;
+
+		if (Packet.Mesh != BoundMesh || Packet.LODIndex != BoundLOD)
+			RenderCommand::BindMesh(Packet.Mesh, Packet.LODIndex);
+		if (Packet.Material != BoundMaterial)
+		{
+			BindMaterial(Packet.Material);
+			// BindMaterial이 바꾼 상태를 측정용으로 덮어쓴다.
+			RenderCommand::SetBlendState(EBlendState::NoColorWrite);
+			Context->OMSetDepthStencilState(DepthLessEqualReadOnly.Get(), 0);
+		}
+
+		if (bUsePerObjectSlots)
+			RenderCommand::BindConstantBufferRange(2, PerObjectSlotCB.get(),
+				Index * PerObjectSlotConstants, PerObjectSlotConstants, EShaderBindFlagBits::Vertex);
+		else
+			UpdatePerObjectConstants(Packet, ViewProjection);
+
+		const uint32 IndexCount = Packet.IndexCount ? Packet.IndexCount : Packet.Mesh->GetIndexBuffer(Packet.LODIndex)->GetIndexCount();
+		ID3D11Query* Query = OcclusionQueries[Index].Get();
+		Context->Begin(Query);
+		RenderCommand::DrawIndexed(IndexCount, Packet.StartIndex);
+		Context->End(Query);
+		bIssued[Index] = 1;
+
+		BoundMesh = Packet.Mesh;
+		BoundMaterial = Packet.Material;
+		BoundLOD = Packet.LODIndex;
+	}
+
+	// 2) 결과를 기다려 모은다. 한 물체가 Section 여러 개로 나뉘면 하나라도 보이면 보이는 것으로 친다.
+	std::unordered_map<const void*, bool> ObjectVisible;
+	ObjectVisible.reserve(Count);
+	for (uint32 Index = 0; Index < Count; ++Index)
+	{
+		if (!bIssued[Index]) continue;
+		const FRenderPacket& Packet = RenderPackets[Index];
+
+		UINT64 Samples = 0;
+		while (Context->GetData(OcclusionQueries[Index].Get(), &Samples, sizeof(Samples), 0) == S_FALSE) {}
+
+		const uint32 IndexCount = Packet.IndexCount ? Packet.IndexCount : Packet.Mesh->GetIndexBuffer(Packet.LODIndex)->GetIndexCount();
+		const uint64 Triangles = IndexCount / 3;
+		const bool bVisible = Samples > 0;
+
+		++Result.TotalDraws;
+		Result.TotalTriangles += Triangles;
+		if (bVisible)
+		{
+			++Result.VisibleDraws;
+			Result.VisibleTriangles += Triangles;
+		}
+
+		// 프록시가 없는 패킷(빌보드 등)은 패킷 자체를 한 물체로 센다.
+		const void* Key = Packet.Proxy ? static_cast<const void*>(Packet.Proxy) : static_cast<const void*>(&Packet);
+		bool& bObjectVisible = ObjectVisible[Key];
+		bObjectVisible = bObjectVisible || bVisible;
+	}
+
+	Result.TotalObjects = static_cast<uint32>(ObjectVisible.size());
+	for (const auto& [Key, bVisible] : ObjectVisible)
+		Result.VisibleObjects += bVisible ? 1 : 0;
+
+	// 뒤따르는 Grid·반투명 패스를 위해 상태를 되돌린다.
+	RenderCommand::SetBlendState(EBlendState::Opaque);
+	RenderCommand::SetDepthStencilState(EDepthStencilState::Default);
+
+	Result.ElapsedMs = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - StartTime).count();
+	Result.bValid = true;
+	return Result;
 }
 
 // Material마다 Shader/Texture/Sampler/State 꽂기

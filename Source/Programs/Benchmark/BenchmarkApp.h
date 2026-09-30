@@ -10,6 +10,7 @@
 #include "Editor/Rendering/Outline.h"
 #include "Editor/Rendering/OutLineRenderer.h"
 #include "Editor/Settings/SettingsPanel.h"
+#include "Render/Renderer.h"
 
 class FImGuiRenderer;
 class FOutlinerPanel;
@@ -60,4 +61,8 @@ private:
 
 	// 지역 변수면 매 프레임 수 MB를 새로 할당·해제해 Gather 시간이 튄다.
 	TArray<FRenderPacket> RenderQueue;
+
+	// 오버레이 버튼으로 요청하면 다음 프레임 한 번만 오클루전 가시 비율을 측정한다.
+	bool bMeasureOcclusionRequested = false;
+	FOcclusionMeasureResult LastOcclusionMeasure;
 };
