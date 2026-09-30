@@ -17,6 +17,7 @@
 #include "Render/Texture2D.h"
 #include "Core/SplashScreen.h"
 #include "Core/Stats/LightweightStats.h"
+#include "Core/Async/TaskPool.h"
 
 namespace
 {
@@ -111,6 +112,9 @@ bool FEngineLoop::PreInit(HINSTANCE hInstance, UClass* EngineClass)
 
 	EngineTimer::Init();
 	PrevFrameCycles = FPlatformTime::GetCycles64();
+
+	const uint32 Cores = std::max(1u, std::thread::hardware_concurrency());
+	FTaskPool::Get().Init(std::min(Cores - 1, 15u));
 	bIsRunning = true;
 	return true;
 }
@@ -162,6 +166,9 @@ bool FEngineLoop::Tick()
 // UObject(에셋 포함)의 GPU 자원은 Device가 살아 있을 때 해제한다.
 void FEngineLoop::Exit()
 {
+	FTaskPool::Get().Shutdown();
+
+
 	if (GEngine)
 	{
 		GEngine->PreExit();

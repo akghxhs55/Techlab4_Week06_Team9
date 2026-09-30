@@ -35,6 +35,13 @@ namespace FMath
 		return Value;
 	}
 
+	static inline uint32 Clamp(uint32 Value, uint32 Min, uint32 Max)
+	{
+		if (Value < Min) return Min;
+		if (Value > Max) return Max;
+		return Value;
+	}
+
 	static inline float RadiansToDegrees(float Radian)
 	{
 		return Radian * (180.0f / PI);

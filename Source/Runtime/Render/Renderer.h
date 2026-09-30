@@ -7,6 +7,8 @@
 
 #include "RenderingInfo.h"
 
+constexpr uint32 ObjectSlotBytes = 256;
+
 struct FPerObjectConstants
 {
 	FMatrix World;
@@ -58,6 +60,9 @@ public:
 	// GPU 결과를 기다리므로 매우 느리다. 버튼 등으로 한 프레임만 실행할 것.
 	FOcclusionMeasureResult MeasureOpaqueOcclusion(const FMatrix& ViewProjection);
 
+	uint8* BeginObjectConstants(uint32 MaxSlots);
+	void EndObjectConstants();
+
 private:
 	// FIFO 소비용 배열의 용량만 재사용하며 매 View의 패킷 값은 새로 채운다.
 	TArray<FRenderPacket> RenderPackets;
@@ -83,7 +88,6 @@ private:
 	void UpdateMaterialParams(const FRenderPacket& RenderPacket);
 	void UpdatePerObjectConstants(const FRenderPacket& RenderPacket, const FMatrix& ViewProjection);
 	void EnsurePerObjectSlotCapacity(uint32 SlotCount);
-	void UploadPerObjectConstants();
 
 	TArray<FSortEntry> SortEntries;
 };

@@ -240,7 +240,7 @@ void UBenchmarkEngine::UpdateGizmoAndPicking()
 	if (FInputSystem::IsMousePressed(EMouseButton::Left) &&
 		!Gizmo->IsUsing() && Gizmo->GetHoveredAxis() < 0)
 	{
-		
+
 		FHitResult Hit;
 		SelectPrimitive(World->LineTraceSingle(Ray, Hit) ? Hit.HitComponent : nullptr);
 	}
@@ -290,7 +290,7 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 		.Quaternion()
 		.RotateVector(FVector(1.0f, 0.0f, 0.0f))
 		.Normalized();
-	LODView.ProjectionScaleSquared = 
+	LODView.ProjectionScaleSquared =
 		std::max(ScaleX * ScaleX, ScaleY * ScaleY);
 	LODView.NearZ = Camera->GetNearZ();
 	LODView.bOrthographic = Camera->GetIsOrthogonal();
@@ -299,7 +299,9 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 	{
 		SCOPE_CYCLE_COUNTER(STAT_TickGather);
 		RenderQueue.Reset();
-		World->GatherRenderPackets(RenderQueue, &LODView, &Frustum);
+		FRenderer* Renderer = GetEngineLoop().GetRenderer();
+
+		World->GatherRenderPackets(RenderQueue, &LODView, &Frustum, Renderer);
 	}
 
 	{
@@ -351,7 +353,12 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 			OutlineRenderer->OnRender(*Outline, ViewProjection, Viewport);
 
 		if (Gizmo->GetTarget())
+		{
+			// 에디터와 같이 깊이를 비워 기즈모가 사과에 가려지지 않고 항상 위에 보이게 한다.
+			// 아웃라인(스텐실)은 이미 그렸고 이후 장면 패스가 없으므로 지워도 된다.
+			RenderCommand::ClearDepthStencil(GetEngineLoop().GetDepthBuffer());
 			GizmoRenderer->OnRender(*Gizmo, ViewProjection, CameraLocation, Camera->GetIsOrthogonal());
+		}
 	}
 
 	{

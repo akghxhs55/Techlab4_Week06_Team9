@@ -42,6 +42,8 @@ public:
 	FRenderer* GetRenderer() const { return Renderer.get(); }
 	FWindow* GetMainWindow() const { return MainWindow.get(); }
 	FSwapchain* GetSwapchain() const { return Swapchain.get(); }
+	// 백버퍼 패스의 깊이 버퍼. 기즈모처럼 장면 위에 항상 보여야 하는 것을 그리기 전에 지울 때 쓴다.
+	FTexture2D* GetDepthBuffer() const { return DepthBuffer.get(); }
 
 	uint32 GetViewportWidth() const;
 	uint32 GetViewportHeight() const;
