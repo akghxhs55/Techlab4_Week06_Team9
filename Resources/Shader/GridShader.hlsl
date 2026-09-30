@@ -1,3 +1,4 @@
+#pragma pack_matrix(row_major)
 cbuffer GridCB : register(b0)
 {
     float4x4 ViewProj;

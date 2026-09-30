@@ -34,8 +34,8 @@ FVertexBuffer::FVertexBuffer(ID3D11Device* Device, const D3D11_BUFFER_DESC& Desc
 	Stride = InStride;
 }
 
-FIndexBuffer::FIndexBuffer(ID3D11Device* Device, const D3D11_BUFFER_DESC& Desc, uint32 Count, const void* InitialData)
-	:FBuffer(Device, Desc, InitialData)
+FIndexBuffer::FIndexBuffer(ID3D11Device* Device, const D3D11_BUFFER_DESC& Desc, uint32 Count, const void* InitialData, DXGI_FORMAT InFormat)
+	:FBuffer(Device, Desc, InitialData), Format(InFormat)
 {
 	IndexCount = Count;
 }

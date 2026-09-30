@@ -1,3 +1,4 @@
+#pragma pack_matrix(row_major)
 // View별 행렬과 렌더 타깃 픽셀 크기·Outline 확장량을 전달한다.
 cbuffer constants : register(b0)
 {

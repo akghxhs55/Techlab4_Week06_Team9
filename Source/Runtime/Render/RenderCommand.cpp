@@ -135,7 +135,7 @@ void RenderCommand::BindIndexBuffer(FIndexBuffer* IndexBuffer)
 	ID3D11Buffer* Buffer = IndexBuffer ? IndexBuffer->GetBuffer() : nullptr;
 
 	uint32 Offset = 0;
-	RenderDevice->GetContext()->IASetIndexBuffer(Buffer, DXGI_FORMAT_R32_UINT, Offset);
+	RenderDevice->GetContext()->IASetIndexBuffer(Buffer, IndexBuffer ? IndexBuffer->GetFormat() : DXGI_FORMAT_R32_UINT, Offset);
 }
 
 void RenderCommand::BindConstantBuffer(uint32 Slot, FConstantBuffer* ConstantBuffer, EShaderBindFlagBits FlagBits)

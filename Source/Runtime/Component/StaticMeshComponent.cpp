@@ -58,44 +58,32 @@ UMaterial* UStaticMeshComponent::GetDefaultMaterial(int32 SlotIndex) const
 }
 
 // 기존 호출 경로는 LOD0를 사용한다.
-void UStaticMeshComponent::SubmitToRenderQueue(TArray<FRenderPacket>& RenderQueue)
+void UStaticMeshComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue)
 {
 	SubmitToRenderQueue(RenderQueue, 0);
 }
 
 // 지정한 LOD의 Section으로 패킷을 만든다.
-void UStaticMeshComponent::SubmitToRenderQueue(TArray<FRenderPacket>& RenderQueue, uint32 LODIndex)
+void UStaticMeshComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue, uint32 LODIndex)
 {
-	if (!StaticMesh) return;
-
-	// 잘못된 번호가 들어오면 안전하게 LOD0 사용
-	if (LODIndex >= StaticMesh->GetLODCount()) LODIndex = 0;
-
-	const FStaticMeshData& MeshData = StaticMesh->GetMeshData(LODIndex);
-
-	for (const FStaticMeshSection& Section : MeshData.Sections)
-	{
-		UMaterial* SectionMaterial = GetMaterial(
-			static_cast<int32>(Section.MaterialSlotIndex));
-
-		if (!SectionMaterial) continue;
-
-		FRenderPacket Packet;
-		Packet.Mesh = StaticMesh;
-		Packet.model = GetSceneProxy()->GetLocalToWorld();
-		Packet.Material = SectionMaterial;
-
-		// 반드시 선택한 LOD의 Section 범위를 사용
-		Packet.StartIndex = Section.StartIndex;
-		Packet.IndexCount = Section.IndexCount;
-
-		// Renderer가 이 번호의 GPU 버퍼를 바인딩한다.
-		Packet.LODIndex = static_cast<uint8>(LODIndex);
-		RenderQueue.Add(Packet);
-	}
+    const FPrimitiveSceneProxy* Proxy = GetSceneProxy();
+    if (!StaticMesh || !Proxy) return;
+    const FMeshRenderState* State = Proxy->GetRenderState();
+    if (!State) return;
+    if (LODIndex >= State->LODCount) LODIndex = 0;
+    const FCachedMeshLOD& LOD = State->LODs[LODIndex];
+    for (uint32 I = 0; I < LOD.NumSections; ++I)
+    {
+        const FCachedMeshSection& Section = State->Sections[LOD.FirstSection + I];
+        FRenderPacket& Packet = RenderQueue.AddDefaulted_GetRef();
+        Packet.Proxy = Proxy;
+        Packet.Mesh = StaticMesh;
+        Packet.Material = Section.Material;
+        Packet.StartIndex = Section.StartIndex;
+        Packet.IndexCount = Section.IndexCount;
+        Packet.LODIndex = static_cast<uint8>(LODIndex);
+    }
 }
-
-
 /*
 // Section별 Material·Texture와 인덱스 범위를 보존해 패킷을 제출한다.
 void UStaticMeshComponent::SubmitToRenderQueue(TQueue<FRenderPacket>& RenderQueue)

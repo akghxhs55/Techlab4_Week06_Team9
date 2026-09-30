@@ -1,4 +1,4 @@
-﻿#include "EnginePCH.h"
+#include "EnginePCH.h"
 #include "World.h"
 #include "Level.h"
 
@@ -146,7 +146,7 @@ void UWorld::ClearWorld()
 	HTR_LOG(Info, "{} : ", PersistentLevel->GetActorNum());
 }
 
-void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODViewContext* LODView, const FFrustumPlanes* Frustum)
+void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FLODViewContext* LODView, const FFrustumPlanes* Frustum)
 {
 	// 멤버로 두어 매 프레임 용량을 재사용한다.
 	RenderStats.Reset();
@@ -179,14 +179,23 @@ void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODV
 
 	{
 		SCOPE_CYCLE_COUNTER(STAT_GatherElements);
-		for (FPrimitiveSceneProxy* Proxy : VisibleProxies)
-		{
+        LODInputs.Reset();
+        if (LODView)
+        {
+            LODInputs.Reserve(VisibleProxies.Num());
+            for (const FPrimitiveSceneProxy* Proxy : VisibleProxies)
+                LODInputs.Add({Proxy->GetLODSphere(), Proxy->GetRenderState()});
+            SelectLODs(LODInputs, *LODView, SelectedLODs);
+        }
+        for (uint32 ProxyIndex = 0; ProxyIndex < static_cast<uint32>(VisibleProxies.Num()); ++ProxyIndex)
+        {
+            FPrimitiveSceneProxy* Proxy = VisibleProxies[ProxyIndex];
 			if (!Proxy->IsVisible())continue;
 
 			UStaticMesh* Mesh = Proxy->GetMesh();
 			if (Mesh)
 			{
-				const uint32 LOD = LODView ? SelectLOD(*Proxy, *LODView) : 0;
+				const uint32 LOD = LODView ? SelectedLODs[ProxyIndex] : 0;
 				const FCachedMeshLOD& CachedLOD = Proxy->GetLOD(LOD);
 				++RenderStats.LODCounts[LOD];
 
@@ -215,10 +224,7 @@ void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODV
 					if (UStaticMesh* Mesh =
 						Component->GetStaticMesh())
 					{
-						const uint32 LOD = SelectStaticMeshLOD(
-							*Mesh,
-							Proxy->GetBounds(),
-							*LODView);
+						const uint32 LOD = SelectedLODs[ProxyIndex];
 
 						{
 							//SCOPE_CYCLE_COUNTER(STAT_GatherSubmit);

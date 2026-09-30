@@ -6,12 +6,14 @@
 #include "Container/Queue.h"
 #include "Math/Matrix.h"
 #include "Render/RenderPacket.h"
+#include "Asset/LOD/StaticMeshLODSelector.h"
 
 #include "Container/Map.h"
 #include "Container/Array.h"
 
 class FOutlinerPanel;
 class UPrimitiveComponent;
+class UStaticMeshComponent;
 class UWorld;
 
 // 팀 엔진 데이터와 MultipleViewports Core API 사이의 상태·변환·렌더 연결을 맡는다.
@@ -90,7 +92,7 @@ public:
     bool HasCapturedParticle() const { return bCapturedParticle; }
 
     // View별 가시 ID를 엔진 컴포넌트로 역매핑해 렌더 큐를 구성한다.
-    void BuildRenderQueue(int32 ViewIndex, TArray<FRenderPacket>& OutQueue);
+    void BuildRenderQueue(int32 ViewIndex, FRenderQueue& OutQueue);
     // 활성 View Ray를 World·Component 피킹으로 전달하고 마지막 결과를 보관한다.
     FPickHit PickActiveView(FVector2 LocalMousePosition, UWorld& World);
     // 마지막 Hit Component의 Owner를 찾아 Outliner 선택에 반영한다.
@@ -104,15 +106,13 @@ public:
 private:
     // 직교 View의 논리 위치는 유지하고 렌더·컬링·피킹용 깊이 범위만 확장한다.
     FViewCamera GetRenderCamera(int32 ViewIndex) const;
-    // 카메라·투영·화면 크기 키와 파생 행렬·절두체를 보관한다.
+    // 현재 호출에서 계산한 행렬·절두체를 보관한다.
     struct PreparedView
     {
-        float Key[14]{};
         FFrustumPlanes Frustum{};
         FMatrix EngineViewProjection{};
-        bool bValid = false;
     };
-    // 카메라·투영·화면 크기가 같으면 VP와 절두체를 재사용한다.
+    // 호출할 때마다 현재 카메라로 VP와 절두체를 계산한다.
     const PreparedView& PrepareView(int32 ViewIndex) const;
     mutable PreparedView PreparedViews[4]{};
     static constexpr float MinimumSplitRatio = 0.1f;
@@ -143,6 +143,9 @@ private:
     TArray<FParticleSortInput> SortInputs;
     TArray<ObjectId> SortedParticleIds;
     TArray<ObjectId> VisibleIds[4];
+    TArray<UStaticMeshComponent*> PendingStaticMeshes;
+    TArray<FLODSelectionInput> LODInputs;
+    TArray<uint8> SelectedLODs;
     bool bCapturedBillboard = false;
     bool bCapturedParticle = false;
 };

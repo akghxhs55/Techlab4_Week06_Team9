@@ -31,12 +31,14 @@ private:
 class FIndexBuffer : public FBuffer
 {
 public:
-	FIndexBuffer(ID3D11Device* Device, const D3D11_BUFFER_DESC& Desc, uint32 Count, const void* InitialData = nullptr);
+	FIndexBuffer(ID3D11Device* Device, const D3D11_BUFFER_DESC& Desc, uint32 Count, const void* InitialData = nullptr, DXGI_FORMAT InFormat = DXGI_FORMAT_R32_UINT);
 	~FIndexBuffer() override = default;
 
 	inline uint32 GetIndexCount() const { return IndexCount; }
+	inline DXGI_FORMAT GetFormat() const { return Format; }
 private:
 	uint32 IndexCount;
+	DXGI_FORMAT Format;
 
 };
 

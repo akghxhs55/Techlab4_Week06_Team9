@@ -3,6 +3,11 @@
 #include "Asset/RenderAsset.h"
 #include "Render/Buffer.h"
 #include "Render/StaticMeshData.h"
+#include "Render/MeshRenderData.h"
+#include <unordered_map>
+#include <vector>
+
+class FPrimitiveSceneProxy;
 
 struct FStaticMeshLODResource
 {
@@ -54,7 +59,22 @@ public:
         return LODIndex == 0 ? IndexBuffer.get() : AdditionalLODs[LODIndex - 1].IndexBuffer.get();
     }
 
+    void RebuildRenderData();
+    const FLODSphere& GetLocalLODSphere() const { return LocalLODSphere; }
+    const FBox& GetRenderBounds() const { return RenderBounds; }
+    TSharedPtr<const FMeshRenderState> GetRenderState(const std::vector<UMaterial*>& Materials);
+    void RegisterProxy(FPrimitiveSceneProxy* Proxy);
+    void UnregisterProxy(FPrimitiveSceneProxy* Proxy);
+
     const uint16 SortID;
 private:
     static inline uint16 NextSortID = 0;
+    struct FMaterialSlotsHash
+    {
+        size_t operator()(const std::vector<UMaterial*>& Slots) const;
+    };
+    FLODSphere LocalLODSphere;
+    FBox RenderBounds;
+    std::unordered_map<std::vector<UMaterial*>, TWeakPtr<const FMeshRenderState>, FMaterialSlotsHash> RenderStates;
+    TArray<FPrimitiveSceneProxy*> RenderProxies;
 };

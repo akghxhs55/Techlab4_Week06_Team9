@@ -26,7 +26,7 @@ private:
 	void UpdateWindowTitle();
 
 	// Render
-	void BuildRenderQueue(TArray<FRenderPacket>& OuTArray) const;
+	void BuildRenderQueue(FRenderQueue& OuTArray) const;
 
 	// Camera
 	void FitCameraToMesh();

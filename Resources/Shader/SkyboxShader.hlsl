@@ -1,3 +1,4 @@
+#pragma pack_matrix(row_major)
 // 등장방형(equirectangular) 파노라마를 배경으로 그린다.
 // 정점 버퍼 없이 화면을 덮는 삼각형 하나를 SV_VertexID로 만든다.
 

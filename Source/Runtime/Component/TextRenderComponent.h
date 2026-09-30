@@ -24,7 +24,7 @@ public:
 
 
 	// 텍스트는 FTextRenderer가 따로 그리므로 렌더 패킷을 만들지 않음
-	virtual void SubmitToRenderQueue(TArray<FRenderPacket>& RenderQueue) override {}
+	virtual void SubmitToRenderQueue(FRenderQueue& RenderQueue) override {}
 
 	const FString& GetText() const { return Text; }
 	void SetText(const FString& InText) { Text = InText; }

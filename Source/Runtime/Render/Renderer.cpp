@@ -1,4 +1,4 @@
-﻿#include "EnginePCH.h"
+#include "EnginePCH.h"
 #include "Renderer.h"
 #include "Shader.h"
 #include "Mesh.h"
@@ -29,6 +29,12 @@ namespace
 	static_assert(sizeof(FPerObjectConstants) <= PerObjectSlotBytes);
 
 	constexpr uint32 MinPerObjectSlots = 1024;
+
+	const FMatrix& GetPacketWorld(const FRenderPacket& Packet)
+	{
+		if (Packet.Proxy) return Packet.Proxy->GetLocalToWorld();
+		return Packet.Model ? *Packet.Model : FMatrix::Identity;
+	}
 
 	uint64 MakeSortKey(const FRenderPacket& Packet)
 	{
@@ -74,7 +80,7 @@ void FRenderer::EnsurePerObjectSlotCapacity(uint32 SlotCount)
 	PerObjectSlotCapacity = NewCapacity;
 }
 
-// 정렬된 순서대로 모든 패킷의 World 행렬을 한 번의 Map으로 올린다. 패킷 i는 칸 i를 쓴다.
+// 원래 패킷 순서로 World 행렬을 올린다. 정렬 목록은 원래 패킷 번호의 칸을 바인딩한다.
 void FRenderer::UploadPerObjectConstants()
 {
 	SCOPE_CYCLE_COUNTER(STAT_UploadPerObjectCB);
@@ -101,22 +107,21 @@ void FRenderer::UploadPerObjectConstants()
 	for (uint32 Index = 0; Index < Count; ++Index)
 	{
 		const FRenderPacket& P = RenderPackets[Index];
-		const FMatrix& Model = P.Proxy ? P.Proxy->GetLocalToWorld() : P.model;
-		const FMatrix World = Model.GetTransposed();
-		std::memcpy(Dest + static_cast<size_t>(Index) * PerObjectSlotBytes, &World, sizeof(FMatrix));
+		const FMatrix& Model = GetPacketWorld(P);
+		std::memcpy(Dest + static_cast<size_t>(Index) * PerObjectSlotBytes, &Model, sizeof(FMatrix));
 	}
 
 	RenderCommand::Unmap(PerObjectSlotCB.get());
 }
 
 // 카메라의 ViewProjection을 공통 렌더 경로로 전달한다.
-void FRenderer::RenderAll(TArray<FRenderPacket>& InQueue, UCameraComponent* CameraComponent)
+void FRenderer::RenderAll(FRenderQueue& InQueue, UCameraComponent* CameraComponent)
 {
 	RenderAll(InQueue, CameraComponent->GetViewProjectionMatrix());
 }
 
 // 불투명 우선·반투명 거리순으로 정렬해 View 행렬과 Section 범위로 그린다.
-void FRenderer::RenderAll(TArray<FRenderPacket>& InQueue, const FMatrix& ViewProjection)
+void FRenderer::RenderAll(FRenderQueue& InQueue, const FMatrix& ViewProjection)
 {
 	RenderQueueSorting(InQueue, ViewProjection);
 	RenderOpaque(ViewProjection);
@@ -136,10 +141,9 @@ void FRenderer::RenderTranslucent(const FMatrix& ViewProjection)
 	FirstTranslucentIndex = 0;
 }
 
-void FRenderer::RenderQueueSorting(TArray<FRenderPacket>& InQueue, const FMatrix& ViewProjection)
+void FRenderer::RenderQueueSorting(FRenderQueue& InQueue, const FMatrix& ViewProjection)
 {
-	FMatrix VP = ViewProjection.GetTransposed();
-	RenderCommand::UpdateBufferData(ViewCB.get(), &VP);
+	RenderCommand::UpdateBufferData(ViewCB.get(), &ViewProjection);
 	{
 		SCOPE_CYCLE_COUNTER(STAT_RenderQueueSorting);
 
@@ -192,8 +196,9 @@ void FRenderer::DrawPackets(uint32 Begin, uint32 End, const FMatrix& ViewProject
 		}
 		if (RenderPacket.Material != LastMaterial) {
 			BindMaterial(RenderPacket.Material);
-			UpdateMaterialParams(RenderPacket);
 		}
+		if (RenderPacket.Material != LastMaterial || RenderPacket.MaterialParamData)
+			UpdateMaterialParams(RenderPacket);
 		if (bUsePerObjectSlots)
 		{
 			// 드로우마다 Map하지 않고 이미 올린 칸의 오프셋만 바꾼다.
@@ -262,7 +267,8 @@ FOcclusionMeasureResult FRenderer::MeasureOpaqueOcclusion(const FMatrix& ViewPro
 	bIssued.Init(0, Count);
 	for (uint32 Index = 0; Index < Count; ++Index)
 	{
-		const FRenderPacket& Packet = RenderPackets[Index];
+		const uint32 PacketIndex = SortEntries[Index].PacketIndex;
+		const FRenderPacket& Packet = RenderPackets[PacketIndex];
 		if (Packet.Mesh == nullptr || Packet.Material == nullptr) continue;
 
 		if (Packet.Mesh != BoundMesh || Packet.LODIndex != BoundLOD)
@@ -274,10 +280,12 @@ FOcclusionMeasureResult FRenderer::MeasureOpaqueOcclusion(const FMatrix& ViewPro
 			RenderCommand::SetBlendState(EBlendState::NoColorWrite);
 			Context->OMSetDepthStencilState(DepthLessEqualReadOnly.Get(), 0);
 		}
+		if (Packet.Material != BoundMaterial || Packet.MaterialParamData)
+			UpdateMaterialParams(Packet);
 
 		if (bUsePerObjectSlots)
 			RenderCommand::BindConstantBufferRange(2, PerObjectSlotCB.get(),
-				Index * PerObjectSlotConstants, PerObjectSlotConstants, EShaderBindFlagBits::Vertex);
+				PacketIndex * PerObjectSlotConstants, PerObjectSlotConstants, EShaderBindFlagBits::Vertex);
 		else
 			UpdatePerObjectConstants(Packet, ViewProjection);
 
@@ -299,7 +307,7 @@ FOcclusionMeasureResult FRenderer::MeasureOpaqueOcclusion(const FMatrix& ViewPro
 	for (uint32 Index = 0; Index < Count; ++Index)
 	{
 		if (!bIssued[Index]) continue;
-		const FRenderPacket& Packet = RenderPackets[Index];
+		const FRenderPacket& Packet = RenderPackets[SortEntries[Index].PacketIndex];
 
 		UINT64 Samples = 0;
 		while (Context->GetData(OcclusionQueries[Index].Get(), &Samples, sizeof(Samples), 0) == S_FALSE) {}
@@ -396,7 +404,7 @@ void FRenderer::UpdatePerObjectConstants(const FRenderPacket& RenderPacket, cons
 
 	FPerObjectConstants Constants;
 
-	Constants.World = RenderPacket.model.GetTransposed();
+	Constants.World = GetPacketWorld(RenderPacket);
 
 	RenderCommand::UpdateBufferData(PerObjectCB.get(), &Constants);
 }

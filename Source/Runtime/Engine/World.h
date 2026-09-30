@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "ObjectSystem/Object.h"
 #include "ObjectSystem/Class.h"
@@ -12,6 +12,7 @@
 #include "Math/BVH.h"
 #include "Engine/Scene.h"
 #include "Camera/CameraActor.h"
+#include "Asset/LOD/StaticMeshLODSelector.h"
 
 //class ACameraActor;
 class ULevel;
@@ -53,7 +54,7 @@ public:
 
 	void ClearWorld();
 
-	void GatherRenderPackets(TArray<FRenderPacket>& RenderArray, const FLODViewContext* LODView = nullptr, const FFrustumPlanes* Frustum = nullptr);
+	void GatherRenderPackets(FRenderQueue& RenderArray, const FLODViewContext* LODView = nullptr, const FFrustumPlanes* Frustum = nullptr);
 
 	void CreateMainCamera();
 
@@ -106,6 +107,8 @@ private:
 
 	// GatherRenderPackets가 매 프레임 채우는 컬링 결과. 용량을 재사용한다.
 	TArray<FPrimitiveSceneProxy*> VisibleProxies;
+    TArray<FLODSelectionInput> LODInputs;
+    TArray<uint8> SelectedLODs;
 
 	FRenderStats RenderStats;
 };

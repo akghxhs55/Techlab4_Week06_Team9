@@ -1,4 +1,4 @@
-﻿#include "EnginePCH.h"
+#include "EnginePCH.h"
 #include "PrimitiveComponent.h"
 #include "../Render/Renderer.h"
 #include "Asset/AssetManager.h"
@@ -49,7 +49,7 @@ void UPrimitiveComponent::BeginPlay()
 }
 
 
-void UPrimitiveComponent::SubmitToRenderQueue(TArray<FRenderPacket>& RenderQueue)
+void UPrimitiveComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue)
 {
 	//if (Mesh && Material)
 	//{

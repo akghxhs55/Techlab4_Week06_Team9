@@ -1,4 +1,4 @@
-﻿#include "EnginePCH.h"
+#include "EnginePCH.h"
 #include "AssetManager.h"
 #include "Render/Buffer.h"
 #include "Render/Material.h"
@@ -91,6 +91,7 @@ namespace
 		}
 
 		Mesh->MeshData.BuildTriangleBVH();
+		Mesh->RebuildRenderData();
 
 		return Mesh;
 	}
@@ -269,6 +270,7 @@ void UAssetManager::CreateDefaultMeshes()
 
 	Mesh->MeshData.AABB.Min = FVector(-0.001f, -0.5, -0.5);
 	Mesh->MeshData.AABB.Max = FVector(0.001f, 0.5, 0.5);
+	Mesh->RebuildRenderData();
 
 	RegisterAsset("ParticleQuad", Mesh);
 }
@@ -430,5 +432,6 @@ FLODGenerateResult UAssetManager::GenerateStaticMeshLODs(UStaticMesh& Mesh, cons
 
 	Mesh.AdditionalLODs = std::move(NewResources);
 	Mesh.ScreenThresholds = Request.ScreenThresholds;
+	Mesh.RebuildRenderData();
 	return Result;
 }

@@ -1,6 +1,12 @@
+#pragma pack_matrix(row_major)
 cbuffer constants : register(b0)
 {
-    matrix MVP;
+    matrix VP;
+};
+
+cbuffer Worldconstants : register(b2)
+{
+    matrix World;
 };
 
 struct VS_INPUT
@@ -25,7 +31,7 @@ PS_INPUT mainVS(VS_INPUT input)
 {
 	PS_INPUT output;
     
-    output.position = mul(float4(input.position, 1.0f), MVP);
+    output.position = mul(mul(float4(input.position, 1.0f), World), VP);
     output.color = float4(input.position, 1.0f);
     output.uv = input.uv;
 	return output;

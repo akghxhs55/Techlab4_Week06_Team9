@@ -3,30 +3,66 @@
 #include "Mesh.h"
 #include "Shader.h"
 #include "Material.h"
+#include <array>
+#include <utility>
 
-// Todo: subuv
-class UTexture2D;
 class FPrimitiveSceneProxy;
-
 inline constexpr uint32 InvalidObjectSlot = ~0u;
 
 struct FRenderPacket
 {
-	const FPrimitiveSceneProxy* Proxy = nullptr;
+    const FPrimitiveSceneProxy* Proxy = nullptr;
+    const FMatrix* Model = nullptr;
+    UStaticMesh* Mesh = nullptr;
+    UMaterial* Material = nullptr;
+    const void* MaterialParamData = nullptr;
+    float CameraToParticleDistance = 0.0f;
+    uint32 MaterialParamDataSize = 0;
+    uint32 StartIndex = 0;
+    uint32 IndexCount = 0; // Zero selects the full index buffer.
+    uint32 Slot = InvalidObjectSlot;
+    uint8 LODIndex = 0;
+};
 
-	FMatrix model;
-	UStaticMesh* Mesh = nullptr;
-	UMaterial* Material = nullptr;
-	uint8 LODIndex = 0;
-
-	// 카메라와의 거리 제곱. 반투명 정렬에 사용
-	float CameraToParticleDistance = 0.0f;
-
-	const void* MaterialParamData = nullptr;
-	uint32 MaterialParamDataSize = 0;
-
-	uint32 StartIndex = 0;
-	uint32 IndexCount = 0; // 0이면 전체 IndexBuffer 사용
-
-	uint32 Slot = InvalidObjectSlot;
+// Owns the current frame's billboard/particle matrices together with their packets.
+// Blocks keep matrix addresses stable when either array grows.
+class FRenderQueue : public TArray<FRenderPacket>
+{
+    using FPackets = TArray<FRenderPacket>;
+    static constexpr uint32 MatricesPerBlock = 256;
+    using FMatrixBlock = std::array<FMatrix, MatricesPerBlock>;
+    TArray<TUniquePtr<FMatrixBlock>> MatrixBlocks;
+    uint32 MatrixCount = 0;
+public:
+    FRenderQueue() = default;
+    FRenderQueue(const FRenderQueue&) = delete;
+    FRenderQueue& operator=(const FRenderQueue&) = delete;
+    FRenderQueue(FRenderQueue&& Other) noexcept
+        : FPackets(std::move(Other)), MatrixBlocks(std::move(Other.MatrixBlocks)),
+          MatrixCount(std::exchange(Other.MatrixCount, 0)) {}
+    FRenderQueue& operator=(FRenderQueue&& Other) noexcept
+    {
+        if (this != &Other)
+        {
+            FPackets::operator=(std::move(Other));
+            MatrixBlocks = std::move(Other.MatrixBlocks);
+            MatrixCount = std::exchange(Other.MatrixCount, 0);
+        }
+        return *this;
+    }
+    const FMatrix* StoreWorldMatrix(const FMatrix& World)
+    {
+        const uint32 BlockIndex = MatrixCount / MatricesPerBlock;
+        if (BlockIndex >= static_cast<uint32>(MatrixBlocks.Num()))
+            MatrixBlocks.Add(MakeUnique<FMatrixBlock>());
+        FMatrix& Stored = (*MatrixBlocks[BlockIndex])[MatrixCount % MatricesPerBlock];
+        Stored = World;
+        ++MatrixCount;
+        return &Stored;
+    }
+    void Reset()
+    {
+        FPackets::Reset();
+        MatrixCount = 0;
+    }
 };

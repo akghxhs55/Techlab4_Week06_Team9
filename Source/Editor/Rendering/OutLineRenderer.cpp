@@ -53,9 +53,9 @@ void FOutlineRenderer::OnRender(const FOutline& InOutline, const FMatrix& InView
 	RenderCommand::BindConstantBuffer(0, ConstantBuffer.get(), EShaderBindFlagBits::Vertex);
 
 	const FMatrix OriginalWorld = InOutline.GetWorldMatrix();
-	const FMatrix World = OriginalWorld.GetTransposed();
-	const FMatrix NormalMatrix = OriginalWorld.Inverse();
-	const FMatrix ViewProj = InViewProj.GetTransposed();
+    const FMatrix& World = OriginalWorld;
+    const FMatrix NormalMatrix = OriginalWorld.Inverse().GetTransposed();
+    const FMatrix& ViewProj = InViewProj;
 	const float ViewportWidth = static_cast<float>(Viewport.Width);
 	const float ViewportHeight = static_cast<float>(Viewport.Height);
 	const uint32 IndexCount = InOutline.GetMesh()->IndexBuffer->GetIndexCount();

@@ -1,3 +1,4 @@
+#pragma pack_matrix(row_major)
 // CPU는 월드 좌표를 보내고 기존 Grid와 같은 행렬 규약으로 GPU에서 VP를 적용한다.
 cbuffer GridLineCB : register(b0)
 {

@@ -1,3 +1,4 @@
+#pragma pack_matrix(row_major)
 cbuffer Viewconstants : register(b0)
 {
     matrix VP;

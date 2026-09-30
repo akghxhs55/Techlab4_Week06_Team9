@@ -115,7 +115,7 @@ void UParticleSubUVComponent::TickComponent(float DeltaTime)
 }
 
 // 기본 카메라 기준으로 파티클 상수와 렌더 패킷을 구성한다.
-void UParticleSubUVComponent::SubmitToRenderQueue(TArray<FRenderPacket>& RenderQueue)
+void UParticleSubUVComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue)
 {
 	assert(QuadMesh != nullptr);
 	assert(Material != nullptr);
@@ -170,7 +170,7 @@ void UParticleSubUVComponent::SubmitToRenderQueue(TArray<FRenderPacket>& RenderQ
 			CameraToParticleVec.Z;
 
 		FRenderPacket Packet;
-		Packet.model = WorldMatrix;
+		Packet.Model = RenderQueue.StoreWorldMatrix(WorldMatrix);
 		Packet.Mesh = QuadMesh;
 		Packet.Material = Material;
 
@@ -273,7 +273,7 @@ void UParticleSubUVComponent::BeginViewSubmission()
 
 // 파티클의 View 행렬·거리·SubUV 상수를 렌더 패킷에 담는다.
 void UParticleSubUVComponent::SubmitParticleToRenderQueue(
-	TArray<FRenderPacket>& RenderQueue,
+	FRenderQueue& RenderQueue,
 	const int32 ParticleIndex,
 	const FMatrix& WorldMatrix,
 	const float CameraDistanceSquared)
@@ -288,7 +288,7 @@ void UParticleSubUVComponent::SubmitParticleToRenderQueue(
 	assert(Constants.Num() == Particles.Num());
 
 	FRenderPacket Packet;
-	Packet.model = WorldMatrix;
+	Packet.Model = RenderQueue.StoreWorldMatrix(WorldMatrix);
 	Packet.Mesh = QuadMesh;
 	Packet.Material = Material;
 	Packet.CameraToParticleDistance = CameraDistanceSquared;

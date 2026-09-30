@@ -1,79 +1,74 @@
 #include "EnginePCH.h"
 #include "StaticMeshLODSelector.h"
-
 #include "Render/Mesh.h"
+#include <immintrin.h>
+#include <cstddef>
 
-#include <algorithm>
-#include <array>
-#include <cfloat>
+static_assert(offsetof(FLODSphere, RadiusSquared) == 12 && sizeof(FLODSphere) == 16);
 
 namespace
 {
-    std::array<FVector, 8> MakeBoxCorners(const FBox& Box)
+    template<bool Orthographic>
+    void SelectBatch(const TArray<FLODSelectionInput>& Inputs, const FLODViewContext& View, TArray<uint8>& OutLODs)
     {
-        return {{
-            {Box.Min.X, Box.Min.Y, Box.Min.Z},
-            {Box.Max.X, Box.Min.Y, Box.Min.Z},
-            {Box.Min.X, Box.Max.Y, Box.Min.Z},
-            {Box.Max.X, Box.Max.Y, Box.Min.Z},
-            {Box.Min.X, Box.Min.Y, Box.Max.Z},
-            {Box.Max.X, Box.Min.Y, Box.Max.Z},
-            {Box.Min.X, Box.Max.Y, Box.Max.Z},
-            {Box.Max.X, Box.Max.Y, Box.Max.Z},
-        }};
+        const __m128 FX = _mm_set1_ps(View.CameraForward.X);
+        const __m128 FY = _mm_set1_ps(View.CameraForward.Y);
+        const __m128 FZ = _mm_set1_ps(View.CameraForward.Z);
+        const __m128 CameraDepth = _mm_set1_ps(View.CameraDepth);
+        const __m128 NearZ = _mm_set1_ps(View.NearZ);
+        const __m128 ProjectionScale = _mm_set1_ps(View.ProjectionScaleSquared);
+        uint32 I = 0;
+        for (; I + 4 <= static_cast<uint32>(Inputs.Num()); I += 4)
+        {
+            bool bScalar = false;
+            for (uint32 Lane = 0; Lane < 4; ++Lane)
+                bScalar |= !Inputs[I + Lane].State || Inputs[I + Lane].State->LODCount <= 1;
+            if (bScalar)
+            {
+                for (uint32 Lane = 0; Lane < 4; ++Lane)
+                    OutLODs[I + Lane] = static_cast<uint8>(SelectSphereLOD<Orthographic>(Inputs[I + Lane], View));
+                continue;
+            }
+            __m128 X = _mm_loadu_ps(&Inputs[I].Sphere.Center.X);
+            __m128 Y = _mm_loadu_ps(&Inputs[I + 1].Sphere.Center.X);
+            __m128 Z = _mm_loadu_ps(&Inputs[I + 2].Sphere.Center.X);
+            __m128 R2 = _mm_loadu_ps(&Inputs[I + 3].Sphere.Center.X);
+            _MM_TRANSPOSE4_PS(X, Y, Z, R2);
+            const __m128 Depth = _mm_sub_ps(_mm_add_ps(_mm_add_ps(_mm_mul_ps(X, FX),
+                _mm_mul_ps(Y, FY)), _mm_mul_ps(Z, FZ)), CameraDepth);
+            const __m128 NearDistance = _mm_sub_ps(Depth, NearZ);
+            const int NearMask = _mm_movemask_ps(_mm_or_ps(_mm_cmple_ps(NearDistance, _mm_setzero_ps()),
+                _mm_cmple_ps(_mm_mul_ps(NearDistance, NearDistance), R2)));
+            const __m128 Numerator = _mm_mul_ps(R2, ProjectionScale);
+            const __m128 Factor = Orthographic ? _mm_set1_ps(1.0f) : _mm_mul_ps(Depth, Depth);
+            int Masks[3];
+            for (uint32 T = 0; T < 3; ++T)
+            {
+                const __m128 Thresholds = _mm_set_ps(Inputs[I + 3].State->LODThresholdSq[T], Inputs[I + 2].State->LODThresholdSq[T],
+                    Inputs[I + 1].State->LODThresholdSq[T], Inputs[I].State->LODThresholdSq[T]);
+                Masks[T] = _mm_movemask_ps(_mm_cmpge_ps(Numerator, _mm_mul_ps(Thresholds, Factor)));
+            }
+            for (uint32 Lane = 0; Lane < 4; ++Lane)
+            {
+                const int Bit = 1 << Lane;
+                const uint32 Count = Inputs[I + Lane].State->LODCount;
+                const uint32 LOD = ((NearMask | Masks[0]) & Bit) ? 0 : (Masks[1] & Bit) ? 1 : (Masks[2] & Bit) ? 2 : 3;
+                OutLODs[I + Lane] = static_cast<uint8>(Count <= 1 ? 0 : LOD < Count ? LOD : Count - 1);
+            }
+        }
+        for (; I < static_cast<uint32>(Inputs.Num()); ++I)
+            OutLODs[I] = static_cast<uint8>(SelectSphereLOD<Orthographic>(Inputs[I], View));
     }
 }
 
-uint32 SelectStaticMeshLOD(const UStaticMesh& Mesh,const FAABB& Bounds, const FLODViewContext& View)
+void SelectLODs(const TArray<FLODSelectionInput>& Inputs, const FLODViewContext& View, TArray<uint8>& OutLODs)
 {
-    const uint32 LODCount = Mesh.GetLODCount();
-    if (LODCount <= 1 || View.Width == 0 || View.Height == 0) return 0;
-
-    const float RadiusSquared = Bounds.Extent.Dot(Bounds.Extent);
-    const float Depth = (Bounds.Center - View.CameraPosition).Dot(View.CameraForward);
-
-    // 구가 근평면에 걸리면 기존 방식처럼 보수적으로 LOD0.
-    const float NearDistance = Depth - View.NearZ;
-    if (NearDistance <= 0.0f || NearDistance * NearDistance <= RadiusSquared) return 0;
-
-    const float SizeNumerator = RadiusSquared * View.ProjectionScaleSquared;
-
-    // 직교 투영에서는 거리에 따라 화면 크기가 변하지 않는다.
-    const float DistanceFactor = View.bOrthographic ? 1.0f : Depth * Depth;
-
-    uint32 DesiredLOD = 3;
-    if (SizeNumerator >= Mesh.ScreenThresholds[0] * Mesh.ScreenThresholds[0] * DistanceFactor)
-        DesiredLOD = 0;
-    else if (SizeNumerator >= Mesh.ScreenThresholds[1] * Mesh.ScreenThresholds[1] * DistanceFactor)
-        DesiredLOD = 1;
-    else if (SizeNumerator >= Mesh.ScreenThresholds[2] * Mesh.ScreenThresholds[2] * DistanceFactor)
-        DesiredLOD = 2;
-
-    return std::min(DesiredLOD, LODCount - 1);
-}
-
-uint32 SelectLOD(const FPrimitiveSceneProxy& Proxy, const FLODViewContext& View)
-{
-    const uint32 LODCount = Proxy.GetLODCount();
-    if (LODCount <= 1 || View.Width == 0 || View.Height == 0) return 0;
-
-    const FAABB& Bounds = Proxy.GetBounds();
-    const float RadiusSquared = Bounds.Extent.Dot(Bounds.Extent);
-    const float Depth = (Bounds.Center - View.CameraPosition).Dot(View.CameraForward);
-
-    // 구가 근평면에 걸리면 보수적으로 LOD0.
-    const float NearDistance = Depth - View.NearZ;
-    if (NearDistance <= 0.0f || NearDistance * NearDistance <= RadiusSquared) return 0;
-
-    // 화면 크기² = R² * ProjScale² / Depth² 를 나눗셈 없이 임계값² * Depth² 와 비교한다.
-    const float SizeNumerator = RadiusSquared * View.ProjectionScaleSquared;
-    const float DistanceFactor = View.bOrthographic ? 1.0f : Depth * Depth;
-    const float* ThresholdSq = Proxy.GetLODThresholdsSq();
-
-    uint32 DesiredLOD = 3;
-    if (SizeNumerator >= ThresholdSq[0] * DistanceFactor)      DesiredLOD = 0;
-    else if (SizeNumerator >= ThresholdSq[1] * DistanceFactor) DesiredLOD = 1;
-    else if (SizeNumerator >= ThresholdSq[2] * DistanceFactor) DesiredLOD = 2;
-
-    return DesiredLOD < LODCount ? DesiredLOD : LODCount - 1;
+    OutLODs.SetNum(Inputs.Num(), false);
+    if (View.Width == 0 || View.Height == 0)
+    {
+        for (uint8& LOD : OutLODs) LOD = 0;
+        return;
+    }
+    if (View.bOrthographic) SelectBatch<true>(Inputs, View, OutLODs);
+    else SelectBatch<false>(Inputs, View, OutLODs);
 }

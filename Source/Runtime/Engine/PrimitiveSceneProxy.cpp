@@ -1,43 +1,57 @@
-﻿#include "EnginePCH.h"
+#include "EnginePCH.h"
 #include "PrimitiveSceneProxy.h"
-
 #include "Component/PrimitiveComponent.h"
 #include "Component/StaticMeshComponent.h"
 #include "Render/Mesh.h"
+#include "Engine/Scene.h"
+
+FPrimitiveSceneProxy::~FPrimitiveSceneProxy()
+{
+    if (Mesh) Mesh->UnregisterProxy(this);
+}
+
+void FPrimitiveSceneProxy::OnMeshRenderDataChanged()
+{
+    if (Scene)
+    {
+        Scene->MarkRenderStateDirty(this);
+        Scene->MarkDirty(this);
+    }
+}
+
+void FPrimitiveSceneProxy::OnMeshDestroyed()
+{
+    Mesh = nullptr;
+    RenderState.reset();
+}
 
 void FPrimitiveSceneProxy::UpdateTransform()
 {
-	LocalToWorld = Component->GetWorldMatrix();
-	WorldToLocal = LocalToWorld.Inverse();
-	LocalToWorldTransposed = LocalToWorld.GetTransposed();
-	Bounds = MakeWorldBounds(Component->CalcLocalBounds().GetWorldAABB(LocalToWorld));
+    LocalToWorld = Component->GetWorldMatrix();
+    WorldToLocal = LocalToWorld.Inverse();
+    const FBox LocalBounds = Mesh ? Mesh->GetRenderBounds() : Component->CalcLocalBounds();
+    Bounds = MakeWorldBounds(LocalBounds.GetWorldAABB(LocalToWorld));
+    LODSphere = Mesh ? Mesh->GetLocalLODSphere().Transform(LocalToWorld) : FLODSphere{};
 }
 
 void FPrimitiveSceneProxy::UpdateRenderState()
 {
-	Mesh = nullptr;
-	Sections.Reset();
-	bVisible = Component->IsVisible();
-
-	UStaticMeshComponent* StaticMeshComponent = Cast<UStaticMeshComponent>(Component);
-	if (!StaticMeshComponent || !StaticMeshComponent->GetStaticMesh()) return;
-
-	Mesh = StaticMeshComponent->GetStaticMesh();
-	LODCount = (uint8)std::min<uint32>(Mesh->GetLODCount(), 4);
-	for (int i = 0; i < 3; i++)
-	{
-		LODThresholdSq[i] = Mesh->ScreenThresholds[i] * Mesh->ScreenThresholds[i];
-	}
-
-	for (uint32 LOD = 0; LOD < LODCount; ++LOD)
-	{
-		LODs[LOD].FirstSection = Sections.Num();
-		for (const FStaticMeshSection& Section : Mesh->GetMeshData(LOD).Sections)
-		{
-			UMaterial* Mat = StaticMeshComponent->GetMaterial((int32)Section.MaterialSlotIndex);
-
-			if (Mat) Sections.Add({ Mat, Section.StartIndex, Section.IndexCount });
-		}
-		LODs[LOD].NumSections = Sections.Num() - LODs[LOD].FirstSection;
-	}
+    UStaticMesh* PreviousMesh = Mesh;
+    Mesh = nullptr;
+    RenderState.reset();
+    bVisible = Component->IsVisible();
+    UStaticMeshComponent* StaticMeshComponent = Cast<UStaticMeshComponent>(Component);
+    if (StaticMeshComponent) Mesh = StaticMeshComponent->GetStaticMesh();
+    if (Mesh != PreviousMesh)
+    {
+        if (PreviousMesh) PreviousMesh->UnregisterProxy(this);
+        if (Mesh) Mesh->RegisterProxy(this);
+        if (Scene) Scene->MarkDirty(this);
+    }
+    if (!Mesh) return;
+    std::vector<UMaterial*> Materials;
+    Materials.reserve(Mesh->MeshData.MaterialSlots.Num());
+    for (uint32 Slot = 0; Slot < static_cast<uint32>(Mesh->MeshData.MaterialSlots.Num()); ++Slot)
+        Materials.push_back(StaticMeshComponent->GetMaterial(Slot));
+    RenderState = Mesh->GetRenderState(Materials);
 }

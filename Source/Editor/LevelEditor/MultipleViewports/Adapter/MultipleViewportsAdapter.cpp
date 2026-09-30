@@ -1,4 +1,4 @@
-﻿#include "EnginePCH.h"
+#include "EnginePCH.h"
 
 #include "Editor/LevelEditor/MultipleViewports/Adapter/MultipleViewportsAdapter.h"
 
@@ -461,7 +461,9 @@ void FMultipleViewportsAdapter::CaptureWorld(UWorld& World)
 
         FRenderableObject RenderObject{};
         RenderObject.Id = Id;
-        RenderObject.WorldBounds = MakeWorldBounds(Primitive->CalcBounds());
+        const FPrimitiveSceneProxy* Proxy = Primitive->GetSceneProxy();
+        RenderObject.WorldBounds = Proxy && Proxy->GetMesh()
+            ? Proxy->GetBounds() : MakeWorldBounds(Primitive->CalcBounds());
         RenderObjects.Add(RenderObject);
         PrimitiveSnapshot& Snapshot = PrimitiveById[Id];
         Snapshot.Primitive = Primitive;
@@ -520,37 +522,20 @@ FViewCamera FMultipleViewportsAdapter::GetRenderCamera(const int32 ViewIndex) co
     return Camera;
 }
 
-// 모든 원본 입력을 비교하므로 속성 창·프리셋·입력·리사이즈 경로의 변경을 빠짐없이 반영한다.
+// 현재 카메라로 VP와 절두체를 매번 계산한다.
 const FMultipleViewportsAdapter::PreparedView& FMultipleViewportsAdapter::PrepareView(const int32 ViewIndex) const
 {
     assert(IsViewActive(ViewIndex));
-    const auto& Source = Views.Cameras[ViewIndex];
-    const auto& P = Source.Projection;
-    const auto& L = Source.Transform.Location;
-    const auto& R = Source.Transform.Rotation;
+    const FViewCamera Camera = GetRenderCamera(ViewIndex);
     const auto& Rect = ViewRects[ViewIndex];
-    const float Key[14]{L.X, L.Y, L.Z, R.X, R.Y, R.Z, R.W,
-        static_cast<float>(P.Mode), P.FovDegrees, P.OrthoWidth, P.NearClip, P.FarClip, Rect.Width, Rect.Height};
-    PreparedView& Cached = PreparedViews[ViewIndex];
-    // 고정 크기 입력 키는 할당 없는 배열로 비교하며 NaN도 매번 변경으로 취급한다.
-    bool bKeyChanged = !Cached.bValid;
-    for (int Index = 0; Index < 14; ++Index)
-        bKeyChanged = bKeyChanged || Cached.Key[Index] != Key[Index];
-    if (bKeyChanged)
-    {
-        const FViewCamera Camera = GetRenderCamera(ViewIndex);
-        // row-vector는 View 다음 Projection 순서로 합성하고 같은 VP로 컬링한다.
-        const FMatrix VP = BuildViewMatrix(Camera.Transform) *
-            BuildProjectionMatrix(Camera.Projection, Rect.Width / Rect.Height);
-        Cached.EngineViewProjection = VP;
-        Cached.Frustum = ExtractFrustumPlanes(VP);
-        for (int Index = 0; Index < 14; ++Index) Cached.Key[Index] = Key[Index];
-        Cached.bValid = true;
-    }
-    return Cached;
+    PreparedView& Prepared = PreparedViews[ViewIndex];
+    Prepared.EngineViewProjection = BuildViewMatrix(Camera.Transform) *
+        BuildProjectionMatrix(Camera.Projection, Rect.Width / Rect.Height);
+    Prepared.Frustum = ExtractFrustumPlanes(Prepared.EngineViewProjection);
+    return Prepared;
 }
 
-// Native와 엔진이 함께 쓰는 row-vector VP를 추가 전치 없이 캐시에서 반환한다.
+// Native와 엔진이 함께 쓰는 현재 row-vector VP를 반환한다.
 FMatrix FMultipleViewportsAdapter::GetEngineViewProjection(const int32 ViewIndex) const
 {
     assert(IsViewActive(ViewIndex));
@@ -636,9 +621,11 @@ std::size_t FMultipleViewportsAdapter::GetVisibleObjectCount(const int32 ViewInd
 }
 
 // 가시 ID를 컴포넌트로 역매핑해 큐를 구성한다. 생존 목록·상수는 프레임 공통, Billboard·정렬 거리는 View별이다.
-void FMultipleViewportsAdapter::BuildRenderQueue(const int32 ViewIndex, TArray<FRenderPacket>& OutQueue)
+void FMultipleViewportsAdapter::BuildRenderQueue(const int32 ViewIndex, FRenderQueue& OutQueue)
 {
     OutQueue.Reset();
+    PendingStaticMeshes.Reset();
+    LODInputs.Reset();
     if (!IsViewActive(ViewIndex)) return;
     {
         CullForView(RenderObjects, PrepareView(ViewIndex).Frustum, VisibleIds[ViewIndex]);
@@ -651,7 +638,6 @@ void FMultipleViewportsAdapter::BuildRenderQueue(const int32 ViewIndex, TArray<F
     const float ScaleY = Projection.M[2][1];
 
     FLODViewContext LODContext{
-        GetEngineViewProjection(ViewIndex),
         static_cast<uint32>(Rect.Width),
         static_cast<uint32>(Rect.Height)
     };
@@ -660,6 +646,7 @@ void FMultipleViewportsAdapter::BuildRenderQueue(const int32 ViewIndex, TArray<F
     LODContext.ProjectionScaleSquared = std::max(ScaleX * ScaleX, ScaleY * ScaleY);
     LODContext.NearZ = ViewCamera.Projection.NearClip;
     LODContext.bOrthographic = ViewCamera.Projection.Mode == EProjectionMode::Orthographic;
+    LODContext.Prepare();
 
     for (const ObjectId Id : VisibleIds[ViewIndex])
     {
@@ -714,17 +701,20 @@ void FMultipleViewportsAdapter::BuildRenderQueue(const int32 ViewIndex, TArray<F
                 continue;
 
             const FPrimitiveSceneProxy* Proxy = StaticComponent->GetSceneProxy();
-            const uint32 LOD = Proxy
-                ? SelectStaticMeshLOD(*Mesh, Proxy->GetBounds(), LODContext)
-                : 0u;
-
-            StaticComponent->SubmitToRenderQueue(OutQueue, LOD);
+            if (Proxy)
+            {
+                PendingStaticMeshes.Add(StaticComponent);
+                LODInputs.Add({Proxy->GetLODSphere(), Proxy->GetRenderState()});
+            }
         }
         else
         {
             Primitive->SubmitToRenderQueue(OutQueue);
         }
     }
+    SelectLODs(LODInputs, LODContext, SelectedLODs);
+    for (uint32 I = 0; I < static_cast<uint32>(PendingStaticMeshes.Num()); ++I)
+        PendingStaticMeshes[I]->SubmitToRenderQueue(OutQueue, SelectedLODs[I]);
 }
 
 // 클릭한 View의 Ray를 World에 전달하고 Component의 최근접 교차 결과를 보관한다.

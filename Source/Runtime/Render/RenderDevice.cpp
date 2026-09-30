@@ -84,9 +84,19 @@ TUniquePtr<FIndexBuffer> FRenderDevice::CreateStaticIndexBuffer(const uint32* In
 	Desc.ByteWidth = sizeof(uint32) * IndexCount;
 	Desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
 
-	TUniquePtr<FIndexBuffer> Buffer = MakeUnique<FIndexBuffer>(Device.Get(), Desc, IndexCount, InIndices);
-
-	return Buffer;
+	uint32 MaxIndex = 0;
+	for (uint32 I = 0; I < IndexCount; ++I)
+		MaxIndex = std::max(MaxIndex, InIndices[I]);
+	if (MaxIndex <= 65535)
+	{
+		TArray<uint16> CompactIndices;
+		CompactIndices.SetNum(IndexCount);
+		for (uint32 I = 0; I < IndexCount; ++I)
+			CompactIndices[I] = static_cast<uint16>(InIndices[I]);
+		Desc.ByteWidth = sizeof(uint16) * IndexCount;
+		return MakeUnique<FIndexBuffer>(Device.Get(), Desc, IndexCount, CompactIndices.GetData(), DXGI_FORMAT_R16_UINT);
+	}
+	return MakeUnique<FIndexBuffer>(Device.Get(), Desc, IndexCount, InIndices, DXGI_FORMAT_R32_UINT);
 }
 
 TUniquePtr<FVertexBuffer> FRenderDevice::CreateDynamicVertexBuffer(uint32 MaxSize, uint32 Stride)

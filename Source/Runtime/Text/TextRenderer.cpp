@@ -1,4 +1,4 @@
-﻿#include "EnginePCH.h"
+#include "EnginePCH.h"
 #include "TextRenderer.h"
 
 #include "Camera/CameraComponent.h"
@@ -207,8 +207,8 @@ void FTextRenderer::OnRender(const FString& Text, const FMatrix& WorldMatrix, fl
 	RenderCommand::UpdateBufferData(IndexBuffer.get(), Indices.GetData(), sizeof(uint32) * Indices.Num());
 
 	TextTransformData TransData;
-	TransData.World = WorldMatrix.GetTransposed();
-	TransData.ViewProj = ViewProjection.GetTransposed();
+	TransData.World = WorldMatrix;
+	TransData.ViewProj = ViewProjection;
 
 	MSDFData MSDFData;
 	MSDFData.ScreenPx = Atlas.DistanceRange;

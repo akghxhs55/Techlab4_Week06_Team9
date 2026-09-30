@@ -1,3 +1,4 @@
+#pragma pack_matrix(row_major)
 cbuffer TransformBuffer : register(b0)
 {
     matrix World;

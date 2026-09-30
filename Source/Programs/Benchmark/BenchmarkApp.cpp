@@ -1,4 +1,4 @@
-﻿#include "EnginePCH.h"
+#include "EnginePCH.h"
 #include "BenchmarkApp.h"
 
 #include "Asset/AssetManager.h"
@@ -284,7 +284,7 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 	const float ScaleY = Projection.M[2][1];
 
 	// LOD에 카메라 정보 저장
-	FLODViewContext LODView{ ViewProjection, Width, Height };
+	FLODViewContext LODView{ Width, Height };
 	LODView.CameraPosition = Camera->GetWorldLocation();
 	LODView.CameraForward = Camera->GetWorldRotation()
 		.Quaternion()
@@ -294,6 +294,7 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 		std::max(ScaleX * ScaleX, ScaleY * ScaleY);
 	LODView.NearZ = Camera->GetNearZ();
 	LODView.bOrthographic = Camera->GetIsOrthogonal();
+	LODView.Prepare();
 
 	// 멤버 큐를 재사용한다. Renderer와 swap으로 버퍼를 주고받으므로 두 버퍼 모두 용량이 유지된다.
 	{
