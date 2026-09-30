@@ -570,7 +570,7 @@ bool UWorld::DestroyActor(AActor* Actor)
 bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 	FBillboardTraceTransform ResolveBillboard, const void* ViewContext)
 {
-	SCOPE_CYCLE_COUNTER(EditorStats::STAT_PickingTime_Name);
+	SCOPE_CYCLE_COUNTER_ALWAYS(EditorStats::STAT_PickingTime_Name);
 	OutHit = FHitResult();
 	float NearestT = std::numeric_limits<float>::max();
 

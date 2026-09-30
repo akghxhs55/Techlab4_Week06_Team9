@@ -429,7 +429,13 @@ void UBenchmarkEngine::DrawProfileOverlay()
 			ImGui::EndTable();
 		}
 
-		ImGui::TextUnformatted("CPU Profile");
+		// 끄면 스코프 타이머가 사이클을 읽지 않고 표도 그리지 않는다. 피킹 시간은 계속 잰다.
+		bool bProfileEnabled = FStatRegistry::IsEnabled();
+		if (ImGui::Checkbox("CPU Profile", &bProfileEnabled))
+		{
+			FStatRegistry::SetEnabled(bProfileEnabled);
+			FStatRegistry::Reset();   // 꺼져 있던 동안의 빈 구간이 평균에 섞이지 않도록
+		}
 		ImGui::SameLine();
 		if (ImGui::SmallButton("Reset"))
 		{
@@ -441,7 +447,7 @@ void UBenchmarkEngine::DrawProfileOverlay()
 			ImGuiTableFlags_RowBg |
 			ImGuiTableFlags_SizingFixedFit;
 
-		if (ImGui::BeginTable("CPUStats", 4, TableFlags))
+		if (bProfileEnabled && ImGui::BeginTable("CPUStats", 4, TableFlags))
 		{
 			ImGui::TableSetupColumn("Scope", ImGuiTableColumnFlags_WidthFixed, 190.0f);
 			ImGui::TableSetupColumn("Last", ImGuiTableColumnFlags_WidthFixed, 80.0f);

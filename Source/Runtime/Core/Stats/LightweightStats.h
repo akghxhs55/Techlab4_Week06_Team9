@@ -91,7 +91,12 @@ public:
 	static const FCycleStatData* Find(TStatId StatId) { return Stats.Find(StatId.GetName()); }
 	static const TMap<const char*, FCycleStatData>& GetAll() { return Stats; }
 
+	// 끄면 일반 스코프 타이머는 사이클을 읽지도 않는다. 항상 재야 하는 것(피킹 시간)은 SCOPE_CYCLE_COUNTER_ALWAYS로 잰다.
+	static bool IsEnabled() { return bEnabled; }
+	static void SetEnabled(bool bInEnabled) { bEnabled = bInEnabled; }
+
 private:
+	inline static bool bEnabled = true;
 	inline static TMap<const char*, FCycleStatData> Stats;
 	inline static TMap<const char*, uint64> PendingStatCycles;
 };
@@ -100,8 +105,10 @@ private:
 class FScopeCycleCounter
 {
 public:
-	explicit FScopeCycleCounter(TStatId InStatId)
-		: StartCycles(FPlatformTime::GetCycles64())
+	// bAlways: 스탯을 꺼도 잰다 (피킹 시간처럼 결과로 보여 줘야 하는 값)
+	explicit FScopeCycleCounter(TStatId InStatId, bool bAlways = false)
+		: bActive(bAlways || FStatRegistry::IsEnabled())
+		, StartCycles(bActive ? FPlatformTime::GetCycles64() : 0)
 		, StatId(InStatId)
 	{
 	}
@@ -118,14 +125,17 @@ public:
 	uint64 Finish()
 	{
 		if (bFinished) return FinishedCycles;
-		FinishedCycles = FPlatformTime::GetCycles64() - StartCycles;
 		bFinished = true;
+		if (!bActive)
+			return 0;
+		FinishedCycles = FPlatformTime::GetCycles64() - StartCycles;
 		if (StatId.IsValidStat())
-			FStatRegistry::AddCycles(StatId, FPlatformTime::GetCycles64() - StartCycles);
+			FStatRegistry::AddCycles(StatId, FinishedCycles);   // 사이클을 다시 읽지 않고 같은 값을 보고한다
 		return FinishedCycles;
 	}
 
 private:
+	bool bActive;          // StartCycles보다 먼저 초기화되도록 먼저 선언한다
 	uint64 StartCycles;
 	TStatId StatId;
 
@@ -144,3 +154,5 @@ private:
 #define STATS_JOIN(A, B) STATS_JOIN_INNER(A, B)
 #define SCOPE_CYCLE_COUNTER(StatId) \
 	FScopeCycleCounter STATS_JOIN(ScopeCycleCounter_, __LINE__)(GET_STATID(StatId))
+#define SCOPE_CYCLE_COUNTER_ALWAYS(StatId) \
+	FScopeCycleCounter STATS_JOIN(ScopeCycleCounter_, __LINE__)(GET_STATID(StatId), true)

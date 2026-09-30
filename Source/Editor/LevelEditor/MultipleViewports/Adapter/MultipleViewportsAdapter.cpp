@@ -721,7 +721,7 @@ void FMultipleViewportsAdapter::BuildRenderQueue(const int32 ViewIndex, FRenderQ
 // 클릭한 View의 Ray를 World에 전달하고 Component의 최근접 교차 결과를 보관한다.
 FPickHit FMultipleViewportsAdapter::PickActiveView(const FVector2 LocalMousePosition, UWorld& World)
 {
-    SCOPE_CYCLE_COUNTER(EditorStats::STAT_PickingTime);
+    SCOPE_CYCLE_COUNTER_ALWAYS(EditorStats::STAT_PickingTime);
 
 	LastPick = {};
     FRay Ray{};
