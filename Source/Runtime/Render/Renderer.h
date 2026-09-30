@@ -6,6 +6,9 @@
 
 
 #include "RenderingInfo.h"
+#include "Occlusion/GPUOcclusion.h"
+
+constexpr uint32 ObjectSlotBytes = 256;
 
 struct FPerObjectConstants
 {
@@ -31,6 +34,9 @@ struct FOcclusionMeasureResult
 	uint64 TotalTriangles = 0;
 	uint64 VisibleTriangles = 0;
 	double ElapsedMs = 0.0;       // 측정 자체에 걸린 시간 (GPU 대기 포함)
+	// GPU 오클루전 검증. 판정만 하고 거르지 않은(Cull 끔) 상태에서 측정해야 의미가 있다.
+	uint32 GPUOccludedDraws = 0;  // GPU가 가렸다고 판정한 드로우 수
+	uint32 FalseCulls = 0;        // 그중 실제로는 픽셀이 보인 드로우 수. 0이어야 한다
 };
 
 class FRenderer
@@ -47,6 +53,14 @@ public:
 	// 큐를 정렬해 불투명 패킷만 그린다. 반투명은 RenderTranslucent 호출 전까지 보관한다.
 	void RenderOpaque(const FMatrix& ViewProjection);
 
+	// Gather 전에 World가 불러 가려진 물체를 거른다.
+	FGPUOcclusion& GetGPUOcclusion() { return GPUOcclusion; }
+
+	// 캐시된 스태틱 메시 경로: World::Gather가 조각별로 채운 묶음을 이번 프레임 불투명 패스에 넘긴다.
+	// 묶음 메모리는 World 소유이며 다음 Gather 전까지 유효하다. RenderQueueSorting이 묶음을 정렬하고 RenderOpaque가 그린다.
+	void ResetStaticDrawGroups() { StaticGroups.clear(); }
+	void AddStaticDrawGroup(const FStaticDrawGroup* Group) { StaticGroups.push_back(Group); }
+
 	// RenderOpaque가 보관한 반투명 패킷을 먼 것부터 그린다.
 	void RenderTranslucent(const FMatrix& ViewProjection);
 
@@ -57,6 +71,9 @@ public:
 	// 패킷마다 오클루전 쿼리를 걸어, 최종 화면에 실제로 픽셀을 남긴 물체 수를 센다.
 	// GPU 결과를 기다리므로 매우 느리다. 버튼 등으로 한 프레임만 실행할 것.
 	FOcclusionMeasureResult MeasureOpaqueOcclusion(const FMatrix& ViewProjection);
+
+	uint8* BeginObjectConstants(uint32 MaxSlots);
+	void EndObjectConstants();
 
 private:
 	// FIFO 소비용 배열의 용량만 재사용하며 매 View의 패킷 값은 새로 채운다.
@@ -78,12 +95,18 @@ private:
 	TArray<ComPtr<ID3D11Query>> OcclusionQueries;
 	ComPtr<ID3D11DepthStencilState> DepthLessEqualReadOnly;
 
+	FGPUOcclusion GPUOcclusion;
+
 	void DrawPackets(uint32 Begin, uint32 End, const FMatrix& ViewProjection);
+	void DrawStaticGroups();
+	void UpdatePerObjectConstants(const FMatrix& World);
+
+	// 이번 프레임 스태틱 메시 묶음 (정렬 키 순). 비어 있지 않은 것만 담는다.
+	std::vector<const FStaticDrawGroup*> StaticGroups;
 	void BindMaterial(UMaterial* material);
 	void UpdateMaterialParams(const FRenderPacket& RenderPacket);
 	void UpdatePerObjectConstants(const FRenderPacket& RenderPacket, const FMatrix& ViewProjection);
 	void EnsurePerObjectSlotCapacity(uint32 SlotCount);
-	void UploadPerObjectConstants();
 
 	TArray<FSortEntry> SortEntries;
 };

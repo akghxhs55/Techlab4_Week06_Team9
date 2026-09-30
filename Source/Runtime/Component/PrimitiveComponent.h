@@ -53,7 +53,11 @@ public:
 	// FShader* GetShader() const { return Shader.get(); };
 
 	bool IsVisible() const { return bVisible; }
-	void SetVisible(bool bInVisible) { bVisible = bInVisible; }
+	void SetVisible(bool bInVisible)
+	{
+		bVisible = bInVisible;
+		MarkRenderStateDirty();
+	}
 
 	virtual bool LineTraceComponent(const FRay& WorldRay, FHitResult& OutHit);
 	virtual bool LineTraceComponentLocal(const FRay& LocalRay, float& OutT);

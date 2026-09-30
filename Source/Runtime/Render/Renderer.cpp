@@ -25,8 +25,7 @@ namespace
 {
 	// VSSetConstantBuffers1의 오프셋은 16개 상수(256바이트) 단위여야 하므로 오브젝트마다 256바이트 칸을 쓴다.
 	constexpr uint32 PerObjectSlotConstants = 16;
-	constexpr uint32 PerObjectSlotBytes = PerObjectSlotConstants * 16;
-	static_assert(sizeof(FPerObjectConstants) <= PerObjectSlotBytes);
+	static_assert(sizeof(FPerObjectConstants) <= ObjectSlotBytes);
 
 	constexpr uint32 MinPerObjectSlots = 1024;
 
@@ -48,6 +47,14 @@ namespace
 			| (static_cast<uint64>(Packet.Mesh->SortID) << 31)
 			| (static_cast<uint64>(Packet.LODIndex & 0x3) << 29);
 	}
+
+	// 불투명 패킷과 같은 규칙의 키 (묶음은 전부 불투명)
+	uint64 MakeGroupKey(const FStaticDrawGroup& Group)
+	{
+		return (static_cast<uint64>(Group.Material->SortID) << 47)
+			| (static_cast<uint64>(Group.Mesh->SortID) << 31)
+			| (static_cast<uint64>(Group.LODIndex & 0x3) << 29);
+	}
 }
 
 bool FRenderer::Init()
@@ -55,6 +62,8 @@ bool FRenderer::Init()
 	bUsePerObjectSlots = RenderCommand::SupportsConstantBufferOffsets();
 	PerObjectCB = RenderCommand::CreateConstantBuffer(sizeof(FPerObjectConstants));
 	ViewCB = RenderCommand::CreateConstantBuffer(sizeof(FMatrix));
+
+	GPUOcclusion.Init();   // 실패해도 오클루전만 못 쓸 뿐 렌더링은 된다
 
 	return true;
 }
@@ -69,7 +78,7 @@ void FRenderer::EnsurePerObjectSlotCapacity(uint32 SlotCount)
 	while (NewCapacity < SlotCount)
 		NewCapacity *= 2;
 
-	PerObjectSlotCB = RenderCommand::CreateConstantBuffer(NewCapacity * PerObjectSlotBytes);
+	PerObjectSlotCB = RenderCommand::CreateConstantBuffer(NewCapacity * ObjectSlotBytes);
 	if (!PerObjectSlotCB || !PerObjectSlotCB->GetBuffer())
 	{
 		HTR_LOG(Warning, "Per-object constant buffer ({} slots) creation failed. Falling back to per-draw updates.", NewCapacity);
@@ -130,6 +139,7 @@ void FRenderer::RenderAll(FRenderQueue& InQueue, const FMatrix& ViewProjection)
 
 void FRenderer::RenderOpaque(const FMatrix& ViewProjection)
 {
+	DrawStaticGroups();
 	DrawPackets(0, FirstTranslucentIndex, ViewProjection);
 }
 
@@ -139,6 +149,7 @@ void FRenderer::RenderTranslucent(const FMatrix& ViewProjection)
 	DrawPackets(FirstTranslucentIndex, SortEntries.Num(), ViewProjection);
 	RenderPackets.Reset();
 	FirstTranslucentIndex = 0;
+	StaticGroups.clear();   // 묶음 메모리는 World 것이므로 이번 프레임이 끝나면 놓는다
 }
 
 void FRenderer::RenderQueueSorting(FRenderQueue& InQueue, const FMatrix& ViewProjection)
@@ -168,9 +179,12 @@ void FRenderer::RenderQueueSorting(FRenderQueue& InQueue, const FMatrix& ViewPro
 		FirstTranslucentIndex = 0;
 		while (FirstTranslucentIndex < SortEntries.Num() && !(SortEntries[FirstTranslucentIndex].Key >> 63))
 			++FirstTranslucentIndex;
-	}
 
-	UploadPerObjectConstants();
+		// ④ 스태틱 메시 묶음: 빈 묶음을 빼고 키 순으로 정렬한다. 조각마다 같은 키 묶음이 있으므로 정렬하면 서로 붙는다.
+		std::erase_if(StaticGroups, [](const FStaticDrawGroup* Group) { return Group->Items.empty(); });
+		std::sort(StaticGroups.begin(), StaticGroups.end(),
+			[](const FStaticDrawGroup* A, const FStaticDrawGroup* B) { return MakeGroupKey(*A) < MakeGroupKey(*B); });
+	}
 }
 
 // 정렬된 패킷 중 [Begin, End) 범위를 View 행렬과 Section 범위로 그린다.
@@ -183,8 +197,7 @@ void FRenderer::DrawPackets(uint32 Begin, uint32 End, const FMatrix& ViewProject
 	uint8 LastLODIndex = 0;
 
 	RenderCommand::BindConstantBuffer(0, ViewCB.get(), EShaderBindFlagBits::Vertex);
-	if (!bUsePerObjectSlots)
-		RenderCommand::BindConstantBuffer(2, PerObjectCB.get(), EShaderBindFlagBits::Vertex);
+
 
 	for (uint32 k = Begin; k < End; ++k)          // k = 정렬된 위치
 	{
@@ -201,12 +214,11 @@ void FRenderer::DrawPackets(uint32 Begin, uint32 End, const FMatrix& ViewProject
 			UpdateMaterialParams(RenderPacket);
 		if (bUsePerObjectSlots)
 		{
-			// 드로우마다 Map하지 않고 이미 올린 칸의 오프셋만 바꾼다.
-			RenderCommand::BindConstantBufferRange(2, PerObjectSlotCB.get(),
-				PacketIndex * PerObjectSlotConstants, PerObjectSlotConstants, EShaderBindFlagBits::Vertex);
+			RenderCommand::BindConstantBufferRange(2, PerObjectSlotCB.get(), RenderPacket.Slot * PerObjectSlotConstants, PerObjectSlotConstants, EShaderBindFlagBits::Vertex);
 		}
 		else
 		{
+			RenderCommand::BindConstantBuffer(2, PerObjectCB.get(), EShaderBindFlagBits::Vertex);
 			UpdatePerObjectConstants(RenderPacket, ViewProjection);
 		}
 
@@ -223,7 +235,36 @@ void FRenderer::DrawPackets(uint32 Begin, uint32 End, const FMatrix& ViewProject
 FOcclusionMeasureResult FRenderer::MeasureOpaqueOcclusion(const FMatrix& ViewProjection)
 {
 	FOcclusionMeasureResult Result;
-	const uint32 Count = FirstTranslucentIndex;
+
+	// 불투명 드로우를 두 경로(스태틱 묶음, 일반 패킷)에서 한 목록으로 모은다. 그린 순서와 같게 묶음 먼저.
+	struct FMeasureDraw
+	{
+		UStaticMesh* Mesh;
+		UMaterial* Material;
+		uint8 LODIndex;
+		uint32 Slot;
+		uint32 StartIndex;
+		uint32 IndexCount;
+		const FMatrix* World;       // 칸이 없을 때만 쓴다
+		const void* ObjectKey;      // 같은 물체의 섹션을 한 물체로 센다
+		bool bOccludedByGpu;
+	};
+	std::vector<FMeasureDraw> Draws;
+	for (const FStaticDrawGroup* Group : StaticGroups)
+		for (const FStaticDrawItem& Item : Group->Items)
+			Draws.push_back({ Group->Mesh, Group->Material, Group->LODIndex, Item.Slot, Item.StartIndex, Item.IndexCount,
+				&Item.Proxy->GetLocalToWorld(), Item.Proxy, Item.bOccludedByGpu != 0 });
+	for (uint32 k = 0; k < FirstTranslucentIndex; ++k)
+	{
+		const FRenderPacket& Packet = RenderPackets[SortEntries[k].PacketIndex];
+		const uint32 IndexCount = Packet.IndexCount ? Packet.IndexCount : Packet.Mesh->GetIndexBuffer(Packet.LODIndex)->GetIndexCount();
+		// 프록시가 없는 패킷(빌보드 등)은 패킷 자체를 한 물체로 센다.
+		const void* Key = Packet.Proxy ? static_cast<const void*>(Packet.Proxy) : static_cast<const void*>(&Packet);
+		Draws.push_back({ Packet.Mesh, Packet.Material, Packet.LODIndex, Packet.Slot, Packet.StartIndex, IndexCount,
+			&Packet.model, Key, Packet.bOccludedByGpu });
+	}
+
+	const uint32 Count = static_cast<uint32>(Draws.size());
 	if (Count == 0)
 		return Result;
 
@@ -261,21 +302,18 @@ FOcclusionMeasureResult FRenderer::MeasureOpaqueOcclusion(const FMatrix& ViewPro
 	UMaterial* BoundMaterial = nullptr;
 	uint8 BoundLOD = 0;
 
-	// 1) 패킷마다 쿼리를 걸고 다시 그린다. DrawPackets와 같은 순서·같은 바인딩을 쓴다.
-	// std::vector<bool>은 비트 압축이라 참조를 못 돌려주므로 uint8을 쓴다.
-	TArray<uint8> bIssued;
-	bIssued.Init(0, Count);
+	// 1) 드로우마다 쿼리를 걸고 다시 그린다. 본 패스와 같은 바인딩(칸 또는 PerObjectCB)을 쓴다.
 	for (uint32 Index = 0; Index < Count; ++Index)
 	{
 		const uint32 PacketIndex = SortEntries[Index].PacketIndex;
 		const FRenderPacket& Packet = RenderPackets[PacketIndex];
 		if (Packet.Mesh == nullptr || Packet.Material == nullptr) continue;
 
-		if (Packet.Mesh != BoundMesh || Packet.LODIndex != BoundLOD)
-			RenderCommand::BindMesh(Packet.Mesh, Packet.LODIndex);
-		if (Packet.Material != BoundMaterial)
+		if (Draw.Mesh != BoundMesh || Draw.LODIndex != BoundLOD)
+			RenderCommand::BindMesh(Draw.Mesh, Draw.LODIndex);
+		if (Draw.Material != BoundMaterial)
 		{
-			BindMaterial(Packet.Material);
+			BindMaterial(Draw.Material);
 			// BindMaterial이 바꾼 상태를 측정용으로 덮어쓴다.
 			RenderCommand::SetBlendState(EBlendState::NoColorWrite);
 			Context->OMSetDepthStencilState(DepthLessEqualReadOnly.Get(), 0);
@@ -283,22 +321,23 @@ FOcclusionMeasureResult FRenderer::MeasureOpaqueOcclusion(const FMatrix& ViewPro
 		if (Packet.Material != BoundMaterial || Packet.MaterialParamData)
 			UpdateMaterialParams(Packet);
 
-		if (bUsePerObjectSlots)
+		if (Draw.Slot != InvalidObjectSlot)
 			RenderCommand::BindConstantBufferRange(2, PerObjectSlotCB.get(),
 				PacketIndex * PerObjectSlotConstants, PerObjectSlotConstants, EShaderBindFlagBits::Vertex);
 		else
-			UpdatePerObjectConstants(Packet, ViewProjection);
+		{
+			RenderCommand::BindConstantBuffer(2, PerObjectCB.get(), EShaderBindFlagBits::Vertex);
+			UpdatePerObjectConstants(*Draw.World);
+		}
 
-		const uint32 IndexCount = Packet.IndexCount ? Packet.IndexCount : Packet.Mesh->GetIndexBuffer(Packet.LODIndex)->GetIndexCount();
 		ID3D11Query* Query = OcclusionQueries[Index].Get();
 		Context->Begin(Query);
-		RenderCommand::DrawIndexed(IndexCount, Packet.StartIndex);
+		RenderCommand::DrawIndexed(Draw.IndexCount, Draw.StartIndex);
 		Context->End(Query);
-		bIssued[Index] = 1;
 
-		BoundMesh = Packet.Mesh;
-		BoundMaterial = Packet.Material;
-		BoundLOD = Packet.LODIndex;
+		BoundMesh = Draw.Mesh;
+		BoundMaterial = Draw.Material;
+		BoundLOD = Draw.LODIndex;
 	}
 
 	// 2) 결과를 기다려 모은다. 한 물체가 Section 여러 개로 나뉘면 하나라도 보이면 보이는 것으로 친다.
@@ -312,9 +351,16 @@ FOcclusionMeasureResult FRenderer::MeasureOpaqueOcclusion(const FMatrix& ViewPro
 		UINT64 Samples = 0;
 		while (Context->GetData(OcclusionQueries[Index].Get(), &Samples, sizeof(Samples), 0) == S_FALSE) {}
 
-		const uint32 IndexCount = Packet.IndexCount ? Packet.IndexCount : Packet.Mesh->GetIndexBuffer(Packet.LODIndex)->GetIndexCount();
-		const uint64 Triangles = IndexCount / 3;
+		const uint64 Triangles = Draw.IndexCount / 3;
 		const bool bVisible = Samples > 0;
+
+		// Cull을 끄고 판정만 한 드로우: 가렸다고 했는데 최종 화면에 픽셀이 남았으면 잘못 가린 것이다.
+		if (Draw.bOccludedByGpu)
+		{
+			++Result.GPUOccludedDraws;
+			if (bVisible)
+				++Result.FalseCulls;
+		}
 
 		++Result.TotalDraws;
 		Result.TotalTriangles += Triangles;
@@ -324,9 +370,7 @@ FOcclusionMeasureResult FRenderer::MeasureOpaqueOcclusion(const FMatrix& ViewPro
 			Result.VisibleTriangles += Triangles;
 		}
 
-		// 프록시가 없는 패킷(빌보드 등)은 패킷 자체를 한 물체로 센다.
-		const void* Key = Packet.Proxy ? static_cast<const void*>(Packet.Proxy) : static_cast<const void*>(&Packet);
-		bool& bObjectVisible = ObjectVisible[Key];
+		bool& bObjectVisible = ObjectVisible[Draw.ObjectKey];
 		bObjectVisible = bObjectVisible || bVisible;
 	}
 
@@ -341,6 +385,19 @@ FOcclusionMeasureResult FRenderer::MeasureOpaqueOcclusion(const FMatrix& ViewPro
 	Result.ElapsedMs = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - StartTime).count();
 	Result.bValid = true;
 	return Result;
+}
+
+uint8* FRenderer::BeginObjectConstants(uint32 MaxSlots)
+{
+	if (!bUsePerObjectSlots || MaxSlots == 0) return nullptr;
+	EnsurePerObjectSlotCapacity(MaxSlots);
+	if (!PerObjectSlotCB) { bUsePerObjectSlots = false; return nullptr; }
+	return static_cast<uint8*>(RenderCommand::MapWriteDiscard(PerObjectSlotCB.get()));
+}
+
+void FRenderer::EndObjectConstants()
+{
+	if (PerObjectSlotCB) RenderCommand::Unmap(PerObjectSlotCB.get());
 }
 
 // Material마다 Shader/Texture/Sampler/State 꽂기
@@ -402,6 +459,11 @@ void FRenderer::UpdatePerObjectConstants(const FRenderPacket& RenderPacket, cons
 	// rp.Transform 과 Camera VP 행렬 곱
 	// 행렬곱의 결과 (MVP Matrix) Constant Buffer 업데이트 필요
 
+	UpdatePerObjectConstants(RenderPacket.model);
+}
+
+void FRenderer::UpdatePerObjectConstants(const FMatrix& World)
+{
 	FPerObjectConstants Constants;
 
 	Constants.World = GetPacketWorld(RenderPacket);

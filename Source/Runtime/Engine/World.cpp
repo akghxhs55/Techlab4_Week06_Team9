@@ -22,6 +22,7 @@
 
 #include "Core/Stats/LightweightStats.h"
 #include "Core/Stats/EditorStats.h"
+#include "Core/Async/TaskPool.h"
 
 
 DECLARE_CYCLE_STAT("Actor Tick", STAT_ActorTick); // Actor 틱 측정
@@ -146,8 +147,10 @@ void UWorld::ClearWorld()
 	HTR_LOG(Info, "{} : ", PersistentLevel->GetActorNum());
 }
 
-void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FLODViewContext* LODView, const FFrustumPlanes* Frustum)
+void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODViewContext* LODView, const FFrustumPlanes* Frustum, FRenderer* Renderer)
 {
+
+
 	// 멤버로 두어 매 프레임 용량을 재사용한다.
 	RenderStats.Reset();
 	VisibleProxies.Reset();
@@ -173,12 +176,71 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FLODViewContex
 	}
 
 	RenderStats.TotalPrimitives = Scene.Proxies.Num();
+
+	// GPU 오클루전: 프러스텀을 통과한 물체를 GPU에서 가림 판정하고 결과를 이번 프레임에 받아 온다.
+	// Cull이 켜져 있으면 가려진 물체를 목록에서 빼서 이후 Gather·정렬·드로우를 모두 건너뛴다.
+	// 꺼져 있으면(검증 모드) 목록은 그대로 두고 패킷에 판정만 표시한다.
+	const uint8* OccludedMask = nullptr;
+	if (Renderer && LODView && Renderer->GetGPUOcclusion().GetSettings().bEnabled)
+	{
+		FGPUOcclusion& Occlusion = Renderer->GetGPUOcclusion();
+		if (Occlusion.Run(VisibleProxies.GetData(), VisibleProxies.Num(), *LODView))
+		{
+			const std::vector<uint8>& Occluded = Occlusion.GetOccluded();
+			if (Occlusion.GetSettings().bCull)
+			{
+				uint32 Kept = 0;
+				for (uint32 i = 0; i < VisibleProxies.Num(); ++i)
+					if (!Occluded[i])
+						VisibleProxies[Kept++] = VisibleProxies[i];
+				VisibleProxies.SetNum(Kept);
+			}
+			else
+			{
+				OccludedMask = Occluded.data();
+			}
+		}
+	}
+
 	RenderStats.VisiblePrimitives = VisibleProxies.Num();
 
-	RenderQueue.Reserve(VisibleProxies.Num());
+	constexpr uint32 ExtraSlots = 4096;
+	const uint32 VisibleCount = VisibleProxies.Num();
+	const uint32 MaxSlots = VisibleCount + ExtraSlots;
+	uint8* SlotDest = Renderer ? Renderer->BeginObjectConstants(MaxSlots) : nullptr;
+	uint32 NextExtraSlot = VisibleCount;
+
+	// 조각 수 = 스레드 수 × 4. 잘게 나눠야 먼저 끝난 스레드가 남은 조각을 가져가서 부하가 고르게 된다.
+	FTaskPool& Pool = FTaskPool::Get();
+	const uint32 ChunkCount = FMath::Clamp(VisibleCount, 1u, Pool.GetNumThreads() * 4);
+
+	if (GatherChunks.Num() < ChunkCount)
+		GatherChunks.SetNum(ChunkCount);     // 늘릴 때만. 줄이지 않아야 배열 용량이 계속 재사용된다.
+
+	for (uint32 c = 0; c < GatherChunks.Num(); ++c)   // 이번에 안 쓰는 조각의 묶음도 비워 둔다 (Renderer에 넘기지 않도록)
+	{
+		FGatherChunk& Chunk = GatherChunks[c];
+		Chunk.Packets.Reset();               // 용량은 유지, 개수만 0
+		Chunk.SlowPathIndices.Reset();
+		std::fill(std::begin(Chunk.LODCounts), std::end(Chunk.LODCounts), 0u);
+		std::fill(std::begin(Chunk.LODTriangles), std::end(Chunk.LODTriangles), 0ull);
+		for (FStaticDrawGroup& Group : Chunk.Groups)
+			Group.Items.clear();             // 용량은 유지
+		Chunk.StaticDrawCount = 0;
+	}
+
+	// Renderer가 있으면 불투명 스태틱 메시는 패킷 대신 조각별 묶음에 작은 항목으로 넣는다.
+	// (패킷 128B를 만들고 → RenderQueue로 복사하고 → 5만 개를 정렬하던 과정이 없어진다.)
+	const bool bStaticGroups = Renderer != nullptr;
+	if (Renderer)
+		Renderer->ResetStaticDrawGroups();
 
 	{
 		SCOPE_CYCLE_COUNTER(STAT_GatherElements);
+
+		Pool.ParallelFor(VisibleCount, ChunkCount, [&](uint32 Begin, uint32 End, uint32 ChunkIndex)
+			{
+				FGatherChunk& Out = GatherChunks[ChunkIndex];      // 이 조각 전용. 다른 스레드는 절대 안 건드림
         LODInputs.Reset();
         if (LODView)
         {
@@ -192,52 +254,151 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FLODViewContex
             FPrimitiveSceneProxy* Proxy = VisibleProxies[ProxyIndex];
 			if (!Proxy->IsVisible())continue;
 
-			UStaticMesh* Mesh = Proxy->GetMesh();
-			if (Mesh)
-			{
-				const uint32 LOD = LODView ? SelectedLODs[ProxyIndex] : 0;
-				const FCachedMeshLOD& CachedLOD = Proxy->GetLOD(LOD);
-				++RenderStats.LODCounts[LOD];
-
-				for (uint32 i = 0; i < CachedLOD.NumSections; i++)
-				{
-					const FCachedMeshSection& Section = Proxy->GetSection(CachedLOD.FirstSection + i);
-					RenderStats.LODTriangles[LOD] += Section.IndexCount / 3;
-					FRenderPacket& Packet = RenderQueue.AddDefaulted_GetRef();
-					Packet.Proxy = Proxy;
-					Packet.Mesh = Proxy->GetMesh();
-					Packet.Material = Section.Material;
-					Packet.StartIndex = Section.StartIndex;
-					Packet.IndexCount = Section.IndexCount;
-					Packet.LODIndex = (uint8)LOD;
-				}
-				continue;
-			}
-			UPrimitiveComponent* Primitive = Proxy->GetComponent();
-			if (!Primitive || !Primitive->IsVisible())
-				continue;
-
-			if (LODView)
-			{
-				if (auto* Component = Cast<UStaticMeshComponent>(Primitive))
-				{
-					if (UStaticMesh* Mesh =
-						Component->GetStaticMesh())
+				// (머티리얼, 메시, LOD) 묶음 찾기. 조합이 몇 개뿐이라 선형 탐색이면 충분하고, 바로 전 묶음을 먼저 본다.
+				const auto FindGroup = [&Out](UMaterial* Material, UStaticMesh* Mesh, uint8 LOD) -> FStaticDrawGroup&
 					{
-						const uint32 LOD = SelectedLODs[ProxyIndex];
-
+						if (Out.LastGroup < Out.Groups.size())
 						{
-							//SCOPE_CYCLE_COUNTER(STAT_GatherSubmit);
-							Component->SubmitToRenderQueue(RenderQueue, LOD);
+							FStaticDrawGroup& Last = Out.Groups[Out.LastGroup];
+							if (Last.Material == Material && Last.Mesh == Mesh && Last.LODIndex == LOD)
+								return Last;
 						}
+						for (uint32 g = 0; g < Out.Groups.size(); ++g)
+						{
+							FStaticDrawGroup& Group = Out.Groups[g];
+							if (Group.Material == Material && Group.Mesh == Mesh && Group.LODIndex == LOD)
+							{
+								Out.LastGroup = g;
+								return Group;
+							}
+						}
+						Out.LastGroup = static_cast<uint32>(Out.Groups.size());
+						FStaticDrawGroup& Group = Out.Groups.emplace_back();
+						Group.Material = Material;
+						Group.Mesh = Mesh;
+						Group.LODIndex = LOD;
+						return Group;
+					};
+
+				for (uint32 VisibleIndex = Begin; VisibleIndex < End; ++VisibleIndex)
+				{
+					FPrimitiveSceneProxy* Proxy = VisibleProxies[VisibleIndex];   // 읽기만
+					if (!Proxy->IsVisible()) continue;
+
+					UStaticMesh* Mesh = Proxy->GetMesh();
+					if (!Mesh)
+					{
+						Out.SlowPathIndices.Add(VisibleIndex);     // 컴포넌트를 건드리는 경로는 메인이 나중에
 						continue;
 					}
+
+					const uint32 LOD = LODView ? SelectLOD(*Proxy, *LODView) : 0;
+					const FCachedMeshLOD& CachedLOD = Proxy->GetLOD(LOD);
+					++Out.LODCounts[LOD];                          // RenderStats 대신 조각 전용 통계
+
+					uint32 Slot = InvalidObjectSlot;
+					if (SlotDest)
+					{
+						// 칸 VisibleIndex는 이 반복만 쓴다 → 스레드끼리 겹치지 않음
+						std::memcpy(SlotDest + size_t(VisibleIndex) * ObjectSlotBytes,
+							&Proxy->GetLocalToWorldTransposed(), sizeof(FMatrix));
+						Slot = VisibleIndex;
+					}
+
+					const bool bOccludedByGpu = OccludedMask && OccludedMask[VisibleIndex];
+					for (uint32 i = 0; i < CachedLOD.NumSections; ++i)
+					{
+						const FCachedMeshSection& Section = Proxy->GetSection(CachedLOD.FirstSection + i);
+						Out.LODTriangles[LOD] += Section.IndexCount / 3;
+
+						if (bStaticGroups && Section.Material && Section.Material->BlendState == EBlendState::Opaque)
+						{
+							FStaticDrawGroup& Group = FindGroup(Section.Material, Mesh, static_cast<uint8>(LOD));
+							Group.Items.push_back({ Proxy, Slot, Section.StartIndex, Section.IndexCount, bOccludedByGpu ? 1u : 0u });
+							++Out.StaticDrawCount;
+							continue;
+						}
+
+						FRenderPacket& Packet = Out.Packets.AddDefaulted_GetRef();   // 조각 전용 배열에 추가
+						Packet.Proxy = Proxy;
+						Packet.Mesh = Mesh;
+						Packet.Material = Section.Material;
+						Packet.StartIndex = Section.StartIndex;
+						Packet.IndexCount = Section.IndexCount;
+						Packet.LODIndex = static_cast<uint8>(LOD);
+						Packet.Slot = Slot;
+						Packet.bOccludedByGpu = bOccludedByGpu;
+					}
+				}
+			});
+
+		// 묶음은 World 메모리 그대로 Renderer에 넘긴다 (복사 없음). 정렬은 Renderer가 묶음 단위로 한다.
+		uint32 StaticDraws = 0;
+		if (Renderer)
+		{
+			for (uint32 c = 0; c < ChunkCount; ++c)
+			{
+				StaticDraws += GatherChunks[c].StaticDrawCount;
+				for (const FStaticDrawGroup& Group : GatherChunks[c].Groups)
+					if (!Group.Items.empty())
+						Renderer->AddStaticDrawGroup(&Group);
+			}
+		}
+
+		uint32 TotalPackets = 0;
+		for (uint32 c = 0; c < ChunkCount; ++c)
+			TotalPackets += GatherChunks[c].Packets.Num();
+
+		RenderQueue.Reserve(TotalPackets + 256);             // 느린 경로 몫 약간 여유
+		for (uint32 c = 0; c < ChunkCount; ++c)
+			if (GatherChunks[c].Packets.Num() > 0)
+				RenderQueue.Append(GatherChunks[c].Packets);  // 조각 순서대로 이어 붙이기
+
+		for (uint32 c = 0; c < ChunkCount; ++c)
+		{
+			for (uint32 VisibleIndex : GatherChunks[c].SlowPathIndices)
+			{
+				FPrimitiveSceneProxy* Proxy = VisibleProxies[VisibleIndex];
+				UPrimitiveComponent* Primitive = Proxy->GetComponent();
+				if (!Primitive || !Primitive->IsVisible())
+					continue;
+
+				const uint32 FirstNew = RenderQueue.Num();
+
+				// 프록시 캐시가 없는 스태틱 메시는 기존처럼 LOD를 골라 제출하고, 그 외는 컴포넌트에 맡긴다.
+				UStaticMeshComponent* StaticMeshComponent = LODView ? Cast<UStaticMeshComponent>(Primitive) : nullptr;
+				if (StaticMeshComponent && StaticMeshComponent->GetStaticMesh())
+				{
+					const uint32 LOD = SelectStaticMeshLOD(*StaticMeshComponent->GetStaticMesh(), Proxy->GetBounds(), *LODView);
+					StaticMeshComponent->SubmitToRenderQueue(RenderQueue, LOD);
+				}
+				else
+				{
+					Primitive->SubmitToRenderQueue(RenderQueue);
+				}
+
+				// continue 없이 항상 여기까지 와서 새 패킷에 여유 칸을 배정한다.
+				for (uint32 p = FirstNew; p < RenderQueue.Num(); ++p)
+				{
+					if (!SlotDest || NextExtraSlot >= MaxSlots) break;
+					FRenderPacket& Packet = RenderQueue[p];
+					const FMatrix& Model = Packet.Proxy ? Packet.Proxy->GetLocalToWorld() : Packet.model;
+					const FMatrix Transposed = Model.GetTransposed();
+					std::memcpy(SlotDest + size_t(NextExtraSlot) * ObjectSlotBytes, &Transposed, sizeof(FMatrix));
+					Packet.Slot = NextExtraSlot++;
 				}
 			}
-
-			Primitive->SubmitToRenderQueue(RenderQueue);
 		}
-		RenderStats.DrawCalls = RenderQueue.Num();
+
+		for (uint32 c = 0; c < ChunkCount; ++c)
+			for (uint32 L = 0; L < 4; ++L)
+			{
+				RenderStats.LODCounts[L] += GatherChunks[c].LODCounts[L];
+				RenderStats.LODTriangles[L] += GatherChunks[c].LODTriangles[L];
+			}
+
+		if (SlotDest) Renderer->EndObjectConstants();
+		RenderStats.DrawCalls = RenderQueue.Num() + StaticDraws;
 		for (uint64 T : RenderStats.LODTriangles) RenderStats.Triangles += T;
 	}
 }
@@ -415,6 +576,28 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 
 	const auto TraceComponent = [&](FPrimitiveSceneProxy* Proxy, float& InOutNearestT)
 	{
+		if (UStaticMesh* Mesh = Proxy ? Proxy->GetMesh() : nullptr)
+		{
+			if (!Proxy->IsVisible())
+				return false;
+
+			const FMatrix& WorldToLocal = Proxy->GetWorldToLocal();
+			const FRay LocalRay{
+				.Origin = WorldToLocal.TransformPosition(WorldRay.Origin),
+				.Direction = WorldToLocal.TransformVector(WorldRay.Direction)
+			};
+
+			float T = InOutNearestT;
+			if (!RayIntersectsMesh(LocalRay, Mesh->GetMeshData(), T))
+				return false;
+
+			OutHit.HitComponent = Proxy->GetComponent();
+			OutHit.Distance = T;
+			OutHit.ImpactPoint = WorldRay.Origin + WorldRay.Direction * T;
+			InOutNearestT = T;
+			return true;
+		}
+
 		UPrimitiveComponent* Component = Proxy ? Proxy->GetComponent() : nullptr;
 
 		if (!Component || !Component->IsVisible())
@@ -452,7 +635,7 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 			InOutNearestT = T;
 			return true;
 		}
-		
+
 		const FMatrix& WorldToLocal = Proxy->GetWorldToLocal();
 		const FRay LocalRay{
 			.Origin = WorldToLocal.TransformPosition(WorldRay.Origin),

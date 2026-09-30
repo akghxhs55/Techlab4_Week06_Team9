@@ -76,7 +76,12 @@ function CommonSettings()
 	filter "configurations:Benchmark"
 		defines  { "ENGINE_RELEASE", "NDEBUG", "BENCHMARK" }
 		runtime  "Release"
-		optimize "on"
+		optimize "speed"
+		linktimeoptimization "on"    -- /GL + /LTCG (배포 시 백신 오탐이 문제되면 끌 것)
+		vectorextensions "AVX2"
+		buffersecuritycheck "Off"    -- /GS-
+		buildoptions { "/Gw" }
+		-- /fp:fast는 피킹 결과가 달라질 수 있어 쓰지 않는다
 		symbols  "on"
 
 
