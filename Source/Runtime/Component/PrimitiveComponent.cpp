@@ -99,7 +99,7 @@ bool UPrimitiveComponent::TraceMesh(const FRay& WorldRay, const FStaticMeshData&
 	}
 
 	FRay LocalRay = ToLocalRay(WorldRay, WorldMatrix);
-	float T;
+	float T = FLT_MAX;
 
 	if (!RayIntersectsMesh(LocalRay, Mesh, T)) return false;
 

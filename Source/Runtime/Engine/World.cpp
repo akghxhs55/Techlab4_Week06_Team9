@@ -434,8 +434,8 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 
 			const FRay LocalRay = ToLocalRay(WorldRay, BillboardToWorld);
 
-			float T;
-			if (!Billboard->LineTraceComponentLocal(LocalRay, T) || T < 0.0f || T >= InOutNearestT)
+			float T = InOutNearestT;
+			if (!Billboard->LineTraceComponentLocal(LocalRay, T))
 			{
 				return false;
 			}
@@ -453,8 +453,8 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 			.Direction = WorldToLocal.TransformVector(WorldRay.Direction)
 		};
 
-		float T;
-		if (!Component->LineTraceComponentLocal(LocalRay, T) || T < 0.0f || T >= InOutNearestT)
+		float T = InOutNearestT;
+		if (!Component->LineTraceComponentLocal(LocalRay, T))
 		{
 			return false;
 		}
@@ -466,8 +466,10 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 		return true;
 	};
 
+	const FPreparedRay PreparedRay(WorldRay);
+
 	Scene.BVH.TraceClosest(
-		[&](const FBox& Bounds, float& OutEnterT) { return RayIntersectsAABB(WorldRay, Bounds.Min, Bounds.Max, OutEnterT); },
+		[&](const FBox& Bounds, float& OutEnterT) { return RayIntersectsAABB(PreparedRay, Bounds.Min, Bounds.Max, OutEnterT); },
 		[&](FPrimitiveSceneProxy* Proxy, float& OutNearestT) { return TraceComponent(Proxy, OutNearestT); },
 		NearestT);
 
