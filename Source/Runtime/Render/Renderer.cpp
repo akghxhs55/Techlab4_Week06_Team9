@@ -25,8 +25,7 @@ namespace
 {
 	// VSSetConstantBuffers1의 오프셋은 16개 상수(256바이트) 단위여야 하므로 오브젝트마다 256바이트 칸을 쓴다.
 	constexpr uint32 PerObjectSlotConstants = 16;
-	constexpr uint32 PerObjectSlotBytes = PerObjectSlotConstants * 16;
-	static_assert(sizeof(FPerObjectConstants) <= PerObjectSlotBytes);
+	static_assert(sizeof(FPerObjectConstants) <= ObjectSlotBytes);
 
 	constexpr uint32 MinPerObjectSlots = 1024;
 
@@ -63,7 +62,7 @@ void FRenderer::EnsurePerObjectSlotCapacity(uint32 SlotCount)
 	while (NewCapacity < SlotCount)
 		NewCapacity *= 2;
 
-	PerObjectSlotCB = RenderCommand::CreateConstantBuffer(NewCapacity * PerObjectSlotBytes);
+	PerObjectSlotCB = RenderCommand::CreateConstantBuffer(NewCapacity * ObjectSlotBytes);
 	if (!PerObjectSlotCB || !PerObjectSlotCB->GetBuffer())
 	{
 		HTR_LOG(Warning, "Per-object constant buffer ({} slots) creation failed. Falling back to per-draw updates.", NewCapacity);
@@ -72,41 +71,6 @@ void FRenderer::EnsurePerObjectSlotCapacity(uint32 SlotCount)
 		return;
 	}
 	PerObjectSlotCapacity = NewCapacity;
-}
-
-// 정렬된 순서대로 모든 패킷의 World 행렬을 한 번의 Map으로 올린다. 패킷 i는 칸 i를 쓴다.
-void FRenderer::UploadPerObjectConstants()
-{
-	SCOPE_CYCLE_COUNTER(STAT_UploadPerObjectCB);
-
-	const uint32 Count = static_cast<uint32>(RenderPackets.size());
-	if (!bUsePerObjectSlots || Count == 0)
-		return;
-
-	EnsurePerObjectSlotCapacity(Count);
-	if (!PerObjectSlotCB)
-	{
-		bUsePerObjectSlots = false;
-		return;
-	}
-
-	uint8* Dest = static_cast<uint8*>(RenderCommand::MapWriteDiscard(PerObjectSlotCB.get()));
-	if (!Dest)
-	{
-		bUsePerObjectSlots = false;
-		return;
-	}
-
-	// 매핑된 메모리는 write-combined라 순차 쓰기만 하고 읽지 않는다.
-	for (uint32 Index = 0; Index < Count; ++Index)
-	{
-		const FRenderPacket& P = RenderPackets[Index];
-		const FMatrix& Model = P.Proxy ? P.Proxy->GetLocalToWorld() : P.model;
-		const FMatrix World = Model.GetTransposed();
-		std::memcpy(Dest + static_cast<size_t>(Index) * PerObjectSlotBytes, &World, sizeof(FMatrix));
-	}
-
-	RenderCommand::Unmap(PerObjectSlotCB.get());
 }
 
 // 카메라의 ViewProjection을 공통 렌더 경로로 전달한다.
@@ -165,8 +129,6 @@ void FRenderer::RenderQueueSorting(TArray<FRenderPacket>& InQueue, const FMatrix
 		while (FirstTranslucentIndex < SortEntries.Num() && !(SortEntries[FirstTranslucentIndex].Key >> 63))
 			++FirstTranslucentIndex;
 	}
-
-	UploadPerObjectConstants();
 }
 
 // 정렬된 패킷 중 [Begin, End) 범위를 View 행렬과 Section 범위로 그린다.
@@ -179,8 +141,7 @@ void FRenderer::DrawPackets(uint32 Begin, uint32 End, const FMatrix& ViewProject
 	uint8 LastLODIndex = 0;
 
 	RenderCommand::BindConstantBuffer(0, ViewCB.get(), EShaderBindFlagBits::Vertex);
-	if (!bUsePerObjectSlots)
-		RenderCommand::BindConstantBuffer(2, PerObjectCB.get(), EShaderBindFlagBits::Vertex);
+
 
 	for (uint32 k = Begin; k < End; ++k)          // k = 정렬된 위치
 	{
@@ -194,14 +155,13 @@ void FRenderer::DrawPackets(uint32 Begin, uint32 End, const FMatrix& ViewProject
 			BindMaterial(RenderPacket.Material);
 			UpdateMaterialParams(RenderPacket);
 		}
-		if (bUsePerObjectSlots)
+		if (RenderPacket.Slot != InvalidObjectSlot)
 		{
-			// 드로우마다 Map하지 않고 이미 올린 칸의 오프셋만 바꾼다.
-			RenderCommand::BindConstantBufferRange(2, PerObjectSlotCB.get(),
-				PacketIndex * PerObjectSlotConstants, PerObjectSlotConstants, EShaderBindFlagBits::Vertex);
+			RenderCommand::BindConstantBufferRange(2, PerObjectSlotCB.get(), RenderPacket.Slot * PerObjectSlotConstants, PerObjectSlotConstants, EShaderBindFlagBits::Vertex);
 		}
 		else
 		{
+			RenderCommand::BindConstantBuffer(2, PerObjectCB.get(), EShaderBindFlagBits::Vertex);
 			UpdatePerObjectConstants(RenderPacket, ViewProjection);
 		}
 
@@ -333,6 +293,19 @@ FOcclusionMeasureResult FRenderer::MeasureOpaqueOcclusion(const FMatrix& ViewPro
 	Result.ElapsedMs = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - StartTime).count();
 	Result.bValid = true;
 	return Result;
+}
+
+uint8* FRenderer::BeginObjectConstants(uint32 MaxSlots)
+{
+	if (!bUsePerObjectSlots || MaxSlots == 0) return nullptr;
+	EnsurePerObjectSlotCapacity(MaxSlots);
+	if (!PerObjectSlotCB) { bUsePerObjectSlots = false; return nullptr; }
+	return static_cast<uint8*>(RenderCommand::MapWriteDiscard(PerObjectSlotCB.get()));
+}
+
+void FRenderer::EndObjectConstants()
+{
+	if (PerObjectSlotCB) RenderCommand::Unmap(PerObjectSlotCB.get());
 }
 
 // Material마다 Shader/Texture/Sampler/State 꽂기
