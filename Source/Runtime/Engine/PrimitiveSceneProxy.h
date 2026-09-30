@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "Math/Frustum.h"
 
@@ -31,6 +31,7 @@ public:
 	UPrimitiveComponent* GetComponent() const { return Component; }
 	const FAABB& GetBounds() const { return Bounds; }
 	const FMatrix& GetLocalToWorld() const { return LocalToWorld; }
+	const FMatrix& GetWorldToLocal() const { return WorldToLocal; }
 
 	UStaticMesh* GetMesh() const { return Mesh; }
 	bool IsVisible() const { return bVisible; }
@@ -46,6 +47,7 @@ private:
 
 	UPrimitiveComponent* Component = nullptr;
 	FMatrix LocalToWorld;
+	FMatrix WorldToLocal;
 	FAABB Bounds;
 	int32 PackedIndex = INDEX_NONE;
 

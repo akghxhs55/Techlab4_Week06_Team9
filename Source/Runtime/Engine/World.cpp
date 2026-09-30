@@ -370,6 +370,17 @@ bool UWorld::DestroyActor(AActor* Actor)
 	FString ActorName = Actor->GetName();
 	uint32 ActorUUID = Actor->GetUUID();
 
+	// 5. 프록시 제거
+	for (UActorComponent* Component : Actor->GetComponents())
+	{
+		if (UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Component))
+		{
+			Scene.RemovePrimitive(Primitive);
+		}
+	}
+
+	Actor->RegisterAllActorTickFunctions(false);
+
 	// 6. Actor 삭제
 	delete Actor;
 
@@ -385,40 +396,68 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 	OutHit = FHitResult();
 	float NearestT = std::numeric_limits<float>::max();
 
-	const auto TraceComponent = [&](UPrimitiveComponent* Component, float& OutNearestT)
+	const auto TraceComponent = [&](FPrimitiveSceneProxy* Proxy, float& InOutNearestT)
+	{
+		UPrimitiveComponent* Component = Proxy ? Proxy->GetComponent() : nullptr;
+
+		if (!Component || !Component->IsVisible())
+			return false;
+
+		if (UBillboardComponent* Billboard = Cast<UBillboardComponent>(Component))
 		{
-			if (!Component || !Component->IsVisible())
+			if (!ResolveBillboard)
+			{
+				FHitResult Hit;
+				if (!Billboard->LineTraceComponent(WorldRay, Hit) ||
+					Hit.Distance >= InOutNearestT)
+				{
+					return false;
+				}
+
+				OutHit = Hit;
+				InOutNearestT = Hit.Distance;
+				return true;
+			}
+
+			const FMatrix BillboardToWorld = ResolveBillboard(*Billboard, ViewContext);
+
+			const FRay LocalRay = ToLocalRay(WorldRay, BillboardToWorld);
+
+			float T;
+			if (!Billboard->LineTraceComponentLocal(LocalRay, T) || T < 0.0f || T >= InOutNearestT)
+			{
 				return false;
-
-			FHitResult Hit;
-			bool bHit = false;
-
-			if (UBillboardComponent* Billboard = Cast<UBillboardComponent>(Component);
-				Billboard && ResolveBillboard)
-			{
-				bHit = Billboard->LineTraceComponentForView(WorldRay, Hit, ResolveBillboard(*Billboard, ViewContext));
-			}
-			else
-			{
-				bHit = Component->LineTraceComponent(WorldRay, Hit);
 			}
 
-			if (!bHit ||
-				!Hit.HitComponent ||
-				Hit.Distance < 0.0f ||
-				Hit.Distance >= OutNearestT)
-			{
-				return false;
-			}
-
-			OutHit = Hit;
-			OutNearestT = Hit.Distance;
+			OutHit.HitComponent = Billboard;
+			OutHit.Distance = T;
+			OutHit.ImpactPoint = WorldRay.Origin + WorldRay.Direction * T;
+			InOutNearestT = T;
 			return true;
+		}
+		
+		const FMatrix& WorldToLocal = Proxy->GetWorldToLocal();
+		const FRay LocalRay{
+			.Origin = WorldToLocal.TransformPosition(WorldRay.Origin),
+			.Direction = WorldToLocal.TransformVector(WorldRay.Direction)
 		};
+
+		float T;
+		if (!Component->LineTraceComponentLocal(LocalRay, T) || T < 0.0f || T >= InOutNearestT)
+		{
+			return false;
+		}
+
+		OutHit.HitComponent = Component;
+		OutHit.Distance = T;
+		OutHit.ImpactPoint = WorldRay.Origin + WorldRay.Direction * T;
+		InOutNearestT = T;
+		return true;
+	};
 
 	Scene.BVH.TraceClosest(
 		[&](const FBox& Bounds, float& OutEnterT) { return RayIntersectsAABB(WorldRay, Bounds.Min, Bounds.Max, OutEnterT); },
-		[&](FPrimitiveSceneProxy* Proxy, float& OutNearestT) { return TraceComponent(Proxy->GetComponent(), OutNearestT); },
+		[&](FPrimitiveSceneProxy* Proxy, float& OutNearestT) { return TraceComponent(Proxy, OutNearestT); },
 		NearestT);
 
 	return OutHit.HitComponent != nullptr;

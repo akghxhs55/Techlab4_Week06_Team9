@@ -1,4 +1,4 @@
-#include "EnginePCH.h"
+﻿#include "EnginePCH.h"
 #include "PrimitiveComponent.h"
 #include "../Render/Renderer.h"
 #include "Asset/AssetManager.h"
@@ -77,6 +77,12 @@ void UPrimitiveComponent::MarkRenderStateDirty()
 		SceneProxy->GetScene()->MarkRenderStateDirty(SceneProxy);
 }
 
+bool UPrimitiveComponent::LineTraceComponentLocal(const FRay& LocalRay, float& OutT)
+{
+	const FStaticMeshData* Mesh = GetMeshData();
+	return Mesh && TraceMeshLocal(LocalRay, *Mesh, OutT);
+}
+
 void UPrimitiveComponent::OnTransformDirty()
 {
 	if (SceneProxy)
@@ -105,3 +111,8 @@ bool UPrimitiveComponent::TraceMesh(const FRay& WorldRay, const FStaticMeshData&
 }
 
 
+
+bool UPrimitiveComponent::TraceMeshLocal(const FRay& LocalRay, const FStaticMeshData& Mesh, float& OutT)
+{
+	return RayIntersectsMesh(LocalRay, Mesh, OutT);
+}

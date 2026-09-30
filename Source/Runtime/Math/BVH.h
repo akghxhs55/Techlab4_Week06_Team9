@@ -81,7 +81,7 @@ private:
 
 	static constexpr uint32 InvalidIndex = std::numeric_limits<uint32>::max();
 	static constexpr uint32 MaxDepth = 32;
-	static constexpr uint32 MinSplitSize = 8;
+	static constexpr uint32 MinSplitSize = 2;
 	static constexpr uint32 BinCount = 16;
 
 	uint32 BuildNode(uint32 First, uint32 Count, uint32 Depth);

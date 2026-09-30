@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "SceneComponent.h"
 #include "../Render/Shader.h"
@@ -56,6 +56,7 @@ public:
 	void SetVisible(bool bInVisible) { bVisible = bInVisible; }
 
 	virtual bool LineTraceComponent(const FRay& WorldRay, FHitResult& OutHit);
+	virtual bool LineTraceComponentLocal(const FRay& LocalRay, float& OutT);
 	virtual FBox CalcLocalBounds() const override
 	{
 		const FStaticMeshData* Data = GetMeshData();
@@ -70,6 +71,7 @@ public:
 
 protected:
 	bool TraceMesh(const FRay& WorldRay, const FStaticMeshData& Mesh, const FMatrix& WorldMatrix, FHitResult& OutResult);
+	bool TraceMeshLocal(const FRay& LocalRay, const FStaticMeshData& Mesh, float& OutT);
 	bool bVisible = true;
 
 private:
