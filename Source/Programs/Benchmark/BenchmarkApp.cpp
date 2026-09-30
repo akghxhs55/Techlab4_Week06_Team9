@@ -58,7 +58,8 @@ bool UBenchmarkEngine::Init()
 		return false;
 
 	FLODGenerateRequest Request;
-	Request.ScreenThresholds = { 0.25f, 0.02f, 0.008f };
+	// 화면 절반 높이 대비 반지름 비율. 0.06·0.025는 2560x1600 기준 반지름 48px·20px에서 LOD2·LOD3으로 전환한다.
+	Request.ScreenThresholds = { 0.25f, 0.06f, 0.025f };
 	Request.bSaveToAsset = false; // 현재 저장 경로가 미구현
 
 	auto GenerateFor = [&](UStaticMesh* Asset)
