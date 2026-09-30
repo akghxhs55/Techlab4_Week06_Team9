@@ -19,6 +19,7 @@
 
 DECLARE_CYCLE_STAT("GPU Occlusion (Total)", STAT_GPUOcclusion);
 DECLARE_CYCLE_STAT("  Occ Prepare+Occluders", STAT_GPUOcclusionPrepare);
+DECLARE_CYCLE_STAT("  Occ Draw", STAT_GPUOcclusionDraw);
 DECLARE_CYCLE_STAT("  Occ Wait GPU", STAT_GPUOcclusionWait);
 
 namespace
