@@ -110,10 +110,9 @@ bool UBenchmarkEngine::Init()
 	FString ScenePath = "Scenes/Default.scene";
 	if (__argc > 1 && __argv[1] && __argv[1][0] != '\0')
 		ScenePath = __argv[1];
+	// 카메라 위치·회전·FOV·클립은 씬 파일의 PerspectiveCamera에서 읽는다.
 	if (!FJsonArchive::LoadWorld(World, ScenePath))
 		HTR_LOG(Warning, "Failed to load scene: {}", ScenePath);
-
-	World->GetMainCamera()->GetCameraComponent()->SetRelativeLocation(FVector(-50.0f, 0.0f, 0.0f));
 
 	InitEditorTools();
 

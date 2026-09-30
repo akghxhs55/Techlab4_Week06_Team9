@@ -9,13 +9,49 @@
 #include "GameFramework/Actor/StaticMeshActor.h"
 #include "TypeSerializer.h"
 #include "Asset/AssetManager.h"
+#include "Camera/CameraActor.h"
+#include "Camera/CameraComponent.h"
 
 namespace
 {
-	//bool LoadJungleSceneFormat()
-	//{
+	// "FOV": [60.0] 처럼 배열 하나로 저장된 값과 숫자 하나 모두 받는다.
+	float ReadScalar(const json& Value, float Default)
+	{
+		if (Value.is_number())
+			return Value.get<float>();
+		if (Value.is_array() && !Value.empty() && Value[0].is_number())
+			return Value[0].get<float>();
+		return Default;
+	}
 
-	//}
+	// 기본 씬 형식의 "PerspectiveCamera"를 메인 카메라에 적용한다.
+	// Rotation은 [Roll, Pitch, Yaw] 라디안이고, 엔진 FRotator는 도 단위다 (Pitch 양수 = 아래를 봄, 씬과 같은 방향).
+	void LoadPerspectiveCamera(UWorld* World, const json& CameraJson)
+	{
+		ACameraActor* CameraActor = World->GetMainCamera();
+		UCameraComponent* Camera = CameraActor ? CameraActor->GetCameraComponent() : nullptr;
+		if (!Camera || !CameraJson.is_object())
+			return;
+
+		if (CameraJson.contains("Location"))
+			Camera->SetRelativeLocation(CameraJson["Location"].get<FVector>());
+
+		if (CameraJson.contains("Rotation") && CameraJson["Rotation"].is_array() && CameraJson["Rotation"].size() >= 3)
+		{
+			const json& R = CameraJson["Rotation"];
+			Camera->SetRelativeRotation(FRotator(
+				FMath::RadiansToDegrees(R[1].get<float>()),    // Pitch
+				FMath::RadiansToDegrees(R[2].get<float>()),    // Yaw
+				FMath::RadiansToDegrees(R[0].get<float>())));  // Roll
+		}
+
+		if (CameraJson.contains("FOV"))
+			Camera->SetFieldOfView(ReadScalar(CameraJson["FOV"], Camera->GetFieldOfView()));
+		if (CameraJson.contains("NearClip"))
+			Camera->SetNearZ(ReadScalar(CameraJson["NearClip"], Camera->GetNearZ()));
+		if (CameraJson.contains("FarClip"))
+			Camera->SetFarZ(ReadScalar(CameraJson["FarClip"], Camera->GetFarZ()));
+	}
 }
 
 bool FJsonArchive::SaveWorld(UWorld* World, const FString& Path)
@@ -111,6 +147,9 @@ bool FJsonArchive::LoadWorld(UWorld* World, const FString& Path)
 			Actor->GetStaticMeshComponent()->SetStaticMesh(Mesh);
 		}
 		World->GetScene().BuildBVH();
+
+		if (Json.contains("PerspectiveCamera"))
+			LoadPerspectiveCamera(World, Json["PerspectiveCamera"]);
 
 		return true;
 	}
