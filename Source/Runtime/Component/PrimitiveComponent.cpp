@@ -71,10 +71,10 @@ bool UPrimitiveComponent::LineTraceComponent(const FRay& WorldRay, FHitResult& O
 	return Mesh && TraceMesh(WorldRay, *Mesh, GetWorldMatrix(), OutHit);
 }
 
-bool UPrimitiveComponent::LineTraceComponentInsideAABB(const FRay& WorldRay, FHitResult& OutHit)
+bool UPrimitiveComponent::LineTraceComponentLocal(const FRay& LocalRay, float& OutT)
 {
 	const FStaticMeshData* Mesh = GetMeshData();
-	return Mesh && TraceMeshInsideAABB(WorldRay, *Mesh, GetWorldMatrix(), OutHit);
+	return Mesh && TraceMeshLocal(LocalRay, *Mesh, OutT);
 }
 
 void UPrimitiveComponent::OnTransformDirty()
@@ -92,19 +92,19 @@ bool UPrimitiveComponent::TraceMesh(const FRay& WorldRay, const FStaticMeshData&
 		return false;
 	}
 
-	return TraceMeshInsideAABB(WorldRay, Mesh, WorldMatrix, OutResult);
-}
-
-bool UPrimitiveComponent::TraceMeshInsideAABB(const FRay& WorldRay, const FStaticMeshData& Mesh, const FMatrix& WorldMatrix, FHitResult& OutResult)
-{
 	FRay LocalRay = ToLocalRay(WorldRay, WorldMatrix);
 	float T;
 
-	if (!RayIntersectsMeshInsideAABB(LocalRay, Mesh, T)) return false;
+	if (!RayIntersectsMesh(LocalRay, Mesh, T)) return false;
 
 	OutResult.HitComponent = this;
 	OutResult.Distance = T;
 	OutResult.ImpactPoint = WorldRay.Origin + WorldRay.Direction * T;
 
 	return true;
+}
+
+bool UPrimitiveComponent::TraceMeshLocal(const FRay& LocalRay, const FStaticMeshData& Mesh, float& OutT)
+{
+	return RayIntersectsMesh(LocalRay, Mesh, OutT);
 }

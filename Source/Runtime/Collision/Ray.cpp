@@ -105,19 +105,15 @@ bool RayIntersectsTriangle(const FRay& Ray, const FVector& v1, const FVector& v2
 // Mesh AABB를 통과한 Ray에 삼각형 교차를 적용해 가장 가까운 거리만 반환한다.
 bool RayIntersectsMesh(const FRay& LocalRay, const FStaticMeshData& Mesh, float& OutT)
 {
-    FBox Box = Mesh.AABB;
-    float BoxT{};
-    if (!RayIntersectsAABB(LocalRay, Box.Min, Box.Max, BoxT))
+    if (!Mesh.TriangleBVH)
     {
-        return false;
+	    FBox Box = Mesh.AABB;
+	    float BoxT{};
+
+        if (!RayIntersectsAABB(LocalRay, Box.Min, Box.Max, BoxT))
+			return false;
     }
 
-    return RayIntersectsMeshInsideAABB(LocalRay, Mesh, OutT);
-}
-
-// AABB 검사를 생략하는 버전
-bool RayIntersectsMeshInsideAABB(const FRay& LocalRay, const FStaticMeshData& Mesh, float& OutT)
-{
     bool bHit = false;
     float NearestT = FLT_MAX;
 

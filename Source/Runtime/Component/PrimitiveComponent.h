@@ -56,7 +56,7 @@ public:
 	void SetVisible(bool bInVisible) { bVisible = bInVisible; }
 
 	virtual bool LineTraceComponent(const FRay& WorldRay, FHitResult& OutHit);
-	virtual bool LineTraceComponentInsideAABB(const FRay& WorldRay, FHitResult& OutHit); // AABB 검사를 생략하는 버전
+	virtual bool LineTraceComponentLocal(const FRay& LocalRay, float& OutT);
 	virtual FBox CalcLocalBounds() const override
 	{
 		const FStaticMeshData* Data = GetMeshData();
@@ -69,7 +69,7 @@ public:
 
 protected:
 	bool TraceMesh(const FRay& WorldRay, const FStaticMeshData& Mesh, const FMatrix& WorldMatrix, FHitResult& OutResult);
-	bool TraceMeshInsideAABB(const FRay& WorldRay, const FStaticMeshData& Mesh, const FMatrix& WorldMatrix, FHitResult& OutResult); // AABB 검사를 생략하는 버전
+	bool TraceMeshLocal(const FRay& LocalRay, const FStaticMeshData& Mesh, float& OutT);
 	bool bVisible = true;
 
 private:

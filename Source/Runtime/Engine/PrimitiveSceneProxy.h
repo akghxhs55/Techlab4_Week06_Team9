@@ -15,6 +15,7 @@ public:
 	UPrimitiveComponent* GetComponent() const { return Component; }
 	const FAABB GetBounds() const { return Bounds; }
 	const FMatrix& GetLocalToWorld() const { return LocalToWorld; }
+	const FMatrix& GetWorldToLocal() const { return WorldToLocal; }
 
 	FScene* GetScene() const { return Scene; }
 private:
@@ -23,6 +24,7 @@ private:
 
 	UPrimitiveComponent* Component = nullptr;
 	FMatrix LocalToWorld;
+	FMatrix WorldToLocal;
 	FAABB Bounds;
 	int32 PackedIndex = INDEX_NONE;
 
