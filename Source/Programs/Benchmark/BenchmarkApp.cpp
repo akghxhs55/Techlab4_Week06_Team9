@@ -20,6 +20,7 @@
 #include "Editor/Details/DetailsPanel.h"
 #include "Editor/EditorControls/EditorControlsPanel.h"
 #include "Editor/OutputLog/OutputLogPanel.h"
+#include "Editor/HitoriEd/EditorFileUtils.h"
 
 #include "Input/InputSystem.h"
 #include "Collision/HitResult.h"
@@ -32,17 +33,8 @@ namespace
 }
 
 DECLARE_CYCLE_STAT("ImGui Render", STAT_ImGuiRender);
-// 기존 스탯에 잡히지 않던 구간. 원인을 찾으면 필요 없는 것은 지운다.
-DECLARE_CYCLE_STAT("[Tick] Gizmo & Picking Update", STAT_TickGizmoPicking);
-DECLARE_CYCLE_STAT("[Tick] World Tick (Total)", STAT_TickWorld);
-DECLARE_CYCLE_STAT("[Tick] Editor UI Tick", STAT_TickEditorUI);
-DECLARE_CYCLE_STAT("[Tick] Gather (Total)", STAT_TickGather);
-DECLARE_CYCLE_STAT("[Tick] Begin Backbuffer Pass", STAT_TickBeginPass);
-DECLARE_CYCLE_STAT("[Tick] Sort+Opaque (Total)", STAT_TickSortOpaque);
-DECLARE_CYCLE_STAT("[Tick] Grid Render", STAT_TickGrid);
-DECLARE_CYCLE_STAT("[Tick] Translucent+Outline+Gizmo", STAT_TickTranslucentOverlay);
-DECLARE_CYCLE_STAT("[Tick] End Backbuffer Pass", STAT_TickEndPass);
-DECLARE_CYCLE_STAT("[Tick] Stat EndFrame", STAT_TickStatEndFrame);
+DECLARE_CYCLE_STAT("Gather (Total)", STAT_GatherTotal);
+DECLARE_CYCLE_STAT("Render Opaque (Total)", STAT_RenderOpaqueTotal);
 
 FEngineConfig UBenchmarkEngine::GetConfig() const
 {
@@ -62,11 +54,14 @@ bool UBenchmarkEngine::Init()
 		return false;
 	}
 
-	UStaticMesh* Mesh = UAssetManager::LoadObjStaticMesh("Assets/Data/apple_mid.obj");
-	UStaticMesh* Mesh_2 = UAssetManager::LoadObjStaticMesh("Assets/Data/bitten_apple_mid.obj");
-
-	if (!Mesh || !Mesh_2)
-		return false;
+	// 이 사과 OBJ들은 Z-up으로 만들어져 있어, 임포터의 OBJ 표준(Y-up) → 엔진(Z-up) 변환을 거치면 꼭지가 -X로 눕는다.
+	// Y축 기준 회전으로 -X → +Z가 되게 세운다 (LOD·피킹 BVH가 새 방향으로 만들어지도록 LOD 생성 전에 한다).
+	const auto StandUp = [](const FVector& V) { return FVector(V.Z, V.Y, -V.X); };
+	for (const char* ApplePath : { "Assets/Data/apple_mid.obj", "Assets/Data/bitten_apple_mid.obj" })
+	{
+		if (UStaticMesh* Apple = UAssetManager::LoadObjStaticMesh(ApplePath))
+			UAssetManager::ReorientStaticMesh(*Apple, StandUp);
+	}
 
 	FLODGenerateRequest Request;
 	// 화면 절반 높이 대비 반지름 비율. 2560x1600 기준 반지름 약 96px·32px 아래에서 LOD2·LOD3으로 전환한다.
@@ -104,10 +99,19 @@ bool UBenchmarkEngine::Init()
 				Report.ActualTriangles[3]);
 		};
 
-	GenerateFor(Mesh);
-	GenerateFor(Mesh_2);
+	// Assets 아래 OBJ 메시는 시작할 때 전부 로드되므로, 모두 LOD를 만들어 두면 어떤 씬을 열어도 LOD가 적용된다.
+	UAssetManager::ForEachObjStaticMesh([&](const FString&, UStaticMesh& Asset)
+		{
+			if (Asset.GetLODCount() == 1)
+				GenerateFor(&Asset);
+		});
 
-	FJsonArchive::LoadWorld(World, "Scenes/Default.scene");
+	// 실행 인자로 씬 경로를 받으면 그 씬을, 없으면 기본 씬을 연다. 예: Benchmark.exe Scenes/Bocchi.scene
+	FString ScenePath = "Scenes/Default.scene";
+	if (__argc > 1 && __argv[1] && __argv[1][0] != '\0')
+		ScenePath = __argv[1];
+	if (!FJsonArchive::LoadWorld(World, ScenePath))
+		HTR_LOG(Warning, "Failed to load scene: {}", ScenePath);
 
 	World->GetMainCamera()->GetCameraComponent()->SetRelativeLocation(FVector(-50.0f, 0.0f, 0.0f));
 
@@ -137,6 +141,19 @@ void UBenchmarkEngine::InitEditorTools()
 
 	EditorUI = MakeUnique<FEditorUI>();
 	EditorUI->Init(true, true);
+
+	// File 메뉴로 씬을 바꾼다. 기존 액터가 지워지므로 선택(기즈모·아웃라인·디테일)을 먼저 비운다.
+	// 아웃라이너 선택을 비우면 콜백으로 기즈모·아웃라인·디테일 선택도 함께 비워진다.
+	EditorUI->SetOpenSceneCallback([this]()
+		{
+			OutlinerPanel->SelectActor(nullptr);
+			FEditorFileUtils::LoadScene(World);
+		});
+	EditorUI->SetNewSceneCallback([this]()
+		{
+			OutlinerPanel->SelectActor(nullptr);
+			FEditorFileUtils::NewScene(World);
+		});
 
 	OutputLogPanel = EditorUI->AddEditorPanel<FOutputLogPanel>();
 	FLog::AddSink(OutputLogPanel);
@@ -260,21 +277,12 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 	Camera->SetAspectRatio(static_cast<float>(Width) / Height);
 
 	// 기즈모 조작 결과가 같은 프레임의 UpdateAllTransforms에 반영되도록 World Tick보다 앞에 둔다.
-	{
-		SCOPE_CYCLE_COUNTER(STAT_TickGizmoPicking);
-		UpdateGizmoAndPicking();
-	}
+	UpdateGizmoAndPicking();
 
-	{
-		SCOPE_CYCLE_COUNTER(STAT_TickWorld);
-		World->Tick(DeltaTime);
-	}
+	World->Tick(DeltaTime);
 
-	{
-		SCOPE_CYCLE_COUNTER(STAT_TickEditorUI);
-		EditorControlsPanel->DeltaTime = DeltaTime;
-		EditorUI->Tick(DeltaTime);
-	}
+	EditorControlsPanel->DeltaTime = DeltaTime;
+	EditorUI->Tick(DeltaTime);
 
 	const FMatrix ViewProjection = Camera->GetViewProjectionMatrix();
 	const FMatrix Projection = Camera->GetProjectionMatrix();
@@ -297,27 +305,23 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 	LODView.bOrthographic = Camera->GetIsOrthogonal();
 
 	// 멤버 큐를 재사용한다. Renderer와 swap으로 버퍼를 주고받으므로 두 버퍼 모두 용량이 유지된다.
+	FRenderer* Renderer = GetEngineLoop().GetRenderer();
 	{
-		SCOPE_CYCLE_COUNTER(STAT_TickGather);
+		// 프러스텀 컬링 + GPU 오클루전 + Gather 전체
+		SCOPE_CYCLE_COUNTER(STAT_GatherTotal);
 		RenderQueue.Reset();
-		FRenderer* Renderer = GetEngineLoop().GetRenderer();
-
 		World->GatherRenderPackets(RenderQueue, &LODView, &Frustum, Renderer);
 	}
 
-	{
-		SCOPE_CYCLE_COUNTER(STAT_TickBeginPass);
-		GetEngineLoop().BeginBackbufferPass();
-	}
+	GetEngineLoop().BeginBackbufferPass();
 
-	FRenderer* Renderer = GetEngineLoop().GetRenderer();
 	const FViewportSettings Viewport{ 0, 0, Width, Height, 0.0f, 1.0f };
 	const FVector CameraLocation = Camera->GetWorldLocation();
 	const FVector CameraForward = Camera->GetTransform().GetForward();
 
 	// 반투명이 Grid 위에 합성되도록 불투명 → Grid → 반투명 순서로 그린다.
 	{
-		SCOPE_CYCLE_COUNTER(STAT_TickSortOpaque);
+		SCOPE_CYCLE_COUNTER(STAT_RenderOpaqueTotal);
 		Renderer->RenderQueueSorting(RenderQueue, ViewProjection);
 		Renderer->RenderOpaque(ViewProjection);
 	}
@@ -329,20 +333,16 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 		LastOcclusionMeasure = Renderer->MeasureOpaqueOcclusion(ViewProjection);
 	}
 
-	{
-		SCOPE_CYCLE_COUNTER(STAT_TickGrid);
-		GridRenderer->OnRenderBatchGrid(
-			ViewProjection,
-			CameraLocation,
-			CameraForward,
-			EGridPlane::XY,
-			static_cast<float>(GridSettings.GridSpacing),
-			true,
-			Viewport);
-	}
+	GridRenderer->OnRenderBatchGrid(
+		ViewProjection,
+		CameraLocation,
+		CameraForward,
+		EGridPlane::XY,
+		static_cast<float>(GridSettings.GridSpacing),
+		true,
+		Viewport);
 
 	{
-		SCOPE_CYCLE_COUNTER(STAT_TickTranslucentOverlay);
 		// Grid 파이프라인이 바꾼 상태를 장면 기준으로 되돌린다.
 		RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
 		RenderCommand::SetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -370,16 +370,8 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 		ImGuiRenderer->End();
 	}
 
-	{
-		SCOPE_CYCLE_COUNTER(STAT_TickEndPass);
-		GetEngineLoop().EndBackbufferPass();
-	}
-
-	// EndFrame 자신의 시간은 다음 프레임의 표에 반영된다.
-	{
-		SCOPE_CYCLE_COUNTER(STAT_TickStatEndFrame);
-		FStatRegistry::EndFrame();
-	}
+	GetEngineLoop().EndBackbufferPass();
+	FStatRegistry::EndFrame();
 }
 
 void UBenchmarkEngine::PreExit()

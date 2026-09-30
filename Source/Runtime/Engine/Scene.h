@@ -11,6 +11,8 @@ class FScene
 public:
 	void AddPrimitive(UPrimitiveComponent* Component);
 	void RemovePrimitive(UPrimitiveComponent* Component);
+	// 모든 프록시를 한 번에 지운다. 액터를 통째로 지우기 전(ClearWorld)에 불러야 지워진 컴포넌트를 가리키는 프록시가 남지 않는다.
+	void RemoveAllPrimitives();
 
 	void UpdateAllTransforms();
 

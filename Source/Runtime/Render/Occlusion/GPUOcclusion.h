@@ -11,7 +11,7 @@ struct FLODViewContext;
 
 struct FGPUOcclusionSettings
 {
-	bool bEnabled = false;
+	bool bEnabled = true;
 	bool bCull = true;               // false면 판정만 하고 그대로 그린다 (측정 도구로 잘못 가린 것이 없는지 검증할 때)
 	// 가림막은 화면에 크게 보이는 것부터 고르고, 둘 중 먼저 닿는 쪽에서 멈춘다.
 	//  - OccluderCoverage: 고른 가림막의 화면 넓이 합 (화면 몇 장분). 가까이 가면 몇백 개로도 금방 찬다.
