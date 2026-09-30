@@ -349,6 +349,17 @@ bool UWorld::DestroyActor(AActor* Actor)
 	FString ActorName = Actor->GetName();
 	uint32 ActorUUID = Actor->GetUUID();
 
+	// 5. 프록시 제거
+	for (UActorComponent* Component : Actor->GetComponents())
+	{
+		if (UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Component))
+		{
+			Scene.RemovePrimitive(Primitive);
+		}
+	}
+
+	Actor->RegisterAllActorTickFunctions(false);
+
 	// 6. Actor 삭제
 	delete Actor;
 
