@@ -563,44 +563,11 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 	float NearestT = std::numeric_limits<float>::max();
 
 	const auto TraceComponent = [&](FPrimitiveSceneProxy* Proxy, float& InOutNearestT)
+	{
+		if (UStaticMesh* Mesh = Proxy ? Proxy->GetMesh() : nullptr)
 		{
-			UPrimitiveComponent* Component = Proxy ? Proxy->GetComponent() : nullptr;
-
-			if (!Component || !Component->IsVisible())
+			if (!Proxy->IsVisible())
 				return false;
-
-			if (UBillboardComponent* Billboard = Cast<UBillboardComponent>(Component))
-			{
-				if (!ResolveBillboard)
-				{
-					FHitResult Hit;
-					if (!Billboard->LineTraceComponent(WorldRay, Hit) ||
-						Hit.Distance >= InOutNearestT)
-					{
-						return false;
-					}
-
-					OutHit = Hit;
-					InOutNearestT = Hit.Distance;
-					return true;
-				}
-
-				const FMatrix BillboardToWorld = ResolveBillboard(*Billboard, ViewContext);
-
-				const FRay LocalRay = ToLocalRay(WorldRay, BillboardToWorld);
-
-				float T = InOutNearestT;
-				if (!Billboard->LineTraceComponentLocal(LocalRay, T))
-				{
-					return false;
-				}
-
-				OutHit.HitComponent = Billboard;
-				OutHit.Distance = T;
-				OutHit.ImpactPoint = WorldRay.Origin + WorldRay.Direction * T;
-				InOutNearestT = T;
-				return true;
-			}
 
 			const FMatrix& WorldToLocal = Proxy->GetWorldToLocal();
 			const FRay LocalRay{
@@ -609,17 +576,72 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 			};
 
 			float T = InOutNearestT;
-			if (!Component->LineTraceComponentLocal(LocalRay, T))
-			{
+			if (!RayIntersectsMesh(LocalRay, Mesh->GetMeshData(), T))
 				return false;
-			}
 
-			OutHit.HitComponent = Component;
+			OutHit.HitComponent = Proxy->GetComponent();
 			OutHit.Distance = T;
 			OutHit.ImpactPoint = WorldRay.Origin + WorldRay.Direction * T;
 			InOutNearestT = T;
 			return true;
+		}
+
+		UPrimitiveComponent* Component = Proxy ? Proxy->GetComponent() : nullptr;
+
+		if (!Component || !Component->IsVisible())
+			return false;
+
+		if (UBillboardComponent* Billboard = Cast<UBillboardComponent>(Component))
+		{
+			if (!ResolveBillboard)
+			{
+				FHitResult Hit;
+				if (!Billboard->LineTraceComponent(WorldRay, Hit) ||
+					Hit.Distance >= InOutNearestT)
+				{
+					return false;
+				}
+
+				OutHit = Hit;
+				InOutNearestT = Hit.Distance;
+				return true;
+			}
+
+			const FMatrix BillboardToWorld = ResolveBillboard(*Billboard, ViewContext);
+
+			const FRay LocalRay = ToLocalRay(WorldRay, BillboardToWorld);
+
+			float T = InOutNearestT;
+			if (!Billboard->LineTraceComponentLocal(LocalRay, T))
+			{
+				return false;
+			}
+
+			OutHit.HitComponent = Billboard;
+			OutHit.Distance = T;
+			OutHit.ImpactPoint = WorldRay.Origin + WorldRay.Direction * T;
+			InOutNearestT = T;
+			return true;
+		}
+
+		const FMatrix& WorldToLocal = Proxy->GetWorldToLocal();
+		const FRay LocalRay{
+			.Origin = WorldToLocal.TransformPosition(WorldRay.Origin),
+			.Direction = WorldToLocal.TransformVector(WorldRay.Direction)
 		};
+
+		float T = InOutNearestT;
+		if (!Component->LineTraceComponentLocal(LocalRay, T))
+		{
+			return false;
+		}
+
+		OutHit.HitComponent = Component;
+		OutHit.Distance = T;
+		OutHit.ImpactPoint = WorldRay.Origin + WorldRay.Direction * T;
+		InOutNearestT = T;
+		return true;
+	};
 
 	const FPreparedRay PreparedRay(WorldRay);
 

@@ -36,22 +36,29 @@ public:
 	void Clear();
 
 private:
-	struct FNode
+	static constexpr uint32 InvalidIndex = std::numeric_limits<uint32>::max();
+	static constexpr uint32 MaxDepth = 32;
+	static constexpr uint32 MinSplitSize = 2;
+	static constexpr uint32 BinCount = 16;
+	static constexpr uint32 PrefetchLevels = 4;
+
+	struct FSlot
 	{
-		FBox Bounds;
-
-		uint32 LeftChild = InvalidIndex;
-		uint32 RightChild = InvalidIndex;
-
-		uint32 FirstElement = 0;
-		uint32 ElementCount = 0;
-		// Partition이 원소를 제자리에서 나누므로 하위 트리 원소는 [FirstElement, FirstElement + SubtreeCount)에 연속한다.
-		uint32 SubtreeCount = 0;
+		uint32 Child = InvalidIndex;
+		uint32 Count = 0;
 
 		bool IsLeaf() const
 		{
-			return LeftChild == InvalidIndex;
+			return Child == InvalidIndex;
 		}
+	};
+
+	struct alignas(64) FNode
+	{
+		FBox LeftBounds;
+		FBox RightBounds;
+		FSlot Left;
+		FSlot Right;
 	};
 
 	struct FElement
@@ -67,40 +74,52 @@ private:
 		float Cost = std::numeric_limits<float>::max();
 	};
 
+	struct FQueryEntry
+	{
+		uint32 Node;
+		uint32 First;
+		uint32 Count;
+	};
+
 	struct FStackEntry
 	{
-		uint32 Index;
+		uint32 Node;
+		uint32 First;
+		uint32 Count;
 		float EnterT;
 	};
 
 	struct FCullStackEntry
 	{
-		uint32 Index;
+		uint32 Node;
+		uint32 First;
 		uint32 Mask;
 	};
 
-	static constexpr uint32 InvalidIndex = std::numeric_limits<uint32>::max();
-	static constexpr uint32 MaxDepth = 32;
-	static constexpr uint32 MinSplitSize = 2;
-	static constexpr uint32 BinCount = 16;
-
-	uint32 BuildNode(uint32 First, uint32 Count, uint32 Depth);
+	FSlot BuildNode(uint32 First, uint32 Count, uint32 Depth, FBox& OutBounds);
 	FBox ComputeBounds(uint32 First, uint32 Count) const;
 	FSplit FindBestSplit(uint32 First, uint32 Count, const FBox& Bounds) const;
 	uint32 Partition(uint32 First, uint32 Count, int32 Axis, float Position);
 
-	FBox RefitNode(uint32 Index);
+	FBox RefitSlot(const FSlot& Slot, uint32 First);
 
 	static float SurfaceArea(const FBox& Box);
+
+	void CollectPrefetchNodes();
 
 	FBoundsGetter BoundsGetter;
 
 	TArray<FNode> Nodes;
 	TArray<FElement> Elements;
 
-	mutable TArray<uint32> QueryStack;
+	FSlot Root;
+	FBox RootBounds;
+
+	mutable TArray<FQueryEntry> QueryStack;
 	mutable TArray<FStackEntry> TraceStack;
 	mutable TArray<FCullStackEntry> CullStack;
+
+	TArray<uint32> PrefetchNodes;
 };
 
 template <typename T>
@@ -118,62 +137,58 @@ void TBVH<T>::Build(std::span<T const> InElements)
 		Elements.Emplace(Element, BoundsGetter(Element));
 	}
 
-	BuildNode(0, static_cast<uint32>(Elements.size()), 0);
+	Root = BuildNode(0, static_cast<uint32>(Elements.size()), 0, RootBounds);
+
+	CollectPrefetchNodes();
 }
 
 template <typename T>
 void TBVH<T>::Refit()
 {
-	if (Nodes.IsEmpty())
+	if (Elements.IsEmpty())
 	{
 		return;
 	}
-	RefitNode(0);
+	RootBounds = RefitSlot(Root, 0);
 }
 
 template <typename T>
 template <typename TBoundsPredicate, typename TVisitor>
 void TBVH<T>::Query(TBoundsPredicate&& BoundsTest, TVisitor&& Visitor) const
 {
-	if (Nodes.IsEmpty())
+	if (Elements.IsEmpty() || !BoundsTest(RootBounds))
 	{
 		return;
 	}
 
-	QueryStack.Add(0);
+	QueryStack.Reset();
+	QueryStack.Add({ Root.Child, 0, Root.Count });
 	while (!QueryStack.IsEmpty())
 	{
-		const uint32 Index = QueryStack.Last();
+		const FQueryEntry Entry = QueryStack.Last();
 		QueryStack.RemoveLast();
 
-		const FNode& Node = Nodes[Index];
-
-		if (!BoundsTest(Node.Bounds))
+		if (Entry.Node == InvalidIndex)
 		{
-			continue;
-		}
-
-		if (Node.IsLeaf())
-		{
-			for (uint32 i = 0; i < Node.ElementCount; ++i)
+			for (uint32 i = Entry.First; i < Entry.First + Entry.Count; ++i)
 			{
-				const FElement& Element = Elements[Node.FirstElement + i];
+				const FElement& Element = Elements[i];
 				if (BoundsTest(Element.Bounds))
 				{
 					Visitor(Element.Value);
 				}
 			}
+			continue;
 		}
-		else
+
+		const FNode& Node = Nodes[Entry.Node];
+		if (BoundsTest(Node.LeftBounds))
 		{
-			if (Node.LeftChild != InvalidIndex)
-			{
-				QueryStack.Add(Node.LeftChild);
-			}
-			if (Node.RightChild != InvalidIndex)
-			{
-				QueryStack.Add(Node.RightChild);
-			}
+			QueryStack.Add({ Node.Left.Child, Entry.First, Node.Left.Count });
+		}
+		if (BoundsTest(Node.RightBounds))
+		{
+			QueryStack.Add({ Node.Right.Child, Entry.First + Node.Left.Count, Node.Right.Count });
 		}
 	}
 }
@@ -182,61 +197,58 @@ template <typename T>
 template <typename TClassify, typename TVisitor>
 void TBVH<T>::QueryCull(uint32 InitialMask, TClassify&& Classify, TVisitor&& Visitor) const
 {
-	if (Nodes.IsEmpty())
+	if (Elements.IsEmpty())
 	{
 		return;
 	}
 
-	CullStack.Reset();
-	CullStack.Add({ 0, InitialMask });
-	while (!CullStack.IsEmpty())
+	const auto VisitChild = [&](const FBox& Bounds, const FSlot& Slot, uint32 First, uint32 ParentMask)
 	{
-		const FCullStackEntry Entry = CullStack.Last();
-		CullStack.RemoveLast();
-
-		const FNode& Node = Nodes[Entry.Index];
-
-		uint32 Mask = Entry.Mask;
-		const EBVHCullResult Result = Mask ? Classify(Node.Bounds, Mask) : EBVHCullResult::Inside;
+		uint32 Mask = ParentMask;
+		const EBVHCullResult Result = Mask ? Classify(Bounds, Mask) : EBVHCullResult::Inside;
 		if (Result == EBVHCullResult::Outside)
 		{
-			continue;
+			return;
 		}
 
 		if (Result == EBVHCullResult::Inside)
 		{
-			// 완전히 안쪽인 노드는 하위 원소를 개별 검사 없이 모두 방문한다.
-			const uint32 End = Node.FirstElement + Node.SubtreeCount;
-			for (uint32 i = Node.FirstElement; i < End; ++i)
+			const uint32 End = First + Slot.Count;
+			for (uint32 i = First; i < End; ++i)
 			{
 				Visitor(Elements[i].Value);
 			}
-			continue;
+			return;
 		}
 
-		if (Node.IsLeaf())
+		if (Slot.IsLeaf())
 		{
-			for (uint32 i = 0; i < Node.ElementCount; ++i)
+			const uint32 End = First + Slot.Count;
+			for (uint32 i = First; i < End; ++i)
 			{
-				const FElement& Element = Elements[Node.FirstElement + i];
+				const FElement& Element = Elements[i];
 				uint32 ElementMask = Mask;
 				if (Classify(Element.Bounds, ElementMask) != EBVHCullResult::Outside)
 				{
 					Visitor(Element.Value);
 				}
 			}
+			return;
 		}
-		else
-		{
-			if (Node.LeftChild != InvalidIndex)
-			{
-				CullStack.Add({ Node.LeftChild, Mask });
-			}
-			if (Node.RightChild != InvalidIndex)
-			{
-				CullStack.Add({ Node.RightChild, Mask });
-			}
-		}
+
+		CullStack.Add({ Slot.Child, First, Mask });
+	};
+
+	CullStack.Reset();
+	VisitChild(RootBounds, Root, 0, InitialMask);
+	while (!CullStack.IsEmpty())
+	{
+		const FCullStackEntry Entry = CullStack.Last();
+		CullStack.RemoveLast();
+
+		const FNode& Node = Nodes[Entry.Node];
+		VisitChild(Node.LeftBounds, Node.Left, Entry.First, Entry.Mask);
+		VisitChild(Node.RightBounds, Node.Right, Entry.First + Node.Left.Count, Entry.Mask);
 	}
 }
 
@@ -244,18 +256,25 @@ template <typename T>
 template <typename TBoundsTrace, typename TLeafTrace>
 bool TBVH<T>::TraceClosest(TBoundsTrace&& BoundsTrace, TLeafTrace&& LeafTrace, float& OutNearestT) const
 {
-	if (Nodes.IsEmpty())
+	if (Elements.IsEmpty())
 	{
 		return false;
 	}
 
 	float RootEnterT;
-	if (!BoundsTrace(Nodes[0].Bounds, RootEnterT) || RootEnterT >= OutNearestT)
+	if (!BoundsTrace(RootBounds, RootEnterT) || RootEnterT >= OutNearestT)
 	{
 		return false;
 	}
 
-	TraceStack.Add({ 0, RootEnterT });
+	const FNode* NodeBase = Nodes.GetData();
+	for (uint32 Index : PrefetchNodes)
+	{
+		_mm_prefetch(reinterpret_cast<const char*>(NodeBase + Index), _MM_HINT_T0);
+	}
+
+	TraceStack.Reset();
+	TraceStack.Add({ Root.Child, 0, Root.Count, RootEnterT });
 
 	bool bHit = false;
 	while (!TraceStack.IsEmpty())
@@ -268,13 +287,12 @@ bool TBVH<T>::TraceClosest(TBoundsTrace&& BoundsTrace, TLeafTrace&& LeafTrace, f
 			continue;
 		}
 
-		const FNode& Node = Nodes[Entry.Index];
-
-		if (Node.IsLeaf())
+		if (Entry.Node == InvalidIndex)
 		{
-			for (uint32 i = 0; i < Node.ElementCount; ++i)
+			const uint32 End = Entry.First + Entry.Count;
+			for (uint32 i = Entry.First; i < End; ++i)
 			{
-				const FElement& Element = Elements[Node.FirstElement + i];
+				const FElement& Element = Elements[i];
 
 				float ElementEnterT;
 				if (!BoundsTrace(Element.Bounds, ElementEnterT) || ElementEnterT >= OutNearestT)
@@ -284,40 +302,41 @@ bool TBVH<T>::TraceClosest(TBoundsTrace&& BoundsTrace, TLeafTrace&& LeafTrace, f
 
 				bHit |= LeafTrace(Element.Value, OutNearestT);
 			}
+			continue;
 		}
-		else
+
+		const FNode& Node = Nodes[Entry.Node];
+		const uint32 RightFirst = Entry.First + Node.Left.Count;
+
+		float LeftEnterT;
+		const bool bLeftHit = BoundsTrace(Node.LeftBounds, LeftEnterT) && LeftEnterT < OutNearestT;
+
+		float RightEnterT;
+		const bool bRightHit = BoundsTrace(Node.RightBounds, RightEnterT) && RightEnterT < OutNearestT;
+
+		const FStackEntry LeftEntry{ Node.Left.Child, Entry.First, Node.Left.Count, LeftEnterT };
+		const FStackEntry RightEntry{ Node.Right.Child, RightFirst, Node.Right.Count, RightEnterT };
+
+		if (bLeftHit && bRightHit)
 		{
-			float LeftEnterT = std::numeric_limits<float>::max();
-			const bool bLeftHit = Node.LeftChild != InvalidIndex && 
-				BoundsTrace(Nodes[Node.LeftChild].Bounds, LeftEnterT) &&
-				LeftEnterT < OutNearestT;
-
-			float RightEnterT;
-			const bool bRightHit = Node.RightChild != InvalidIndex &&
-				BoundsTrace(Nodes[Node.RightChild].Bounds, RightEnterT) &&
-				RightEnterT < OutNearestT;
-
-			if (bLeftHit && bRightHit)
+			if (LeftEnterT < RightEnterT)
 			{
-				if (LeftEnterT < RightEnterT)
-				{
-					TraceStack.Add({ Node.RightChild, RightEnterT });
-					TraceStack.Add({ Node.LeftChild, LeftEnterT });
-				}
-				else
-				{
-					TraceStack.Add({ Node.LeftChild, LeftEnterT });
-					TraceStack.Add({ Node.RightChild, RightEnterT });
-				}
+				TraceStack.Add(RightEntry);
+				TraceStack.Add(LeftEntry);
 			}
-			else if (bLeftHit)
+			else
 			{
-				TraceStack.Add({ Node.LeftChild, LeftEnterT });
+				TraceStack.Add(LeftEntry);
+				TraceStack.Add(RightEntry);
 			}
-			else if (bRightHit)
-			{
-				TraceStack.Add({ Node.RightChild, RightEnterT });
-			}
+		}
+		else if (bLeftHit)
+		{
+			TraceStack.Add(LeftEntry);
+		}
+		else if (bRightHit)
+		{
+			TraceStack.Add(RightEntry);
 		}
 	}
 
@@ -329,47 +348,47 @@ void TBVH<T>::Clear()
 {
 	Nodes.Reset();
 	Elements.Reset();
+	Root = FSlot{};
+	RootBounds = FBox{};
 }
 
 template <typename T>
-uint32 TBVH<T>::BuildNode(uint32 First, uint32 Count, uint32 Depth)
+typename TBVH<T>::FSlot TBVH<T>::BuildNode(uint32 First, uint32 Count, uint32 Depth, FBox& OutBounds)
 {
-	const uint32 Index = static_cast<uint32>(Nodes.Num());
-	Nodes.Emplace();
-
-	FNode& Node = Nodes[Index];
-
-	Node.FirstElement = First;
-	Node.ElementCount = Count;
-	Node.SubtreeCount = Count;
-	Node.Bounds = ComputeBounds(First, Count);
+	OutBounds = ComputeBounds(First, Count);
 
 	if (Count <= MinSplitSize || Depth >= MaxDepth)
 	{
-		return Index;
+		return FSlot{ InvalidIndex, Count };
 	}
 
-	const FSplit Split = FindBestSplit(First, Count, Node.Bounds);
+	const FSplit Split = FindBestSplit(First, Count, OutBounds);
 	if (Split.Axis == -1 || Split.Cost >= static_cast<float>(Count)) // 분할 후의 비용이 더 크다고 보이는 경우
 	{
-		return Index;
+		return FSlot{ InvalidIndex, Count };
 	}
 
 	const uint32 Middle = Partition(First, Count, Split.Axis, Split.Position);
 	if (Middle == First || Middle == First + Count)
 	{
-		return Index;
+		return FSlot{ InvalidIndex, Count };
 	}
 
-	const uint32 LeftChild = BuildNode(First, Middle - First, Depth + 1);
-	const uint32 RightChild = BuildNode(Middle, First + Count - Middle, Depth + 1);
+	const uint32 Index = static_cast<uint32>(Nodes.Num());
+	Nodes.Emplace();
 
-	FNode& FinalNode = Nodes[Index]; // Nodes가 변경되어 참조가 무효화되는 경우 방지
-	FinalNode.LeftChild = LeftChild;
-	FinalNode.RightChild = RightChild;
-	FinalNode.ElementCount = 0;
+	FBox LeftBounds;
+	FBox RightBounds;
+	const FSlot Left = BuildNode(First, Middle - First, Depth + 1, LeftBounds);
+	const FSlot Right = BuildNode(Middle, First + Count - Middle, Depth + 1, RightBounds);
 
-	return Index;
+	FNode& Node = Nodes[Index]; // 재귀 중 Nodes가 재할당되어 참조가 무효화되는 경우 방지
+	Node.LeftBounds = LeftBounds;
+	Node.RightBounds = RightBounds;
+	Node.Left = Left;
+	Node.Right = Right;
+
+	return FSlot{ Index, Count };
 }
 
 template <typename T>
@@ -494,35 +513,28 @@ uint32 TBVH<T>::Partition(uint32 First, uint32 Count, int32 Axis, float Position
 }
 
 template <typename T>
-FBox TBVH<T>::RefitNode(uint32 Index)
+FBox TBVH<T>::RefitSlot(const FSlot& Slot, uint32 First)
 {
-	FNode& Node = Nodes[Index];
-
-	if (Node.IsLeaf())
+	if (Slot.IsLeaf())
 	{
-		FBox Bounds = FBox{FVector{std::numeric_limits<float>::max()}, FVector{std::numeric_limits<float>::lowest()}};
+		FBox Bounds = FBox{ FVector{ std::numeric_limits<float>::max() }, FVector{ std::numeric_limits<float>::lowest() } };
 
-		for (uint32 i = 0; i < Node.ElementCount; ++i)
+		for (uint32 i = First; i < First + Slot.Count; ++i)
 		{
-			FElement& Element = Elements[Node.FirstElement + i];
+			FElement& Element = Elements[i];
 			Element.Bounds = BoundsGetter(Element.Value);
 			Bounds.Expand(Element.Bounds);
 		}
-		Node.Bounds = Bounds;
 		return Bounds;
 	}
-	
-	Node.Bounds = FBox{ FVector{std::numeric_limits<float>::max()}, FVector{std::numeric_limits<float>::lowest()} };
-	if (Node.LeftChild != InvalidIndex)
-	{
-		Node.Bounds.Expand(RefitNode(Node.LeftChild));
-	}
-	if (Node.RightChild != InvalidIndex)
-	{
-		Node.Bounds.Expand(RefitNode(Node.RightChild));
-	}
 
-	return Node.Bounds;
+	FNode& Node = Nodes[Slot.Child];
+	Node.LeftBounds = RefitSlot(Node.Left, First);
+	Node.RightBounds = RefitSlot(Node.Right, First + Node.Left.Count);
+
+	FBox Bounds = Node.LeftBounds;
+	Bounds.Expand(Node.RightBounds);
+	return Bounds;
 }
 
 template <typename T>
@@ -530,4 +542,29 @@ float TBVH<T>::SurfaceArea(const FBox& Box)
 {
 	const FVector Size = Box.Max - Box.Min;
 	return 2.0f * (Size.X * Size.Y + Size.Y * Size.Z + Size.Z * Size.X);
+}
+
+template <typename T>
+void TBVH<T>::CollectPrefetchNodes()
+{
+	PrefetchNodes.Reset();
+	if (Root.IsLeaf())
+		return;
+
+	TArray<uint32> Level;
+	Level.Add(Root.Child);
+	for (uint32 Depth = 0; Depth < PrefetchLevels && !Level.IsEmpty(); ++Depth)
+	{
+		TArray<uint32> NextLevel;
+		for (uint32 NodeIndex : Level)
+		{
+			const FNode& Node = Nodes[NodeIndex];
+			if (!Node.Left.IsLeaf())
+				NextLevel.Add(Node.Left.Child);
+			if (!Node.Right.IsLeaf())
+				NextLevel.Add(Node.Right.Child);
+		}
+		PrefetchNodes.Append(NextLevel);
+		Level = std::move(NextLevel);
+	}
 }
