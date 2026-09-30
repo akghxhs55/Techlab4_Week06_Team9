@@ -286,6 +286,7 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 
 	// LOD에 카메라 정보 저장
 	FLODViewContext LODView{ Width, Height };
+	LODView.ViewProjection = ViewProjection;
 	LODView.CameraPosition = Camera->GetWorldLocation();
 	LODView.CameraForward = Camera->GetWorldRotation()
 		.Quaternion()

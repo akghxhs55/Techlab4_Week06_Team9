@@ -56,7 +56,7 @@ public:
 
 	void ClearWorld();
 
-	void GatherRenderPackets(TArray<FRenderPacket>& RenderArray, const FLODViewContext* LODView = nullptr, const FFrustumPlanes* Frustum = nullptr, FRenderer* Renderer = nullptr);
+	void GatherRenderPackets(FRenderQueue& RenderArray, const FLODViewContext* LODView = nullptr, const FFrustumPlanes* Frustum = nullptr, FRenderer* Renderer = nullptr);
 
 	void CreateMainCamera();
 

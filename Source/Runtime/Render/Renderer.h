@@ -88,6 +88,7 @@ private:
 	TUniquePtr<FConstantBuffer> PerObjectSlotCB;
 	uint32 PerObjectSlotCapacity = 0;
 	bool bUsePerObjectSlots = false;
+	bool bObjectConstantsPrepared = false;
 	UMaterial* LastMaterial;
 	UStaticMesh* LastMesh;
 
@@ -107,6 +108,7 @@ private:
 	void UpdateMaterialParams(const FRenderPacket& RenderPacket);
 	void UpdatePerObjectConstants(const FRenderPacket& RenderPacket, const FMatrix& ViewProjection);
 	void EnsurePerObjectSlotCapacity(uint32 SlotCount);
+	void UploadPerObjectConstants();
 
 	TArray<FSortEntry> SortEntries;
 };

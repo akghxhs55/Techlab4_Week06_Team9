@@ -28,6 +28,7 @@ namespace
 {
 	// 셰이더 폴더의 .hlsl은 전부 VS/PS로 자동 컴파일되므로 컴퓨트 셰이더는 소스를 여기에 둔다.
 	constexpr char OcclusionShaderSource[] = R"(
+#pragma pack_matrix(row_major)
 // ---------- Hi-Z 만들기: 밉 L 텍셀 = 밉 L-1의 해당 영역 중 가장 먼 깊이 ----------
 cbuffer HiZParams : register(b0)
 {
@@ -59,7 +60,7 @@ void BuildHiZ(uint3 Id : SV_DispatchThreadID)
 // ---------- 물체별 AABB 판정 ----------
 cbuffer CullParams : register(b1)
 {
-	matrix ViewProjection;     // 다른 셰이더와 같이 전치해서 올리고 mul(p, VP)로 쓴다
+	matrix ViewProjection;     // CPU row-major 데이터를 그대로 사용한다
 	float2 ScreenSize;
 	uint NumItems;
 	uint Padding;
@@ -528,7 +529,7 @@ void FGPUOcclusion::DrawOccluders(const FPrimitiveSceneProxy* const* Proxies, co
 
 		if (bAnyOpaque)
 		{
-			std::memcpy(Slots + size_t(Selected) * ObjectSlotBytes, &Proxy->GetLocalToWorldTransposed(), sizeof(FMatrix));
+			std::memcpy(Slots + size_t(Selected) * ObjectSlotBytes, &Proxy->GetLocalToWorld(), sizeof(FMatrix));
 			++Selected;
 		}
 	}
@@ -538,8 +539,7 @@ void FGPUOcclusion::DrawOccluders(const FPrimitiveSceneProxy* const* Proxies, co
 
 	SCOPE_CYCLE_COUNTER(STAT_GPUOcclusionDraw);
 
-	const FMatrix ViewProjectionT = View.ViewProjection.GetTransposed();
-	Context->UpdateSubresource(ViewCB.Get(), 0, nullptr, &ViewProjectionT, 0, 0);
+	Context->UpdateSubresource(ViewCB.Get(), 0, nullptr, &View.ViewProjection, 0, 0);
 
 	Context->OMSetRenderTargets(0, nullptr, OccluderDSV.Get());   // 색 없이 깊이만
 	const D3D11_VIEWPORT Viewport{ 0.0f, 0.0f, static_cast<float>(TargetWidth), static_cast<float>(TargetHeight), 0.0f, 1.0f };
@@ -607,7 +607,7 @@ void FGPUOcclusion::Cull(const FMatrix& ViewProjection, uint32 Count)
 	ID3D11DeviceContext* Context = RenderCommand::GetContext();
 
 	FCullParams Params;
-	Params.ViewProjection = ViewProjection.GetTransposed();
+	Params.ViewProjection = ViewProjection;
 	Params.ScreenSize[0] = static_cast<float>(TargetWidth);
 	Params.ScreenSize[1] = static_cast<float>(TargetHeight);
 	Params.NumItems = Count;

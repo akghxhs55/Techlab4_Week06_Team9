@@ -12,6 +12,7 @@ struct FLODViewContext
     float NearZ = 0.0f;
     bool bOrthographic = false;
     float CameraDepth = 0.0f;
+    FMatrix ViewProjection; // Current view used by the GPU occlusion pass.
 
     void Prepare()
     {

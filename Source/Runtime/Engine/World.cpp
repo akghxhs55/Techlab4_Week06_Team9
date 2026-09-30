@@ -147,7 +147,7 @@ void UWorld::ClearWorld()
 	HTR_LOG(Info, "{} : ", PersistentLevel->GetActorNum());
 }
 
-void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODViewContext* LODView, const FFrustumPlanes* Frustum, FRenderer* Renderer)
+void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FLODViewContext* LODView, const FFrustumPlanes* Frustum, FRenderer* Renderer)
 {
 
 
@@ -230,7 +230,7 @@ void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODV
 	}
 
 	// Renderer가 있으면 불투명 스태틱 메시는 패킷 대신 조각별 묶음에 작은 항목으로 넣는다.
-	// (패킷 128B를 만들고 → RenderQueue로 복사하고 → 5만 개를 정렬하던 과정이 없어진다.)
+	// 동일 바인딩의 개별 드로우를 묶어 패킷 복사와 항목별 정렬을 줄인다.
 	const bool bStaticGroups = Renderer != nullptr;
 	if (Renderer)
 		Renderer->ResetStaticDrawGroups();
@@ -238,9 +238,6 @@ void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODV
 	{
 		SCOPE_CYCLE_COUNTER(STAT_GatherElements);
 
-		Pool.ParallelFor(VisibleCount, ChunkCount, [&](uint32 Begin, uint32 End, uint32 ChunkIndex)
-			{
-				FGatherChunk& Out = GatherChunks[ChunkIndex];      // 이 조각 전용. 다른 스레드는 절대 안 건드림
         LODInputs.Reset();
         if (LODView)
         {
@@ -249,11 +246,9 @@ void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODV
                 LODInputs.Add({Proxy->GetLODSphere(), Proxy->GetRenderState()});
             SelectLODs(LODInputs, *LODView, SelectedLODs);
         }
-        for (uint32 ProxyIndex = 0; ProxyIndex < static_cast<uint32>(VisibleProxies.Num()); ++ProxyIndex)
-        {
-            FPrimitiveSceneProxy* Proxy = VisibleProxies[ProxyIndex];
-			if (!Proxy->IsVisible())continue;
-
+		Pool.ParallelFor(VisibleCount, ChunkCount, [&](uint32 Begin, uint32 End, uint32 ChunkIndex)
+			{
+				FGatherChunk& Out = GatherChunks[ChunkIndex];      // 이 조각 전용. 다른 스레드는 절대 안 건드림
 				// (머티리얼, 메시, LOD) 묶음 찾기. 조합이 몇 개뿐이라 선형 탐색이면 충분하고, 바로 전 묶음을 먼저 본다.
 				const auto FindGroup = [&Out](UMaterial* Material, UStaticMesh* Mesh, uint8 LOD) -> FStaticDrawGroup&
 					{
@@ -292,7 +287,7 @@ void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODV
 						continue;
 					}
 
-					const uint32 LOD = LODView ? SelectLOD(*Proxy, *LODView) : 0;
+					const uint32 LOD = LODView ? SelectedLODs[VisibleIndex] : 0;
 					const FCachedMeshLOD& CachedLOD = Proxy->GetLOD(LOD);
 					++Out.LODCounts[LOD];                          // RenderStats 대신 조각 전용 통계
 
@@ -301,7 +296,7 @@ void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODV
 					{
 						// 칸 VisibleIndex는 이 반복만 쓴다 → 스레드끼리 겹치지 않음
 						std::memcpy(SlotDest + size_t(VisibleIndex) * ObjectSlotBytes,
-							&Proxy->GetLocalToWorldTransposed(), sizeof(FMatrix));
+							&Proxy->GetLocalToWorld(), sizeof(FMatrix));
 						Slot = VisibleIndex;
 					}
 
@@ -369,7 +364,7 @@ void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODV
 				UStaticMeshComponent* StaticMeshComponent = LODView ? Cast<UStaticMeshComponent>(Primitive) : nullptr;
 				if (StaticMeshComponent && StaticMeshComponent->GetStaticMesh())
 				{
-					const uint32 LOD = SelectStaticMeshLOD(*StaticMeshComponent->GetStaticMesh(), Proxy->GetBounds(), *LODView);
+					const uint32 LOD = SelectedLODs[VisibleIndex];
 					StaticMeshComponent->SubmitToRenderQueue(RenderQueue, LOD);
 				}
 				else
@@ -382,9 +377,8 @@ void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderQueue, const FLODV
 				{
 					if (!SlotDest || NextExtraSlot >= MaxSlots) break;
 					FRenderPacket& Packet = RenderQueue[p];
-					const FMatrix& Model = Packet.Proxy ? Packet.Proxy->GetLocalToWorld() : Packet.model;
-					const FMatrix Transposed = Model.GetTransposed();
-					std::memcpy(SlotDest + size_t(NextExtraSlot) * ObjectSlotBytes, &Transposed, sizeof(FMatrix));
+					const FMatrix& Model = Packet.Proxy ? Packet.Proxy->GetLocalToWorld() : Packet.Model ? *Packet.Model : FMatrix::Identity;
+					std::memcpy(SlotDest + size_t(NextExtraSlot) * ObjectSlotBytes, &Model, sizeof(FMatrix));
 					Packet.Slot = NextExtraSlot++;
 				}
 			}

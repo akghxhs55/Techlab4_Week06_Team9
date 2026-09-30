@@ -642,6 +642,7 @@ void FMultipleViewportsAdapter::BuildRenderQueue(const int32 ViewIndex, FRenderQ
         static_cast<uint32>(Rect.Height)
     };
     LODContext.CameraPosition = GetEngineCameraLocation(ViewIndex);
+    LODContext.ViewProjection = GetEngineViewProjection(ViewIndex);
     LODContext.CameraForward = GetEngineCameraForward(ViewIndex);
     LODContext.ProjectionScaleSquared = std::max(ScaleX * ScaleX, ScaleY * ScaleY);
     LODContext.NearZ = ViewCamera.Projection.NearClip;

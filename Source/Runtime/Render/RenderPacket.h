@@ -22,6 +22,25 @@ struct FRenderPacket
     uint32 IndexCount = 0; // Zero selects the full index buffer.
     uint32 Slot = InvalidObjectSlot;
     uint8 LODIndex = 0;
+    bool bOccludedByGpu = false;
+};
+
+// Shared bindings, with one ordinary indexed draw per item.
+struct FStaticDrawItem
+{
+    const FPrimitiveSceneProxy* Proxy;
+    uint32 Slot;
+    uint32 StartIndex;
+    uint32 IndexCount;
+    uint32 bOccludedByGpu;
+};
+
+struct FStaticDrawGroup
+{
+    UMaterial* Material = nullptr;
+    UStaticMesh* Mesh = nullptr;
+    uint8 LODIndex = 0;
+    std::vector<FStaticDrawItem> Items;
 };
 
 // Owns the current frame's billboard/particle matrices together with their packets.
