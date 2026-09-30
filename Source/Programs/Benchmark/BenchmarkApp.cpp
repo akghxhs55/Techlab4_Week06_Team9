@@ -66,14 +66,16 @@ bool UBenchmarkEngine::Init()
 		{
 			const FLODGenerateResult Report = UAssetManager::Get().GenerateStaticMeshLODs(*Asset, Request);
 			const FString Diagnostics = std::format(
-				"[Benchmark] {}: LOD {}. target={}/{}/{}/{}, actual={}/{}/{}/{}, feature={}, topology={}, flips={}, reason={}\n",
+				"[Benchmark] {}: LOD {}. target={}/{}/{}/{}, actual={}/{}/{}/{}, volume={:.3f}/{:.3f}/{:.3f}/{:.3f}, feature={}, topology={}, flips={}, error={}, reason={}\n",
 				Asset->GetPath(), Report.bSuccess ? "OK" : "FAILED",
 				Report.TargetTriangles[0], Report.TargetTriangles[1],
 				Report.TargetTriangles[2], Report.TargetTriangles[3],
 				Report.ActualTriangles[0], Report.ActualTriangles[1],
 				Report.ActualTriangles[2], Report.ActualTriangles[3],
+				Report.VolumeRatio[0], Report.VolumeRatio[1],
+				Report.VolumeRatio[2], Report.VolumeRatio[3],
 				Report.RejectedFeatureEdges, Report.RejectedTopology,
-				Report.RejectedFlips, Report.FailureReason);
+				Report.RejectedFlips, Report.RejectedError, Report.FailureReason);
 			OutputDebugStringA(Diagnostics.c_str());
 
 			if (!Report.bSuccess)

@@ -18,9 +18,13 @@ struct FLODGenerateResult
 	uint32 TargetTriangles[4]{};
 	uint32 ActualTriangles[4]{};
 
+	// LOD0 대비 부피 비율. 1보다 많이 작으면 단순화하면서 메시가 쪼그라든 것이다.
+	float VolumeRatio[4]{ 1.0f, 1.0f, 1.0f, 1.0f };
+
 	uint32 RejectedFeatureEdges = 0;
 	uint32 RejectedTopology = 0;
 	uint32 RejectedFlips = 0;
+	uint32 RejectedError = 0;   // LOD별 허용 오차를 넘어 건너뛴 collapse 수
 
 	FString FailureReason;
 };

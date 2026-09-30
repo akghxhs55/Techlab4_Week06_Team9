@@ -20,14 +20,23 @@ namespace
         1.0, 0.7, 0.25, 0.1
     };
 
+    // LOD0 AABB 대각선 대비 허용 오차(평면까지의 RMS 거리). 이보다 크게 형태를 바꾸는 collapse는
+    // 목표 삼각형 수에 못 미치더라도 하지 않는다. 목표를 억지로 맞추면 면이 통째로 꺼진다.
+    constexpr double MaxErrorRatios[4] = {
+        0.0, 0.005, 0.01, 0.025
+    };
+
     struct FQuadric
     {
         double M[4][4]{};
+        // 누적된 평면 수. Evaluate(p) / Weight가 평면까지의 평균 제곱 거리다.
+        double Weight = 0.0;
 
         // 평면 n.x*x + n.y*y + n.z*z + d = 0의 오차를 더한다.
         // Q += [nx, ny, nz, d]^T * [nx, ny, nz, d]
         void AddPlane(const FVector& Normal, double D)
         {
+            Weight += 1.0;
             const double Plane[4] = {
                 Normal.X, Normal.Y, Normal.Z, D
             };
@@ -43,6 +52,7 @@ namespace
 
         FQuadric& operator+=(const FQuadric& Other)
         {
+            Weight += Other.Weight;
             for (int I = 0; I < 4; ++I)
             {
                 for (int J = 0; J < 4; ++J)
@@ -261,10 +271,19 @@ namespace
         // 삼각형의 edge로 연결된 정점 ID
         std::unordered_set<uint32> Neighbors;
 
+        // UV·노멀·재질 이음매에서 같은 원본 위치를 공유하는 다른 쪽 렌더 정점.
+        // 이음선을 따라 접을 때 두 정점을 같은 위치로 함께 옮겨 틈이 생기지 않게 한다.
+        uint32 Twin = std::numeric_limits<uint32>::max();
+
         uint32 Revision = 0;
+        // 혼자서는 움직일 수 없는 정점. 다른 정점이 이 위치로 합쳐지는 것은 허용한다.
         bool bProtected = false;
+        // 이음매 쌍으로도 움직일 수 없는 정점 (3개 이상 겹침, 열린 경계, 비다양체, 날카로운 모서리)
+        bool bLocked = false;
         bool bAlive = true;
     };
+
+    constexpr uint32 InvalidVertex = std::numeric_limits<uint32>::max();
 
     struct FWorkMesh
     {
@@ -378,8 +397,17 @@ namespace
 
         for (FWorkVertex& Vertex : Work.Vertices)
         {
-            if (Vertex.bAlive) Vertex.bProtected = false;
+            if (!Vertex.bAlive) continue;
+            Vertex.bProtected = false;
+            Vertex.bLocked = false;
+            Vertex.Twin = InvalidVertex;
         }
+
+        auto Lock = [&Work](uint32 V)
+            {
+                Work.Vertices[V].bProtected = true;
+                Work.Vertices[V].bLocked = true;
+            };
 
         // 현재 살아 있는 렌더 정점을 원본 기하 위치별로 묶는다.
         // 원본 위치를 잃은 정점은 각각 별개의 기하 위치로 취급한다.
@@ -405,20 +433,41 @@ namespace
         }
 
         std::vector<uint32> GeometryVertexCounts(NextGeometryID, 0);
+        std::vector<uint32> GeometryFirstVertex(NextGeometryID, InvalidVertex);
         for (uint32 I = 0; I < Work.Vertices.size(); ++I)
         {
-            if (Work.Vertices[I].bAlive && !Work.Vertices[I].Faces.empty())
-                ++GeometryVertexCounts[GeometryID[I]];
+            if (!Work.Vertices[I].bAlive || Work.Vertices[I].Faces.empty())
+                continue;
+
+            const uint32 Geometry = GeometryID[I];
+            if (++GeometryVertexCounts[Geometry] == 1)
+                GeometryFirstVertex[Geometry] = I;
         }
 
-        // LOD1에서만 UV/normal 이음매의 분리된 렌더 정점 위치를 고정한다.
-        if (LOD <= 2)
+        // 같은 위치에 렌더 정점이 여러 개면(UV·노멀·재질 이음매) 모든 LOD에서 혼자 움직이지 못하게 한다.
+        // 한쪽만 움직이면 이음선이 벌어진다. 정확히 2개면 쌍둥이로 묶어 이음선을 따라 함께 접을 수 있게 하고,
+        // 3개 이상이면 이음선이 만나는 교차점이라 고정한다.
+        for (uint32 I = 0; I < Work.Vertices.size(); ++I)
         {
-            for (uint32 I = 0; I < Work.Vertices.size(); ++I)
+            if (!Work.Vertices[I].bAlive || Work.Vertices[I].Faces.empty())
+                continue;
+
+            const uint32 Geometry = GeometryID[I];
+            const uint32 Count = GeometryVertexCounts[Geometry];
+            if (Count < 2) continue;
+
+            Work.Vertices[I].bProtected = true;
+            if (Count >= 3)
             {
-                if (Work.Vertices[I].bAlive && !Work.Vertices[I].Faces.empty() &&
-                    GeometryVertexCounts[GeometryID[I]] > 1)
-                    Work.Vertices[I].bProtected = true;
+                Work.Vertices[I].bLocked = true;
+                continue;
+            }
+
+            const uint32 First = GeometryFirstVertex[Geometry];
+            if (First != I)
+            {
+                Work.Vertices[I].Twin = First;
+                Work.Vertices[First].Twin = I;
             }
         }
 
@@ -439,8 +488,8 @@ namespace
 
                 if (GeometryA == GeometryB)
                 {
-                    Work.Vertices[RenderA].bProtected = true;
-                    Work.Vertices[RenderB].bProtected = true;
+                    Lock(RenderA);
+                    Lock(RenderB);
                     continue;
                 }
 
@@ -451,8 +500,9 @@ namespace
 
         for (const auto& [Key, Uses] : EdgeUses)
         {
-            // 비다양체는 항상 보호하고 열린 경계는 LOD1에서만 보호한다.
-            bool bProtect = Uses.size() >= 3 || (LOD <= 2 && Uses.size() == 1);
+            // 비다양체와 열린 경계는 모든 LOD에서 고정한다.
+            bool bLockEdge = Uses.size() >= 3 || Uses.size() == 1;
+            bool bSeamEdge = false;
 
             if (Uses.size() == 2)
             {
@@ -488,20 +538,28 @@ namespace
                         Source.LODSourceVertices[B0].NormalIndex != Source.LODSourceVertices[B1].NormalIndex);
 
                 const float FaceDot = GetFaceNormal(F0, Work).Dot(GetFaceNormal(F1, Work));
-                bProtect = bProtect ||
-                    (LOD <= 2 && (bMaterialBoundary || bUVSeam || bNormalDiscontinuity)) ||
-                    FaceDot < HardEdgeCosine[LOD];
+                // 이음매는 쌍둥이 collapse로 줄일 수 있고, 날카로운 모서리는 형태 유지를 위해 고정한다.
+                bSeamEdge = bMaterialBoundary || bUVSeam || bNormalDiscontinuity;
+                bLockEdge = bLockEdge || FaceDot < HardEdgeCosine[LOD];
             }
 
-            if (!bProtect) continue;
+            if (!bLockEdge && !bSeamEdge) continue;
 
             ++Result.RejectedFeatureEdges;
 
             // edge 양쪽에서 사용된 렌더 정점 모두 고정한다.
             for (const FEdgeUse& Use : Uses)
             {
-                Work.Vertices[Use.RenderA].bProtected = true;
-                Work.Vertices[Use.RenderB].bProtected = true;
+                if (bLockEdge)
+                {
+                    Lock(Use.RenderA);
+                    Lock(Use.RenderB);
+                }
+                else
+                {
+                    Work.Vertices[Use.RenderA].bProtected = true;
+                    Work.Vertices[Use.RenderB].bProtected = true;
+                }
             }
         }
     }
@@ -513,6 +571,17 @@ namespace
         uint32 RevisionA = 0;
         uint32 RevisionB = 0;
         FEdgePlacement Placement;
+
+        // 이음선을 따라 접는 경우 반대쪽 쌍둥이 edge(TwinA-TwinB)도 같은 위치로 함께 접는다.
+        uint32 TwinA = InvalidVertex;
+        uint32 TwinB = InvalidVertex;
+        uint32 RevisionTwinA = 0;
+        uint32 RevisionTwinB = 0;
+
+        // 합쳐질 모든 평면까지의 평균 제곱 거리. LOD별 허용 오차와 비교한다.
+        double ErrorSquared = 0.0;
+
+        bool IsSeamPair() const { return TwinA != InvalidVertex; }
     };
 
     struct FGreaterCollapseCost
@@ -583,11 +652,9 @@ namespace
         Flip
     };
 
-    ECollapseCheck CheckCollapse(const FCollapseCandidate& Candidate, const FWorkMesh& Work)
+    // A-B 한 쪽 edge만 검사한다. 이음매 쌍은 CheckCollapse가 양쪽에 대해 호출한다.
+    ECollapseCheck CheckCollapseSide(uint32 A, uint32 B, const FVector& NewPosition, const FWorkMesh& Work)
     {
-        const uint32 A = Candidate.A;
-        const uint32 B = Candidate.B;
-
         if (!PassesLinkCondition(A, B, Work)) return ECollapseCheck::Topology;
 
         std::unordered_set<uint32> IncidentFaces = Work.Vertices[A].Faces;
@@ -615,7 +682,7 @@ namespace
                 OldPositions[I] = Work.Vertices[V].Vertex.Position;
 
                 NewPositions[I] = (V == A || V == B)
-                    ? Candidate.Placement.Position : OldPositions[I];
+                    ? NewPosition : OldPositions[I];
             }
 
             const FVector OldCross = FVector::Cross(
@@ -636,36 +703,121 @@ namespace
         return ECollapseCheck::Allowed;
     }
 
-    bool FindBestValidPlacement(uint32 A, uint32 B, const FWorkMesh& Work,
-        FEdgePlacement& Out)
+    ECollapseCheck CheckCollapse(const FCollapseCandidate& Candidate, const FWorkMesh& Work)
+    {
+        const ECollapseCheck Check = CheckCollapseSide(Candidate.A, Candidate.B, Candidate.Placement.Position, Work);
+        if (Check != ECollapseCheck::Allowed || !Candidate.IsSeamPair())
+            return Check;
+
+        // 쌍둥이 쪽 면들도 같은 새 위치에서 뒤집히거나 위상이 깨지면 안 된다.
+        return CheckCollapseSide(Candidate.TwinA, Candidate.TwinB, Candidate.Placement.Position, Work);
+    }
+
+    bool IsMovableSeam(const FWorkVertex& Vertex, const FWorkMesh& Work)
+    {
+        return Vertex.bProtected && !Vertex.bLocked &&
+            Vertex.Twin != InvalidVertex && Work.Vertices[Vertex.Twin].bAlive;
+    }
+
+    // A-B가 이음선을 따라가는 edge이고 반대쪽에 같은 모양의 쌍둥이 edge(TwinA-TwinB)가 있으면 true.
+    // 이음선을 따라가는 렌더 edge는 한쪽 면만 공유한다(반대쪽 면은 쌍둥이 정점에 붙어 있다).
+    bool FindSeamTwinEdge(uint32 A, uint32 B, const FWorkMesh& Work, uint32& OutTwinA, uint32& OutTwinB)
     {
         const FWorkVertex& VA = Work.Vertices[A];
         const FWorkVertex& VB = Work.Vertices[B];
-        if (VA.bProtected && VB.bProtected) return false;
+        if (!IsMovableSeam(VA, Work) || !IsMovableSeam(VB, Work))
+            return false;
 
-        FQuadric Q = VA.Quadric;
-        Q += VB.Quadric;
+        const uint32 TwinA = VA.Twin;
+        const uint32 TwinB = VB.Twin;
+        if (TwinA == B || TwinB == A || TwinA == TwinB)
+            return false;
+
+        const FWorkVertex& VTA = Work.Vertices[TwinA];
+        const FWorkVertex& VTB = Work.Vertices[TwinB];
+        if (!VTA.Neighbors.contains(TwinB))
+            return false;
+
+        // 쌍둥이는 같은 위치여야 한다. 어긋나 있으면 이미 벌어진 것이므로 건드리지 않는다.
+        constexpr float SamePositionDistanceSquared = 1e-12f;
+        const FVector DeltaA = VTA.Vertex.Position - VA.Vertex.Position;
+        const FVector DeltaB = VTB.Vertex.Position - VB.Vertex.Position;
+        if (DeltaA.Dot(DeltaA) > SamePositionDistanceSquared || DeltaB.Dot(DeltaB) > SamePositionDistanceSquared)
+            return false;
+
+        if (SharedFaces(A, B, Work).size() != 1 || SharedFaces(TwinA, TwinB, Work).size() != 1)
+            return false;
+
+        OutTwinA = TwinA;
+        OutTwinB = TwinB;
+        return true;
+    }
+
+    bool FindBestValidCandidate(uint32 A, uint32 B, const FWorkMesh& Work,
+        FCollapseCandidate& Out)
+    {
+        const FWorkVertex& VA = Work.Vertices[A];
+        const FWorkVertex& VB = Work.Vertices[B];
+
+        Out = FCollapseCandidate{};
+        Out.A = A;
+        Out.B = B;
+        Out.RevisionA = VA.Revision;
+        Out.RevisionB = VB.Revision;
+
+        const FVector& PositionA = VA.Vertex.Position;
+        const FVector& PositionB = VB.Vertex.Position;
 
         bool bFound = false;
         auto Consider = [&](const FEdgePlacement& Placement)
             {
                 if (!std::isfinite(Placement.Cost)) return;
 
-                const FCollapseCandidate Probe{
-                    A, B, VA.Revision, VB.Revision, Placement
-                };
+                FCollapseCandidate Probe = Out;
+                Probe.Placement = Placement;
                 if (CheckCollapse(Probe, Work) != ECollapseCheck::Allowed)
                     return;
 
-                if (!bFound || Placement.Cost < Out.Cost)
+                if (!bFound || Placement.Cost < Out.Placement.Cost)
                 {
-                    Out = Placement;
+                    Out.Placement = Placement;
                     bFound = true;
                 }
             };
 
-        const FVector& PositionA = VA.Vertex.Position;
-        const FVector& PositionB = VB.Vertex.Position;
+        // 둘 다 고정이면 이음선을 따라 쌍둥이와 함께 접는 경우만 허용한다.
+        // 양쪽이 같은 위치로 이동하므로 이음선이 벌어지지 않고, UV는 각 쪽이 자기 값으로 보간한다.
+        if (VA.bProtected && VB.bProtected)
+        {
+            uint32 TwinA = InvalidVertex;
+            uint32 TwinB = InvalidVertex;
+            if (!FindSeamTwinEdge(A, B, Work, TwinA, TwinB))
+                return false;
+
+            Out.TwinA = TwinA;
+            Out.TwinB = TwinB;
+            Out.RevisionTwinA = Work.Vertices[TwinA].Revision;
+            Out.RevisionTwinB = Work.Vertices[TwinB].Revision;
+
+            // 한 원본 위치의 오차는 이음매 양쪽 면을 모두 합친 것이다.
+            FQuadric QA = VA.Quadric;
+            QA += Work.Vertices[TwinA].Quadric;
+            FQuadric QB = VB.Quadric;
+            QB += Work.Vertices[TwinB].Quadric;
+            FQuadric Q = QA;
+            Q += QB;
+
+            // 이음선 밖으로 벗어나지 않도록 edge 위의 위치만 쓴다.
+            Consider(FindBestPointOnEdge(PositionA, PositionB, QA, QB));
+            Consider({ PositionA, 0.0f, Q.Evaluate(PositionA) });
+            Consider({ PositionB, 1.0f, Q.Evaluate(PositionB) });
+            if (bFound)
+                Out.ErrorSquared = Out.Placement.Cost / std::max(Q.Weight, 1.0);
+            return bFound;
+        }
+
+        FQuadric Q = VA.Quadric;
+        Q += VB.Quadric;
 
         if (VA.bProtected || VB.bProtected)
         {
@@ -690,6 +842,8 @@ namespace
             Consider({ PositionB, 1.0f, Q.Evaluate(PositionB) });
         }
 
+        if (bFound)
+            Out.ErrorSquared = Out.Placement.Cost / std::max(Q.Weight, 1.0);
         return bFound;
     }
 
@@ -701,23 +855,24 @@ namespace
         const FWorkVertex& VB = Work.Vertices[B];
         if (!VA.bAlive || !VB.bAlive || !VA.Neighbors.contains(B)) return;
 
-        FEdgePlacement Placement;
-        if (!FindBestValidPlacement(A, B, Work, Placement)) return;
+        FCollapseCandidate Candidate;
+        if (!FindBestValidCandidate(A, B, Work, Candidate)) return;
 
-        Heap.push({ A, B, VA.Revision, VB.Revision, Placement });
+        Heap.push(Candidate);
     }
 
-    void ApplyCollapse(const FCollapseCandidate& Candidate, FWorkMesh& Work, FCollapseHeap& Heap)
+    // B를 A에 합친다. 이웃 재구성과 힙 갱신은 ApplyCollapse가 양쪽 collapse를 끝낸 뒤 한 번에 한다.
+    void CollapseEdge(uint32 A, uint32 B, const FEdgePlacement& Placement, FWorkMesh& Work,
+        std::unordered_set<uint32>& Touched)
     {
-        const uint32 A = Candidate.A;
-        const uint32 B = Candidate.B;
-        const float T = Candidate.Placement.T;
+        const float T = Placement.T;
 
         FWorkVertex& VA = Work.Vertices[A];
         FWorkVertex& VB = Work.Vertices[B];
 
         // 변경 전 이웃을 기억한다. 변경 후 이 영역의 후보만 갱신.
-        std::unordered_set<uint32> Touched{A, B};
+        Touched.insert(A);
+        Touched.insert(B);
         Touched.insert(VA.Neighbors.begin(), VA.Neighbors.end());
         Touched.insert(VB.Neighbors.begin(), VB.Neighbors.end());
 
@@ -729,6 +884,18 @@ namespace
             // A가 B 위치에 고정되면 seam과 원래의 smoothing 정보도 B를 따른다.
             VA.SourcePositionIndex = VB.SourcePositionIndex;
             VA.Vertex.Normal = OldB.Normal;
+
+            if (!VA.bProtected)
+            {
+                // 내부 정점 A가 이음매 정점 B의 자리를 물려받는다. B의 쌍둥이가 이제 A를 가리키게 한다.
+                VA.bLocked = VB.bLocked;
+                VA.Twin = VB.Twin;
+                if (VB.Twin != InvalidVertex)
+                {
+                    Work.Vertices[VB.Twin].Twin = A;
+                    Touched.insert(VB.Twin);
+                }
+            }
         }
         else if (!VA.bProtected)
         {
@@ -736,7 +903,7 @@ namespace
             VA.SourcePositionIndex = -1;
         }
 
-        VA.Vertex.Position = Candidate.Placement.Position;
+        VA.Vertex.Position = Placement.Position;
         VA.Vertex.UV = OldA.UV * (1.0f - T) + OldB.UV * T;
         VA.Vertex.Color = OldA.Color * (1.0f - T) + OldB.Color * T;
 
@@ -782,6 +949,17 @@ namespace
         VB.Faces.clear();
         VB.Neighbors.clear();
         VB.bAlive = false;
+    }
+
+    void ApplyCollapse(const FCollapseCandidate& Candidate, FWorkMesh& Work, FCollapseHeap& Heap)
+    {
+        std::unordered_set<uint32> Touched;
+        CollapseEdge(Candidate.A, Candidate.B, Candidate.Placement, Work, Touched);
+
+        // 이음선 반대쪽도 같은 위치·같은 T로 접는다. 위치는 같아지고 UV는 각 쪽의 값으로 보간된다.
+        // A와 TwinA는 계속 쌍둥이로 남는다.
+        if (Candidate.IsSeamPair())
+            CollapseEdge(Candidate.TwinA, Candidate.TwinB, Candidate.Placement, Work, Touched);
 
         // Touched 정점의 이웃 관계를 살아 있는 면에서 재구성.
         for (uint32 V : Touched)
@@ -823,6 +1001,20 @@ namespace
                 PushCandidate(V, Neighbor, Work, Heap);
             }
         }
+    }
+
+    // 원점 기준 사면체 부피의 합. 닫힌 메시면 메시 부피가 된다.
+    double ComputeSignedVolume(const FStaticMeshData& Mesh)
+    {
+        double Volume = 0.0;
+        for (uint32 I = 0; I + 2 < static_cast<uint32>(Mesh.Indices.Num()); I += 3)
+        {
+            const FVector& A = Mesh.Vertices[Mesh.Indices[I]].Position;
+            const FVector& B = Mesh.Vertices[Mesh.Indices[I + 1]].Position;
+            const FVector& C = Mesh.Vertices[Mesh.Indices[I + 2]].Position;
+            Volume += static_cast<double>(A.Dot(FVector::Cross(B, C)));
+        }
+        return Volume / 6.0;
     }
 
     FStaticMeshData BuildLODMesh(const FWorkMesh& Work,const FStaticMeshData& LOD0)
@@ -1010,6 +1202,9 @@ FLODGenerateResult FStaticMeshLODGenerator::Generate(const FStaticMeshData& LOD0
     }
 
     bool bReachedAllTargets = true;
+    const double BaseVolume = ComputeSignedVolume(LOD0);
+    const FVector BaseExtent = LOD0.AABB.Max - LOD0.AABB.Min;
+    const double BaseDiagonal = std::sqrt(static_cast<double>(BaseExtent.Dot(BaseExtent)));
 
     for (uint32 LOD = 1; LOD <= 3; ++LOD)
     {
@@ -1029,6 +1224,8 @@ FLODGenerateResult FStaticMeshLODGenerator::Generate(const FStaticMeshData& LOD0
 
         // 빈 메시를 만들지 않도록 적어도 한 삼각형은 남긴다.
         const uint32 StopAt = std::max(1u, Result.TargetTriangles[LOD]);
+        const double MaxError = MaxErrorRatios[LOD] * BaseDiagonal;
+        const double MaxErrorSquared = MaxError * MaxError;
         while (Work.LiveTriangles > StopAt && !Heap.empty())
         {
             const FCollapseCandidate Candidate = Heap.top();
@@ -1041,6 +1238,24 @@ FLODGenerateResult FStaticMeshLODGenerator::Generate(const FStaticMeshData& LOD0
                 VA.Revision != Candidate.RevisionA ||
                 VB.Revision != Candidate.RevisionB)
                 continue;
+
+            // 이음매 쌍은 반대쪽 쌍둥이 edge도 후보를 만들 때 그대로여야 한다.
+            if (Candidate.IsSeamPair())
+            {
+                const FWorkVertex& VTA = Work.Vertices[Candidate.TwinA];
+                const FWorkVertex& VTB = Work.Vertices[Candidate.TwinB];
+                if (!VTA.bAlive || !VTB.bAlive ||
+                    VTA.Revision != Candidate.RevisionTwinA ||
+                    VTB.Revision != Candidate.RevisionTwinB)
+                    continue;
+            }
+
+            // 힙은 누적 비용 순이라 오차가 큰 후보 뒤에도 작은 후보가 남아 있을 수 있다. 멈추지 않고 건너뛴다.
+            if (Candidate.ErrorSquared > MaxErrorSquared)
+            {
+                ++Result.RejectedError;
+                continue;
+            }
 
             const ECollapseCheck Check = CheckCollapse(Candidate, Work);
             if (Check == ECollapseCheck::Topology)
@@ -1070,6 +1285,8 @@ FLODGenerateResult FStaticMeshLODGenerator::Generate(const FStaticMeshData& LOD0
         }
 
         Result.ActualTriangles[LOD] = Work.LiveTriangles;
+        if (std::abs(BaseVolume) > 1e-12)
+            Result.VolumeRatio[LOD] = static_cast<float>(ComputeSignedVolume(Snapshot) / BaseVolume);
         OutLODs.Add(std::move(Snapshot));
     }
 
