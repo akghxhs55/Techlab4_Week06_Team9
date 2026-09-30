@@ -40,6 +40,7 @@ private:
 	static constexpr uint32 MaxDepth = 32;
 	static constexpr uint32 MinSplitSize = 2;
 	static constexpr uint32 BinCount = 16;
+	static constexpr uint32 PrefetchLevels = 4;
 
 	struct FSlot
 	{
@@ -104,6 +105,8 @@ private:
 
 	static float SurfaceArea(const FBox& Box);
 
+	void CollectPrefetchNodes();
+
 	FBoundsGetter BoundsGetter;
 
 	TArray<FNode> Nodes;
@@ -115,6 +118,8 @@ private:
 	mutable TArray<FQueryEntry> QueryStack;
 	mutable TArray<FStackEntry> TraceStack;
 	mutable TArray<FCullStackEntry> CullStack;
+
+	TArray<uint32> PrefetchNodes;
 };
 
 template <typename T>
@@ -133,6 +138,8 @@ void TBVH<T>::Build(std::span<T const> InElements)
 	}
 
 	Root = BuildNode(0, static_cast<uint32>(Elements.size()), 0, RootBounds);
+
+	CollectPrefetchNodes();
 }
 
 template <typename T>
@@ -258,6 +265,12 @@ bool TBVH<T>::TraceClosest(TBoundsTrace&& BoundsTrace, TLeafTrace&& LeafTrace, f
 	if (!BoundsTrace(RootBounds, RootEnterT) || RootEnterT >= OutNearestT)
 	{
 		return false;
+	}
+
+	const FNode* NodeBase = Nodes.GetData();
+	for (uint32 Index : PrefetchNodes)
+	{
+		_mm_prefetch(reinterpret_cast<const char*>(NodeBase + Index), _MM_HINT_T0);
 	}
 
 	TraceStack.Reset();
@@ -529,4 +542,29 @@ float TBVH<T>::SurfaceArea(const FBox& Box)
 {
 	const FVector Size = Box.Max - Box.Min;
 	return 2.0f * (Size.X * Size.Y + Size.Y * Size.Z + Size.Z * Size.X);
+}
+
+template <typename T>
+void TBVH<T>::CollectPrefetchNodes()
+{
+	PrefetchNodes.Reset();
+	if (Root.IsLeaf())
+		return;
+
+	TArray<uint32> Level;
+	Level.Add(Root.Child);
+	for (uint32 Depth = 0; Depth < PrefetchLevels && !Level.IsEmpty(); ++Depth)
+	{
+		TArray<uint32> NextLevel;
+		for (uint32 NodeIndex : Level)
+		{
+			const FNode& Node = Nodes[NodeIndex];
+			if (!Node.Left.IsLeaf())
+				NextLevel.Add(Node.Left.Child);
+			if (!Node.Right.IsLeaf())
+				NextLevel.Add(Node.Right.Child);
+		}
+		PrefetchNodes.Append(NextLevel);
+		Level = std::move(NextLevel);
+	}
 }
