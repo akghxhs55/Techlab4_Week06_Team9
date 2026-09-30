@@ -28,7 +28,9 @@ struct FLODSourceVertex
 
 struct FMeshTriangleElement
 {
-	uint32 TriangleIndex; // Indices[TriangleIndex * 3 + 0..2]
+	FVector V0;
+	FVector Edge1; // V1 - V0
+	FVector Edge2; // V2 - V0
 	FBox Bounds;
 };
 

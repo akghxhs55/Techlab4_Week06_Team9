@@ -19,22 +19,24 @@ FRay ToLocalRay(const FRay& WorldRay, const FMatrix& WorldMatrix)
 
 bool RayIntersectsAABB(const FRay& Ray, const FVector& BoxMin, const FVector& BoxMax, float& OutT)
 {
-    FVectorRegister Rayoriginreg = VectorSIMD::LoadFloat3(&Ray.Origin.X);
-    FVectorRegister Raydirreg = VectorSIMD::LoadFloat3(&Ray.Direction.X);
+	FPreparedRay PreparedRay(Ray);
+    return RayIntersectsAABB(PreparedRay, BoxMin, BoxMax, OutT);
+}
+
+bool RayIntersectsAABB(const FPreparedRay& PreparedRay, const FVector& BoxMin, const FVector& BoxMax, float& OutT)
+{
     FVectorRegister Boxminreg = VectorSIMD::LoadFloat3(&BoxMin.X);
     FVectorRegister Boxmaxreg = VectorSIMD::LoadFloat3(&BoxMax.X);
 
-    FVectorRegister invRayDirreg = VectorSIMD::Reciprocal(Raydirreg);
+    FVectorRegister tX1reg = VectorSIMD::Mul(VectorSIMD::Sub(Boxminreg, PreparedRay.Origin), PreparedRay.InvDirection);
+    FVectorRegister tX2reg = VectorSIMD::Mul(VectorSIMD::Sub(Boxmaxreg, PreparedRay.Origin), PreparedRay.InvDirection);
 
-    FVectorRegister tX1reg = VectorSIMD::Mul(VectorSIMD::Sub(Boxminreg, Rayoriginreg), invRayDirreg);
-    FVectorRegister tX2reg = VectorSIMD::Mul(VectorSIMD::Sub(Boxmaxreg, Rayoriginreg), invRayDirreg);
-
-    FVectorRegister tminreg = VectorSIMD::Min(tX1reg,tX2reg);
+    FVectorRegister tminreg = VectorSIMD::Min(tX1reg, tX2reg);
     FVectorRegister tmaxreg = VectorSIMD::Max(tX1reg, tX2reg);
 
     FVectorRegister maxXY = VectorSIMD::Max(tminreg, VectorSIMD::SplatY(tminreg));
     FVectorRegister maxXYZ = VectorSIMD::Max(maxXY, VectorSIMD::SplatZ(tminreg));
-    float tEnter = _mm_cvtss_f32(maxXYZ); 
+    float tEnter = _mm_cvtss_f32(maxXYZ);
 
     FVectorRegister minXY = VectorSIMD::Min(tmaxreg, VectorSIMD::SplatY(tmaxreg));
     FVectorRegister minXYZ = VectorSIMD::Min(minXY, VectorSIMD::SplatZ(tmaxreg));
@@ -57,11 +59,15 @@ bool RayIntersectsAABB(const FRay& Ray, const FVector& BoxMin, const FVector& Bo
 
 bool RayIntersectsTriangle(const FRay& Ray, const FVector& v1, const FVector& v2, const FVector& v3, float& OutT)
 {
-    constexpr float epsilon = 1e-5f;
-    // 평면 정의
+    return RayIntersectsTriangleEdges(Ray, v1, v2 - v1, v3 - v1, OutT);
+}
 
-    FVectorRegister edge1 = VectorSIMD::Sub(VectorSIMD::LoadFloat3(&v2.X), VectorSIMD::LoadFloat3(&v1.X));
-    FVectorRegister edge2 = VectorSIMD::Sub(VectorSIMD::LoadFloat3(&v3.X), VectorSIMD::LoadFloat3(&v1.X));
+bool RayIntersectsTriangleEdges(const FRay& Ray, const FVector& V0, const FVector& Edge1, const FVector& Edge2, float& OutT)
+{
+    constexpr float epsilon = 1e-5f;
+
+    FVectorRegister edge1 = VectorSIMD::LoadFloat3(&Edge1.X);
+    FVectorRegister edge2 = VectorSIMD::LoadFloat3(&Edge2.X);
 
     FVectorRegister RayVector = VectorSIMD::LoadFloat3(&Ray.Direction.X);
     const FVectorRegister rayCrossVec = VectorSIMD::Cross3(RayVector, edge2);
@@ -71,11 +77,10 @@ bool RayIntersectsTriangle(const FRay& Ray, const FVector& v1, const FVector& v2
         return false;
     }
 
-
     float invDet = 1.0f / det;
     // 수식: Ray.Origin - v1 = u * edge1 + v * edge2 - t * Ray.Direction
     // 1. u 구하기
-    FVectorRegister s = VectorSIMD::Sub(VectorSIMD::LoadFloat3(&Ray.Origin.X), VectorSIMD::LoadFloat3(&v1.X));
+    FVectorRegister s = VectorSIMD::Sub(VectorSIMD::LoadFloat3(&Ray.Origin.X), VectorSIMD::LoadFloat3(&V0.X));
     float u = invDet * VectorSIMD::Dot(s, rayCrossVec);
 
     if (-epsilon > u || epsilon < u - 1)
@@ -85,7 +90,7 @@ bool RayIntersectsTriangle(const FRay& Ray, const FVector& v1, const FVector& v2
 
     FVectorRegister sCrossE1 = VectorSIMD::Cross3(s, edge1);
     float v = invDet * VectorSIMD::Dot(RayVector, sCrossE1);
-        
+
     if (-epsilon > v || epsilon < u + v - 1)
     {
         return false;
@@ -103,35 +108,38 @@ bool RayIntersectsTriangle(const FRay& Ray, const FVector& v1, const FVector& v2
 }
 
 // Mesh AABB를 통과한 Ray에 삼각형 교차를 적용해 가장 가까운 거리만 반환한다.
-bool RayIntersectsMesh(const FRay& LocalRay, const FStaticMeshData& Mesh, float& OutT)
+bool RayIntersectsMesh(const FRay& LocalRay, const FStaticMeshData& Mesh, float& InOutNearestT)
 {
     if (!Mesh.TriangleBVH)
     {
 	    FBox Box = Mesh.AABB;
 	    float BoxT{};
 
-        if (!RayIntersectsAABB(LocalRay, Box.Min, Box.Max, BoxT))
+        if (!RayIntersectsAABB(LocalRay, Box.Min, Box.Max, BoxT) ||
+			BoxT >= InOutNearestT)
 			return false;
     }
 
     bool bHit = false;
-    float NearestT = FLT_MAX;
+    float NearestT = InOutNearestT;
+
+    const FPreparedRay PreparedRay(LocalRay);
 
     if (Mesh.TriangleBVH)
     {
         bHit = Mesh.TriangleBVH->TraceClosest(
             [&](const FBox& Bounds, float& OutEnterT)
             {
-                return RayIntersectsAABB(LocalRay, Bounds.Min, Bounds.Max, OutEnterT);
+                return RayIntersectsAABB(PreparedRay, Bounds.Min, Bounds.Max, OutEnterT);
             },
             [&](const FMeshTriangleElement& Element, float& OutNearestT)
             {
-                float T = FLT_MAX;
-                if (RayIntersectsTriangle(
+                float T = InOutNearestT;
+                if (RayIntersectsTriangleEdges(
                     LocalRay,
-                    Mesh.Vertices[Mesh.Indices[Element.TriangleIndex * 3]].Position,
-                    Mesh.Vertices[Mesh.Indices[Element.TriangleIndex * 3 + 1]].Position,
-                    Mesh.Vertices[Mesh.Indices[Element.TriangleIndex * 3 + 2]].Position,
+                    Element.V0,
+                    Element.Edge1,
+                    Element.Edge2,
                     T) &&
                     T < OutNearestT)
                 {
@@ -166,7 +174,7 @@ bool RayIntersectsMesh(const FRay& LocalRay, const FStaticMeshData& Mesh, float&
         }
     }
 
-    if (bHit) OutT = NearestT;
+    if (bHit) InOutNearestT = NearestT;
     return bHit;
 }
 

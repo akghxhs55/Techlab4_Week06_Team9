@@ -188,20 +188,22 @@ void FStaticMeshData::BuildTriangleBVH()
 	TArray<FMeshTriangleElement> Elements;
 	for (int32 i = 0; i + 2 < Indices.Num(); i += 3)
 	{
-		FMeshTriangleElement Element;
-		Element.TriangleIndex = i / 3;
-		FVector vertices[3];
-		for (uint32 j = 0; j < 3; ++j)
-		{
-			uint32 index = Indices[i + j];
-			vertices[j] = Vertices[index].Position;
-		}
-		Element.Bounds.Min.X = std::min({ vertices[0].X, vertices[1].X, vertices[2].X });
-		Element.Bounds.Min.Y = std::min({ vertices[0].Y, vertices[1].Y, vertices[2].Y });
-		Element.Bounds.Min.Z = std::min({ vertices[0].Z, vertices[1].Z, vertices[2].Z });
-		Element.Bounds.Max.X = std::max({ vertices[0].X, vertices[1].X, vertices[2].X });
-		Element.Bounds.Max.Y = std::max({ vertices[0].Y, vertices[1].Y, vertices[2].Y });
-		Element.Bounds.Max.Z = std::max({ vertices[0].Z, vertices[1].Z, vertices[2].Z });
+		const FVector& V0 = Vertices[Indices[i]].Position;
+		const FVector& V1 = Vertices[Indices[i + 1]].Position;
+		const FVector& V2 = Vertices[Indices[i + 2]].Position;
+
+		FMeshTriangleElement Element = {
+			.V0 = V0,
+			.Edge1 = V1 - V0,
+			.Edge2 = V2 - V0,
+		};
+
+		Element.Bounds.Min.X = std::min({ V0.X, V1.X, V2.X });
+		Element.Bounds.Min.Y = std::min({ V0.Y, V1.Y, V2.Y });
+		Element.Bounds.Min.Z = std::min({ V0.Z, V1.Z, V2.Z });
+		Element.Bounds.Max.X = std::max({ V0.X, V1.X, V2.X });
+		Element.Bounds.Max.Y = std::max({ V0.Y, V1.Y, V2.Y });
+		Element.Bounds.Max.Z = std::max({ V0.Z, V1.Z, V2.Z });
 		Elements.Add(Element);
 	}
 
