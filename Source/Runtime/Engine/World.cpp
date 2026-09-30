@@ -21,6 +21,8 @@
 #include "Math/Frustum.h"
 
 #include "Core/Stats/LightweightStats.h"
+#include "Core/Stats/EditorStats.h"
+
 
 DECLARE_CYCLE_STAT("Actor Tick", STAT_ActorTick); // Actor 틱 측정
 DECLARE_CYCLE_STAT("Update All Transforms", STAT_UpdateAllTransforms); // 각 Transform의 Update 시간 측정
@@ -401,6 +403,7 @@ bool UWorld::DestroyActor(AActor* Actor)
 bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 	FBillboardTraceTransform ResolveBillboard, const void* ViewContext)
 {
+	SCOPE_CYCLE_COUNTER(EditorStats::STAT_PickingTime_Name);
 	OutHit = FHitResult();
 	float NearestT = std::numeric_limits<float>::max();
 

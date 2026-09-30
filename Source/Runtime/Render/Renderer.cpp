@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <chrono>
 #include <unordered_map>
+#include <bit>
 
 DECLARE_CYCLE_STAT("Draw Render Packets", STAT_DrawRenderPackets);
 DECLARE_CYCLE_STAT("Render Queue Sorting", STAT_RenderQueueSorting);
@@ -28,6 +29,19 @@ namespace
 	static_assert(sizeof(FPerObjectConstants) <= PerObjectSlotBytes);
 
 	constexpr uint32 MinPerObjectSlots = 1024;
+
+	uint64 MakeSortKey(const FRenderPacket& Packet)
+	{
+		if (Packet.Material->BlendState != EBlendState::Opaque)
+		{
+			const uint32 DistanceBits = std::bit_cast<uint32>(Packet.CameraToParticleDistance);
+			return (1ull << 63) | static_cast<uint64>(~DistanceBits);
+		}
+
+		return (static_cast<uint64>(Packet.Material->SortID) << 47)
+			| (static_cast<uint64>(Packet.Mesh->SortID) << 31)
+			| (static_cast<uint64>(Packet.LODIndex & 0x3) << 29);
+	}
 }
 
 bool FRenderer::Init()
@@ -117,7 +131,7 @@ void FRenderer::RenderOpaque(const FMatrix& ViewProjection)
 // RenderOpaque가 남긴 반투명 패킷을 먼 것부터 그린다.
 void FRenderer::RenderTranslucent(const FMatrix& ViewProjection)
 {
-	DrawPackets(FirstTranslucentIndex, static_cast<uint32>(RenderPackets.size()), ViewProjection);
+	DrawPackets(FirstTranslucentIndex, SortEntries.Num(), ViewProjection);
 	RenderPackets.Reset();
 	FirstTranslucentIndex = 0;
 }
@@ -127,34 +141,29 @@ void FRenderer::RenderQueueSorting(TArray<FRenderPacket>& InQueue, const FMatrix
 	FMatrix VP = ViewProjection.GetTransposed();
 	RenderCommand::UpdateBufferData(ViewCB.get(), &VP);
 	{
-	SCOPE_CYCLE_COUNTER(STAT_RenderQueueSorting);
+		SCOPE_CYCLE_COUNTER(STAT_RenderQueueSorting);
 
-	std::swap(RenderPackets, InQueue);
-	InQueue.Reset();
+		std::swap(RenderPackets, InQueue);
+		InQueue.Reset();
 
-	std::sort(
-		RenderPackets.begin(),
-		RenderPackets.end(),
-		[](const FRenderPacket& First, const FRenderPacket& Second) -> bool
+		// ① 패킷을 한 번 훑으며 키를 만든다. 그릴 수 없는 패킷은 목록에 넣지 않는다.
+		SortEntries.Reset();
+		SortEntries.Reserve(RenderPackets.Num());
+		for (uint32 i = 0; i < RenderPackets.Num(); ++i)
 		{
-			const bool bFirstTranslucent = First.Material->BlendState != EBlendState::Opaque;
-			const bool bSecondTranslucent = Second.Material->BlendState != EBlendState::Opaque;
+			const FRenderPacket& P = RenderPackets[i];
+			if (!P.Mesh || !P.Material) continue;
+			SortEntries.Add({ MakeSortKey(P), i });
+		}
 
-			if (bFirstTranslucent != bSecondTranslucent) { return !bFirstTranslucent; }
-			if (bFirstTranslucent) { return First.CameraToParticleDistance > Second.CameraToParticleDistance; }
-			if (First.Material != Second.Material) { return std::less<UMaterial*>{}(First.Material, Second.Material); }
-			if (First.Mesh != Second.Mesh) { return std::less<UStaticMesh*>{}(First.Mesh, Second.Mesh); }
-			return std::less<uint8>{}(First.LODIndex, Second.LODIndex);
-		});
+		// ② 16B 항목만 정렬
+		std::sort(SortEntries.begin(), SortEntries.end(),
+			[](const FSortEntry& A, const FSortEntry& B) { return A.Key < B.Key; });
 
-	// 정렬 결과 반투명은 뒤쪽에 모이므로 첫 반투명 위치에서 두 패스를 나눈다.
-	FirstTranslucentIndex = 0;
-	while (FirstTranslucentIndex < RenderPackets.size()
-		&& (RenderPackets[FirstTranslucentIndex].Material == nullptr
-			|| RenderPackets[FirstTranslucentIndex].Material->BlendState == EBlendState::Opaque))
-	{
-		++FirstTranslucentIndex;
-	}
+		// ③ 반투명 시작 위치 = 최상위 비트가 처음 1인 곳
+		FirstTranslucentIndex = 0;
+		while (FirstTranslucentIndex < SortEntries.Num() && !(SortEntries[FirstTranslucentIndex].Key >> 63))
+			++FirstTranslucentIndex;
 	}
 
 	UploadPerObjectConstants();
@@ -173,12 +182,13 @@ void FRenderer::DrawPackets(uint32 Begin, uint32 End, const FMatrix& ViewProject
 	if (!bUsePerObjectSlots)
 		RenderCommand::BindConstantBuffer(2, PerObjectCB.get(), EShaderBindFlagBits::Vertex);
 
-	for (uint32 Index = Begin; Index < End; ++Index)
+	for (uint32 k = Begin; k < End; ++k)          // k = 정렬된 위치
 	{
-		const FRenderPacket& RenderPacket = RenderPackets[Index];
-		if (RenderPacket.Mesh == nullptr || RenderPacket.Material == nullptr) continue;
+		const uint32 PacketIndex = SortEntries[k].PacketIndex;
+		const FRenderPacket& RenderPacket = RenderPackets[PacketIndex];
+		//if (RenderPacket.Mesh == nullptr || RenderPacket.Material == nullptr) continue;
 		if (RenderPacket.Mesh != LastMesh || RenderPacket.LODIndex != LastLODIndex) {
-			RenderCommand::BindMesh(RenderPacket.Mesh,RenderPacket.LODIndex);
+			RenderCommand::BindMesh(RenderPacket.Mesh, RenderPacket.LODIndex);
 		}
 		if (RenderPacket.Material != LastMaterial) {
 			BindMaterial(RenderPacket.Material);
@@ -188,7 +198,7 @@ void FRenderer::DrawPackets(uint32 Begin, uint32 End, const FMatrix& ViewProject
 		{
 			// 드로우마다 Map하지 않고 이미 올린 칸의 오프셋만 바꾼다.
 			RenderCommand::BindConstantBufferRange(2, PerObjectSlotCB.get(),
-				Index * PerObjectSlotConstants, PerObjectSlotConstants, EShaderBindFlagBits::Vertex);
+				PacketIndex * PerObjectSlotConstants, PerObjectSlotConstants, EShaderBindFlagBits::Vertex);
 		}
 		else
 		{
@@ -347,34 +357,34 @@ void FRenderer::UpdateMaterialParams(const FRenderPacket& RenderPacket)
 {
 	switch (RenderPacket.Material->ParamLayout)
 	{
-		case EMaterialParamLayout::StaticMesh:
+	case EMaterialParamLayout::StaticMesh:
+	{
+		break; // 라이팅 적용 시 제거
+
+		const float TotalTime = EngineTimer::GetTotalTime();
+
+		FStaticMeshMaterialParams Params{};
+		Params.BaseColor = RenderPacket.Material->BaseColor;
+		Params.UVOffset = RenderPacket.Material->UVScrollSpeed * TotalTime;
+		Params.bOpaque = RenderPacket.Material->BlendState == EBlendState::Opaque ? 1.0f : 0.0f;
+
+		RenderCommand::UpdateBufferData(RenderPacket.Material->ParamBuffer.get(), &Params, sizeof(FStaticMeshMaterialParams));
+		RenderCommand::BindConstantBuffer(1, RenderPacket.Material->ParamBuffer.get(), EShaderBindFlagBits::Pixel);
+		break;
+	}
+	case EMaterialParamLayout::ParticleSubUV:
+	{
+		if (RenderPacket.Material->ParamBuffer && RenderPacket.MaterialParamData != nullptr)
 		{
-			break; // 라이팅 적용 시 제거
-
-			const float TotalTime = EngineTimer::GetTotalTime();
-
-			FStaticMeshMaterialParams Params{};
-			Params.BaseColor = RenderPacket.Material->BaseColor;
-			Params.UVOffset = RenderPacket.Material->UVScrollSpeed * TotalTime;
-			Params.bOpaque = RenderPacket.Material->BlendState == EBlendState::Opaque ? 1.0f : 0.0f;
-
-			RenderCommand::UpdateBufferData(RenderPacket.Material->ParamBuffer.get(), &Params, sizeof(FStaticMeshMaterialParams));
+			RenderCommand::UpdateBufferData(RenderPacket.Material->ParamBuffer.get(), RenderPacket.MaterialParamData, RenderPacket.MaterialParamDataSize);
 			RenderCommand::BindConstantBuffer(1, RenderPacket.Material->ParamBuffer.get(), EShaderBindFlagBits::Pixel);
-			break;
 		}
-		case EMaterialParamLayout::ParticleSubUV:
-		{
-			if (RenderPacket.Material->ParamBuffer && RenderPacket.MaterialParamData != nullptr)
-			{
-				RenderCommand::UpdateBufferData(RenderPacket.Material->ParamBuffer.get(), RenderPacket.MaterialParamData, RenderPacket.MaterialParamDataSize);
-				RenderCommand::BindConstantBuffer(1, RenderPacket.Material->ParamBuffer.get(), EShaderBindFlagBits::Pixel);
-			}
-			break;
-		}
-		case EMaterialParamLayout::None:
-		{
-			break;
-		}
+		break;
+	}
+	case EMaterialParamLayout::None:
+	{
+		break;
+	}
 	}
 }
 

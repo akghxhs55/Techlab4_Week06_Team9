@@ -15,6 +15,7 @@ class UStaticMesh : public URenderAsset
 {
 	DECLARE_CLASS(UStaticMesh, URenderAsset)
 public:
+    UStaticMesh() : SortID(NextSortID++) {}
 	virtual ~UStaticMesh() override;
 
 	FStaticMeshData MeshData;
@@ -52,4 +53,8 @@ public:
     {
         return LODIndex == 0 ? IndexBuffer.get() : AdditionalLODs[LODIndex - 1].IndexBuffer.get();
     }
+
+    const uint16 SortID;
+private:
+    static inline uint16 NextSortID = 0;
 };

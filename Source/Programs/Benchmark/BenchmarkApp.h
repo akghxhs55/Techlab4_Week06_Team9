@@ -11,6 +11,7 @@
 #include "Editor/Rendering/OutLineRenderer.h"
 #include "Editor/Settings/SettingsPanel.h"
 #include "Render/Renderer.h"
+#include "Render/LineBatcher.h"
 
 class FImGuiRenderer;
 class FOutlinerPanel;
@@ -55,6 +56,12 @@ private:
 	TUniquePtr<FOutline> Outline;
 	TUniquePtr<FOutlineRenderer> OutlineRenderer;
 	TUniquePtr<FGridRenderer> GridRenderer;
+	// 선택된 물체 하나의 바운딩 박스만 그린다. BuildVertexBuffer(전체 순회)는 쓰지 않는다.
+	TUniquePtr<FLineBatcher> LineBatcher;
+
+	// 선택된 물체의 UUID·이름을 오버레이에 표시하고 바운딩 박스를 그린다.
+	UPrimitiveComponent* GetSelectedPrimitive() const;
+	void DrawSelectionBounds(const FMatrix& ViewProjection);
 
 	// Benchmark는 SettingsPanel을 두지 않으므로 Grid 옵션만 기본값으로 보관한다.
 	FEditorSettings GridSettings;

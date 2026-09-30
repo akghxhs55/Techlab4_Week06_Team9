@@ -32,6 +32,17 @@ namespace
 }
 
 DECLARE_CYCLE_STAT("ImGui Render", STAT_ImGuiRender);
+// 기존 스탯에 잡히지 않던 구간. 원인을 찾으면 필요 없는 것은 지운다.
+DECLARE_CYCLE_STAT("[Tick] Gizmo & Picking Update", STAT_TickGizmoPicking);
+DECLARE_CYCLE_STAT("[Tick] World Tick (Total)", STAT_TickWorld);
+DECLARE_CYCLE_STAT("[Tick] Editor UI Tick", STAT_TickEditorUI);
+DECLARE_CYCLE_STAT("[Tick] Gather (Total)", STAT_TickGather);
+DECLARE_CYCLE_STAT("[Tick] Begin Backbuffer Pass", STAT_TickBeginPass);
+DECLARE_CYCLE_STAT("[Tick] Sort+Opaque (Total)", STAT_TickSortOpaque);
+DECLARE_CYCLE_STAT("[Tick] Grid Render", STAT_TickGrid);
+DECLARE_CYCLE_STAT("[Tick] Translucent+Outline+Gizmo", STAT_TickTranslucentOverlay);
+DECLARE_CYCLE_STAT("[Tick] End Backbuffer Pass", STAT_TickEndPass);
+DECLARE_CYCLE_STAT("[Tick] Stat EndFrame", STAT_TickStatEndFrame);
 
 FEngineConfig UBenchmarkEngine::GetConfig() const
 {
@@ -112,6 +123,9 @@ void UBenchmarkEngine::InitEditorTools()
 	GridRenderer = MakeUnique<FGridRenderer>();
 	GridRenderer->Init(Renderer);
 
+	LineBatcher = MakeUnique<FLineBatcher>();
+	LineBatcher->Init(Renderer, World);
+
 	Gizmo = MakeUnique<FGizmo>();
 	GizmoRenderer = MakeUnique<FGizmoRenderer>();
 	GizmoRenderer->Init(Renderer);
@@ -138,7 +152,13 @@ void UBenchmarkEngine::InitEditorTools()
 	OutlinerPanel->SetSelectionCallback(
 		[this](UPrimitiveComponent* Primitive) { SelectPrimitive(Primitive); });
 	OutlinerPanel->SetDeleteActorCallback(
-		[this](AActor* Actor) { World->DestroyActor(Actor); });
+		[this](AActor* Actor)
+		{
+			// 선택된 물체를 지우면 선택 표시(UUID·박스)가 해제된 포인터를 읽지 않도록 먼저 비운다.
+			if (UPrimitiveComponent* Selected = GetSelectedPrimitive(); Selected && Selected->GetOwner() == Actor)
+				SelectPrimitive(nullptr);
+			World->DestroyActor(Actor);
+		});
 
 	HTR_LOG(Info, "Benchmark editor tools ready.");
 }
@@ -149,6 +169,40 @@ void UBenchmarkEngine::SelectPrimitive(UPrimitiveComponent* Primitive)
 	Gizmo->SetTarget(Primitive);
 	Outline->SetTarget(Primitive);
 	DetailsPanel->SetTarget(Primitive);
+}
+
+UPrimitiveComponent* UBenchmarkEngine::GetSelectedPrimitive() const
+{
+	return Gizmo ? Cast<UPrimitiveComponent>(Gizmo->GetTarget()) : nullptr;
+}
+
+// 선택된 물체 하나의 월드 AABB만 그린다. 컬링·피킹에 실제로 쓰는 프록시 바운드와 같다.
+void UBenchmarkEngine::DrawSelectionBounds(const FMatrix& ViewProjection)
+{
+	UPrimitiveComponent* Selected = GetSelectedPrimitive();
+	if (!Selected || !LineBatcher)
+		return;
+
+	FBox Bounds;
+	if (const FPrimitiveSceneProxy* Proxy = Selected->GetSceneProxy())
+	{
+		const FAABB& WorldBounds = Proxy->GetBounds();
+		Bounds = FBox{ WorldBounds.Center - WorldBounds.Extent, WorldBounds.Center + WorldBounds.Extent };
+	}
+	else
+	{
+		Bounds = Selected->CalcBounds();
+	}
+
+	LineBatcher->BeginFrame();
+	LineBatcher->AddBox(Bounds, FVector4(1.0f, 1.0f, 0.0f, 1.0f));
+	LineBatcher->OnRender(ViewProjection);
+
+	// 라인 파이프라인이 바꾼 상태를 장면 기준으로 되돌린다.
+	RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
+	RenderCommand::SetBlendState(EBlendState::Opaque);
+	RenderCommand::SetDepthStencilState(EDepthStencilState::Default);
+	RenderCommand::SetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
 // 마우스 Ray로 Gizmo를 갱신하고, 축을 잡지 않은 클릭은 피킹으로 처리한다.
@@ -186,7 +240,7 @@ void UBenchmarkEngine::UpdateGizmoAndPicking()
 	if (FInputSystem::IsMousePressed(EMouseButton::Left) &&
 		!Gizmo->IsUsing() && Gizmo->GetHoveredAxis() < 0)
 	{
-		SCOPE_CYCLE_COUNTER(EditorStats::STAT_PickingTime_Name);
+		
 		FHitResult Hit;
 		SelectPrimitive(World->LineTraceSingle(Ray, Hit) ? Hit.HitComponent : nullptr);
 	}
@@ -205,12 +259,21 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 	Camera->SetAspectRatio(static_cast<float>(Width) / Height);
 
 	// 기즈모 조작 결과가 같은 프레임의 UpdateAllTransforms에 반영되도록 World Tick보다 앞에 둔다.
-	UpdateGizmoAndPicking();
+	{
+		SCOPE_CYCLE_COUNTER(STAT_TickGizmoPicking);
+		UpdateGizmoAndPicking();
+	}
 
-	World->Tick(DeltaTime);
+	{
+		SCOPE_CYCLE_COUNTER(STAT_TickWorld);
+		World->Tick(DeltaTime);
+	}
 
-	EditorControlsPanel->DeltaTime = DeltaTime;
-	EditorUI->Tick(DeltaTime);
+	{
+		SCOPE_CYCLE_COUNTER(STAT_TickEditorUI);
+		EditorControlsPanel->DeltaTime = DeltaTime;
+		EditorUI->Tick(DeltaTime);
+	}
 
 	const FMatrix ViewProjection = Camera->GetViewProjectionMatrix();
 	const FMatrix Projection = Camera->GetProjectionMatrix();
@@ -233,10 +296,16 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 	LODView.bOrthographic = Camera->GetIsOrthogonal();
 
 	// 멤버 큐를 재사용한다. Renderer와 swap으로 버퍼를 주고받으므로 두 버퍼 모두 용량이 유지된다.
-	RenderQueue.Reset();
-	World->GatherRenderPackets(RenderQueue, &LODView, &Frustum);
+	{
+		SCOPE_CYCLE_COUNTER(STAT_TickGather);
+		RenderQueue.Reset();
+		World->GatherRenderPackets(RenderQueue, &LODView, &Frustum);
+	}
 
-	GetEngineLoop().BeginBackbufferPass();
+	{
+		SCOPE_CYCLE_COUNTER(STAT_TickBeginPass);
+		GetEngineLoop().BeginBackbufferPass();
+	}
 
 	FRenderer* Renderer = GetEngineLoop().GetRenderer();
 	const FViewportSettings Viewport{ 0, 0, Width, Height, 0.0f, 1.0f };
@@ -244,8 +313,11 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 	const FVector CameraForward = Camera->GetTransform().GetForward();
 
 	// 반투명이 Grid 위에 합성되도록 불투명 → Grid → 반투명 순서로 그린다.
-	Renderer->RenderQueueSorting(RenderQueue, ViewProjection);
-	Renderer->RenderOpaque(ViewProjection);
+	{
+		SCOPE_CYCLE_COUNTER(STAT_TickSortOpaque);
+		Renderer->RenderQueueSorting(RenderQueue, ViewProjection);
+		Renderer->RenderOpaque(ViewProjection);
+	}
 
 	// Grid가 깊이를 쓰기 전, 불투명만 그려진 깊이 버퍼로 측정한다.
 	if (bMeasureOcclusionRequested)
@@ -254,25 +326,33 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 		LastOcclusionMeasure = Renderer->MeasureOpaqueOcclusion(ViewProjection);
 	}
 
-	GridRenderer->OnRenderBatchGrid(
-		ViewProjection,
-		CameraLocation,
-		CameraForward,
-		EGridPlane::XY,
-		static_cast<float>(GridSettings.GridSpacing),
-		true,
-		Viewport);
+	{
+		SCOPE_CYCLE_COUNTER(STAT_TickGrid);
+		GridRenderer->OnRenderBatchGrid(
+			ViewProjection,
+			CameraLocation,
+			CameraForward,
+			EGridPlane::XY,
+			static_cast<float>(GridSettings.GridSpacing),
+			true,
+			Viewport);
+	}
 
-	// Grid 파이프라인이 바꾼 상태를 장면 기준으로 되돌린다.
-	RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
-	RenderCommand::SetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	Renderer->RenderTranslucent(ViewProjection);
+	{
+		SCOPE_CYCLE_COUNTER(STAT_TickTranslucentOverlay);
+		// Grid 파이프라인이 바꾼 상태를 장면 기준으로 되돌린다.
+		RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
+		RenderCommand::SetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		Renderer->RenderTranslucent(ViewProjection);
 
-	if (Outline->GetTarget())
-		OutlineRenderer->OnRender(*Outline, ViewProjection, Viewport);
+		DrawSelectionBounds(ViewProjection);
 
-	if (Gizmo->GetTarget())
-		GizmoRenderer->OnRender(*Gizmo, ViewProjection, CameraLocation, Camera->GetIsOrthogonal());
+		if (Outline->GetTarget())
+			OutlineRenderer->OnRender(*Outline, ViewProjection, Viewport);
+
+		if (Gizmo->GetTarget())
+			GizmoRenderer->OnRender(*Gizmo, ViewProjection, CameraLocation, Camera->GetIsOrthogonal());
+	}
 
 	{
 		SCOPE_CYCLE_COUNTER(STAT_ImGuiRender);
@@ -282,9 +362,16 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 		ImGuiRenderer->End();
 	}
 
-	GetEngineLoop().EndBackbufferPass();
+	{
+		SCOPE_CYCLE_COUNTER(STAT_TickEndPass);
+		GetEngineLoop().EndBackbufferPass();
+	}
 
-	FStatRegistry::EndFrame();
+	// EndFrame 자신의 시간은 다음 프레임의 표에 반영된다.
+	{
+		SCOPE_CYCLE_COUNTER(STAT_TickStatEndFrame);
+		FStatRegistry::EndFrame();
+	}
 }
 
 void UBenchmarkEngine::PreExit()
@@ -387,6 +474,18 @@ void UBenchmarkEngine::DrawProfileOverlay()
 		if (const FCycleStatData* PickingData = FStatRegistry::Find(EditorStats::STAT_PickingTime))
 		{
 			ImGui::Text("Picking Time - Last: %.4f ms, Attempts: %d, Acc.: %.4f ms", PickingData->GetLastMs(), PickingData->CallCount, PickingData->GetTotalMs());
+		}
+
+		if (UPrimitiveComponent* Selected = GetSelectedPrimitive())
+		{
+			if (AActor* Owner = Selected->GetOwner())
+				ImGui::Text("Selected: %s (UUID %u)", Owner->GetName().c_str(), Owner->GetUUID());
+			else
+				ImGui::Text("Selected: %s (UUID %u)", Selected->GetName().c_str(), Selected->GetUUID());
+		}
+		else
+		{
+			ImGui::TextUnformatted("Selected: None");
 		}
 
 		// 측정 전용: 불투명 물체 중 최종 화면에 픽셀을 남긴 비율 = 오클루전 컬링으로 얻을 수 있는 상한

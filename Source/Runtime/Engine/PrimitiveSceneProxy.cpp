@@ -9,6 +9,7 @@ void FPrimitiveSceneProxy::UpdateTransform()
 {
 	LocalToWorld = Component->GetWorldMatrix();
 	WorldToLocal = LocalToWorld.Inverse();
+	LocalToWorldTransposed = LocalToWorld.GetTransposed();
 	Bounds = MakeWorldBounds(Component->CalcLocalBounds().GetWorldAABB(LocalToWorld));
 }
 

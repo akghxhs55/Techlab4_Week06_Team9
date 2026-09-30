@@ -32,6 +32,7 @@ public:
 	const FAABB& GetBounds() const { return Bounds; }
 	const FMatrix& GetLocalToWorld() const { return LocalToWorld; }
 	const FMatrix& GetWorldToLocal() const { return WorldToLocal; }
+	const FMatrix& GetLocalToWorldTransposed() const { return LocalToWorldTransposed; }
 
 	UStaticMesh* GetMesh() const { return Mesh; }
 	bool IsVisible() const { return bVisible; }
@@ -47,6 +48,7 @@ private:
 
 	UPrimitiveComponent* Component = nullptr;
 	FMatrix LocalToWorld;
+	FMatrix LocalToWorldTransposed;
 	FMatrix WorldToLocal;
 	FAABB Bounds;
 	int32 PackedIndex = INDEX_NONE;

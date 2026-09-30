@@ -28,7 +28,7 @@ class UMaterial : public UMaterialInterface
 	DECLARE_CLASS(UMaterial, UMaterialInterface)
 
 public:
-	UMaterial() = default;
+	UMaterial() :SortID(NextSortID++) {};
 	virtual ~UMaterial() override = default;
 
 	EMaterialParamLayout ParamLayout = EMaterialParamLayout::None;
@@ -55,5 +55,8 @@ public:
 
 	static json SaveMaterial(const UMaterial* Material);
 	static UMaterial* LoadMaterial(const json& In);
+
+	const uint16 SortID;
 private:
+	inline static uint16 NextSortID = 0;
 };

@@ -12,6 +12,12 @@ struct FPerObjectConstants
 	FMatrix World;
 };
 
+struct FSortEntry
+{
+	uint64 Key;
+	uint32 PacketIndex;
+};
+
 class UCameraComponent;
 
 // 오클루전 컬링의 효과 상한을 재기 위한 측정 결과 (디버그 전용)
@@ -78,4 +84,6 @@ private:
 	void UpdatePerObjectConstants(const FRenderPacket& RenderPacket, const FMatrix& ViewProjection);
 	void EnsurePerObjectSlotCapacity(uint32 SlotCount);
 	void UploadPerObjectConstants();
+
+	TArray<FSortEntry> SortEntries;
 };

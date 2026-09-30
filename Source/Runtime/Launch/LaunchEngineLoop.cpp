@@ -21,6 +21,8 @@
 namespace
 {
 	DECLARE_CYCLE_STAT("Present", STAT_Present); // Actor 틱 측정
+	DECLARE_CYCLE_STAT("[Loop] Input & Messages", STAT_LoopInputMessages);
+	DECLARE_CYCLE_STAT("[Loop] Engine Tick (Total)", STAT_LoopEngineTick);
 
 	// 이 간격마다 FPS 평균을 갱신한다.
 	constexpr double FrameStatsWindowSeconds = 0.5;
@@ -115,9 +117,12 @@ bool FEngineLoop::PreInit(HINSTANCE hInstance, UClass* EngineClass)
 
 bool FEngineLoop::Tick()
 {
-	EngineTimer::Tick();
-	FInputSystem::UpdateInputStates();
-	MainWindow->ProcessMessage(bIsRunning);
+	{
+		SCOPE_CYCLE_COUNTER(STAT_LoopInputMessages);
+		EngineTimer::Tick();
+		FInputSystem::UpdateInputStates();
+		MainWindow->ProcessMessage(bIsRunning);
+	}
 
 	if (Config.bExitOnEscape && FInputSystem::IsKeyPressed(EKeyCode::Escape))
 	{
@@ -137,7 +142,10 @@ bool FEngineLoop::Tick()
 		return true;
 	}
 
-	GEngine->Tick(EngineTimer::GetDeltaTime());
+	{
+		SCOPE_CYCLE_COUNTER(STAT_LoopEngineTick);
+		GEngine->Tick(EngineTimer::GetDeltaTime());
+	}
 	{
 		SCOPE_CYCLE_COUNTER(STAT_Present);
 		Swapchain->SwapBuffers(Config.SyncInterval);
