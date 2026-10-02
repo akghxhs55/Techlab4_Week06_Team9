@@ -32,7 +32,13 @@ struct FRenderStats
 	void Reset() { *this = FRenderStats(); }
 };
 
-
+enum class EWorldType : uint8
+{
+	Editor,
+	EditorPreview,
+	PIE,
+	Game,
+};
 
 class UWorld : public UObject
 {
@@ -90,6 +96,9 @@ public:
 	FTickTaskManager& GetTickTaskManager() { return TickTaskManager; }
 
 	const FRenderStats& GetRenderStats() const { return RenderStats; }
+
+	inline EWorldType GetWorldType() const { return WorldType; }
+	inline void SetWorldType(EWorldType InWorldType) { WorldType = InWorldType; }
 private:
 	struct alignas(64) FGatherChunk
 	{
@@ -126,4 +135,18 @@ private:
     TArray<uint8> SelectedLODs;
 
 	FRenderStats RenderStats;
+
+	EWorldType WorldType = EWorldType::Editor;
+};
+
+struct FWorldContext
+{
+	/* Owned World */
+	UWorld* World = nullptr;
+
+	/* Contexts */
+	EWorldType WorldType = EWorldType::Editor;
+
+	// Other world contexts can be added later.
+	// ...
 };

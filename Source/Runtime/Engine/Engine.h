@@ -5,11 +5,6 @@
 
 #include "Engine/World.h"
 
-enum class EWorldType
-{
-
-};
-
 class FEngineLoop;
 
 // 엔진 모드별 실행 설정. UE에서는 ini가 맡는 부분이다.
