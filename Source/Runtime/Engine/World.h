@@ -35,9 +35,9 @@ struct FRenderStats
 enum class EWorldType : uint8
 {
 	Editor,
-	EditorPreview,
+	//EditorPreview,	// TODO
 	PIE,
-	Game,
+	//Game,				// TODO
 };
 
 class UWorld : public UObject

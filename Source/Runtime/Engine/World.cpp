@@ -114,7 +114,20 @@ void UWorld::Tick(float DeltaTime)
 	{
 		SCOPE_CYCLE_COUNTER(STAT_ActorTick);
 		// 모든 Actor를 도는 대신 등록된 Tick 함수(메인 카메라 포함)만 실행한다.
-		TickTaskManager.RunAllTickGroups(DeltaTime);
+
+		ELevelTick LevelTick;
+
+		switch (WorldType)
+		{
+		case EWorldType::Editor:
+			LevelTick = ELevelTick::ViewportsOnly;
+			break;
+		case EWorldType::PIE:
+			LevelTick = ELevelTick::All;
+			break;
+		}
+		
+		TickTaskManager.RunAllTickGroups(DeltaTime, LevelTick);
 
 		for (ULevel* Level : Levels)
 		{

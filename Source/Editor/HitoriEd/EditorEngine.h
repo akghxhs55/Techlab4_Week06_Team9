@@ -49,6 +49,9 @@ public:
 	void PresentFrame();
 	void DeleteActor(AActor* Actor);
 
+	void PausePIE(bool bPause) { bPIEPaused = bPause; }
+	bool IsPIEPaused() const { return bPIEPaused; }
+
 private:
 	// 이번 프레임 DeltaTime을 패널에 전달하고 에디터 단축키를 처리한다.
 	void BeginFrame(float DeltaTime);
@@ -93,6 +96,9 @@ private:
 
 	// Currently editing world context which type is EWorldType::Editor.
 	FWorldContext* EditorWorldContextRef = nullptr;
+
+	// If enabled, all the PIE world will not tick
+	bool bPIEPaused = false;
 
 	void ResetSceneSelection();
 

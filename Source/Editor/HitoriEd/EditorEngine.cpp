@@ -72,11 +72,12 @@ bool UEditorEngine::Init()
 		UWorld* World = FObjectFactory::ConstructObject<UWorld>();
 		if (!World || !World->Init()) return false;
 
+		EWorldType WorldType = EWorldType::Editor;
 		FWorldContext WorldContext = {
 			.World = World,
-			.WorldType = EWorldType::Editor
+			.WorldType = WorldType
 		};
-		World->SetWorldType(EWorldType::Editor);
+		World->SetWorldType(WorldType);
 		WorldContexts.Add(std::move(WorldContext));
 		EditorWorldContextRef = &WorldContexts.Last();
 	}
@@ -275,6 +276,10 @@ void UEditorEngine::TickWorldAndEditor(const float DeltaTime)
 		{
 			UWorld* World = Context.World;
 			assert(World);
+
+			// Skip ticking PIE worlds if paused
+			if (Context.WorldType == EWorldType::PIE && bPIEPaused)
+				continue;
 
 			World->Tick(DeltaTime);
 		}
