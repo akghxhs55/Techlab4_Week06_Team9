@@ -213,6 +213,12 @@ void UEditorEngine::BeginFrame(const float DeltaTime)
 
 	if (!ImGui::GetIO().WantTextInput && FInputSystem::IsKeyPressed(EKeyCode::Delete))
 		DeleteActor(OutlinerPanel->GetSelectedActor());
+
+	// TODO: Set World that each viewport is rendering.
+	for (int32 ViewIndex = 0; ViewIndex < 4; ++ViewIndex)
+	{
+		MultipleViewportsAdapter.SetViewWorld(ViewIndex, *EditorWorldContextRef->World);
+	}
 }
 
 // 패널의 Layout·Preset 요청과 입력을 Adapter에 반영한다.
@@ -290,11 +296,10 @@ void UEditorEngine::TickWorldAndEditor(const float DeltaTime)
 	}
 	{
 		SCOPE_CYCLE_COUNTER(STAT_CaptureWorld);
-		for (FWorldContext& Context : WorldContexts)
+		for (int32 ViewIndex = 0; ViewIndex < 4; ++ViewIndex)
 		{
-			UWorld* World = Context.World;
-			assert(World);
-			MultipleViewportsAdapter.CaptureWorld(*World);
+			if (MultipleViewportsAdapter.IsViewActive(ViewIndex))
+				MultipleViewportsAdapter.CaptureWorld(ViewIndex);
 		}
 	}
 	UpdateGizmoAndPicking();
@@ -375,9 +380,7 @@ void UEditorEngine::UpdateGizmoAndPicking()
 
 	if (FInputSystem::IsMousePressed(EMouseButton::Left) && !Gizmo->IsUsing() && Gizmo->GetHoveredAxis() < 0)
 	{
-		// TODO: Remove UWorld parameter of PickActiveView
-		UWorld* World = WorldContexts[0].World;
-		MultipleViewportsAdapter.PickActiveView(LocalMousePosition, *World);
+		MultipleViewportsAdapter.PickActiveView(LocalMousePosition);
 		MultipleViewportsAdapter.ApplyLastPickToOutliner(*OutlinerPanel);
 	}
 
@@ -397,9 +400,12 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		{
 			LineBatcher->BuildVertexBuffer();
 
-			// TODO: Iterate WorldContexts to render each world
-			UWorld* World = WorldContexts[0].World;
-			World->GetPathTracker().OnRender(LineBatcher.get());
+			for (auto& WorldContext : WorldContexts)
+			{
+				assert(WorldContext.World);
+				UWorld& World = *WorldContext.World;
+				World.GetPathTracker().OnRender(LineBatcher.get());
+			}
 		}
 
 		// 선택된 액터가 라이트면 원뿔을 같이 쌓는다
