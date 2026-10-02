@@ -70,6 +70,11 @@ void FSettingsPanel::OnRender()
 	ImGui::SliderFloat("Camera Speed", &Settings.CameraSpeed, 0.1f, 10.0f, "%.2f");
 	CamCom->SetMoveSpeed(Settings.CameraSpeed);
 
+	///////////////////////////////////////////////////////////
+	
+	ImGui::SeparatorText("Depth View");
+	ImGui::Checkbox("Depth View", &Settings.bDepthView);
+
 	//////////////////////////////////////////////////////////
 
 	ImGui::Dummy(ImVec2(0.0f, SectionGap));

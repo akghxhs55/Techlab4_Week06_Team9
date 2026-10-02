@@ -38,6 +38,8 @@ struct FEditorSettings
     FQuat ViewRotation[4]{};
     bool bViewLocationSaved[4]{};
     bool bViewRotationSaved[4]{};
+
+	bool bDepthView = false;
 };
 
 
