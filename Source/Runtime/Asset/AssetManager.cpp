@@ -117,6 +117,7 @@ void UAssetManager::Init(const FAssetLoadProgress& OnProgress)
 	Get().ScanAssets("Assets", OnProgress);
 	Get().CreateDefaultMeshes();
 	Get().CreateParticleMaterial();
+	Get().CreateSphereGlowMaterial();
 }
 
 void UAssetManager::ScanAssets(const fs::path& AssetRoot, const FAssetLoadProgress& OnProgress)
@@ -297,6 +298,18 @@ void UAssetManager::CreateParticleMaterial()
 	ParticleMat->ParamLayout = EMaterialParamLayout::ParticleSubUV;
 	ParticleMat->ParamBuffer = RenderCommand::CreateConstantBuffer(256);
 	RegisterAsset("SubUVMaterial", ParticleMat);
+}
+
+void UAssetManager::CreateSphereGlowMaterial()
+{
+	UMaterial* GlowMat = FObjectFactory::ConstructObject<UMaterial>();
+	GlowMat->Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/SphereGlowShader.hlsl");
+	GlowMat->RasterizerState = ERasterizerState::SolidNone;
+	GlowMat->BlendState = EBlendState::Additive;
+	GlowMat->DepthStencilState = EDepthStencilState::ReadOnly;
+	GlowMat->ParamLayout = EMaterialParamLayout::SphereGlow;
+	GlowMat->ParamBuffer = RenderCommand::CreateConstantBuffer(512);
+	RegisterAsset("SphereGlowMaterial", GlowMat);
 }
 
 void UAssetManager::Shutdown()

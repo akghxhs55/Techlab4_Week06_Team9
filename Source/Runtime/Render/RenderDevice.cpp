@@ -224,7 +224,6 @@ void FRenderDevice::CreateStates()
 		Desc.CullMode = D3D11_CULL_BACK;
 		Desc.FrontCounterClockwise = FALSE;
 		Desc.DepthClipEnable = TRUE;
-
 		Device->CreateRasterizerState(&Desc, RasterizerStates[(uint8)ERasterizerState::SolidBack].GetAddressOf());
 
 		Desc.CullMode = D3D11_CULL_NONE;
@@ -245,7 +244,6 @@ void FRenderDevice::CreateStates()
 		Desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
 		Desc.DepthFunc = D3D11_COMPARISON_LESS;
 		Desc.StencilEnable = FALSE;
-
 		Device->CreateDepthStencilState(&Desc, DepthStencilStates[(uint8)EDepthStencilState::Default].GetAddressOf());
 
 		Desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
@@ -284,7 +282,6 @@ void FRenderDevice::CreateStates()
 		Desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
 		Desc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
 		Desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-
 		Device->CreateBlendState(&Desc, BlendStates[(uint8)EBlendState::Opaque].GetAddressOf());
 
 		Desc.RenderTarget[0].BlendEnable = TRUE;
@@ -292,13 +289,22 @@ void FRenderDevice::CreateStates()
 		Desc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
 		Desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
 		Desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_INV_SRC_ALPHA;
-
 		Device->CreateBlendState(&Desc, BlendStates[(uint8)EBlendState::AlphaBlend].GetAddressOf());
 
 		// 스텐실 마스크 패스처럼 색은 쓰지 않고 깊이·스텐실만 갱신할 때 쓴다.
 		Desc.RenderTarget[0].BlendEnable = FALSE;
 		Desc.RenderTarget[0].RenderTargetWriteMask = 0;
 		Device->CreateBlendState(&Desc, BlendStates[(uint8)EBlendState::NoColorWrite].GetAddressOf());
+
+		Desc.RenderTarget[0].BlendEnable = TRUE;
+		Desc.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
+		Desc.RenderTarget[0].DestBlend = D3D11_BLEND_ONE;
+		Desc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+		Desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ZERO;
+		Desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
+		Desc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+		Desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+		Device->CreateBlendState(&Desc, BlendStates[(uint8)EBlendState::Additive].GetAddressOf());
 	}
 
 	// ---------- Sampler ----------
@@ -312,13 +318,11 @@ void FRenderDevice::CreateStates()
 		Desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
 		Desc.MinLOD = 0.0f;
 		Desc.MaxLOD = D3D11_FLOAT32_MAX;
-
 		Device->CreateSamplerState(&Desc, SamplerStates[(uint8)ESamplerState::LinearClamp].GetAddressOf());
 
 		Desc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
 		Desc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
 		Desc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
-
 		Device->CreateSamplerState(&Desc, SamplerStates[(uint8)ESamplerState::LinearWrap].GetAddressOf());
 	}
 }

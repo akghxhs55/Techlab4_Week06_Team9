@@ -12,7 +12,8 @@ enum class EMaterialParamLayout
 {
 	None,
 	StaticMesh,
-	ParticleSubUV
+	ParticleSubUV,
+	SphereGlow
 };
 
 struct FStaticMeshMaterialParams
@@ -35,6 +36,7 @@ public:
 	FShaderProgram* Shader;
 	TArray<UTexture2D*> Textures;
 	TUniquePtr<FConstantBuffer> ParamBuffer;
+	ERasterizerState RasterizerState = ERasterizerState::SolidBack;
 	EBlendState BlendState = EBlendState::Opaque;
 	EDepthStencilState DepthStencilState = EDepthStencilState::Default;
 	ESamplerState SamplerState = ESamplerState::LinearClamp;

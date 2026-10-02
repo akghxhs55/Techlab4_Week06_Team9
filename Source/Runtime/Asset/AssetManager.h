@@ -40,6 +40,7 @@ public:
 	void CreateDefaultMeshes();
 	void CreateDefaultMaterial();
 	void CreateParticleMaterial();
+	void CreateSphereGlowMaterial();
 
 	template <typename T>
 	static T* GetAssetByPath(const FString& Path)
