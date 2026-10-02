@@ -1,4 +1,4 @@
-// 다중 뷰포트의 레이아웃·카메라·가시성 계산을 제공한다.
+﻿// 다중 뷰포트의 레이아웃·카메라·가시성 계산을 제공한다.
 #include "EnginePCH.h"
 #include "Editor/LevelEditor/MultipleViewports/Core/MultipleViewports.h"
 
@@ -415,7 +415,7 @@ FPickHit Pick(const FRay& WorldRay, const TArray<FPickableObject>& Objects, cons
 // 카메라를 향하는 직교기저를 만들고 크기를 반영해 Billboard 행렬을 만든다.
 FBillboardTransform ComputeBillboardTransform(const FBillboardComputeInput& Input, const FCameraTransform& ViewCamera)
 {
-    FVector Forward = Subtract(ViewCamera.Location, Input.WorldPosition);
+    FVector Forward = Rotate(ViewCamera.Rotation, { -1.0f, 0.0f, 0.0f });
     if (LengthSquared(Forward) <= Epsilon * Epsilon)
     {
         Forward = Rotate(ViewCamera.Rotation, {-1.0f, 0.0f, 0.0f});
