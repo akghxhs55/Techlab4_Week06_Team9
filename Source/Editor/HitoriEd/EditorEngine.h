@@ -91,6 +91,9 @@ private:
 	FOutlinerPanel* OutlinerPanel = nullptr;
 	FContentDrawerPanel* ContentDrawerPanel = nullptr;
 
+	// Currently editing world context which type is EWorldType::Editor.
+	FWorldContext* EditorWorldContextRef = nullptr;
+
 	void ResetSceneSelection();
 
 	void CreateNewScene();

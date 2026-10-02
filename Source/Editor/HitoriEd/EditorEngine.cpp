@@ -67,6 +67,20 @@ bool UEditorEngine::Init()
 	if (!Super::Init())
 		return false;
 
+	// Create a default world context for the engine
+	{
+		UWorld* World = FObjectFactory::ConstructObject<UWorld>();
+		if (!World || !World->Init()) return false;
+
+		FWorldContext WorldContext = {
+			.World = World,
+			.WorldType = EWorldType::Editor
+		};
+		World->SetWorldType(EWorldType::Editor);
+		WorldContexts.Add(std::move(WorldContext));
+		EditorWorldContextRef = &WorldContexts.Last();
+	}
+
 	MainWindow = GetEngineLoop().GetMainWindow();
 	MainWindowSC = GetEngineLoop().GetSwapchain();
 	Renderer = GetEngineLoop().GetRenderer();
@@ -118,6 +132,9 @@ bool UEditorEngine::Init()
 
 	TextRenderer = MakeUnique<FTextRenderer>();
 	TextRenderer->Init();
+
+	// TODO: Iterate WorldContext to set each world
+	UWorld* World = WorldContexts[0].World;
 
 	// 투영 행렬 생성 
 	MultipleViewportsAdapter.InitializeFromWorld(*World);
@@ -254,7 +271,13 @@ void UEditorEngine::TickWorldAndEditor(const float DeltaTime)
 	// 월드 상태는 프레임마다 정확히 한 번 갱신하고 캡처한다.
 	{
 		SCOPE_CYCLE_COUNTER(STAT_WorldTick);
-		World->Tick(DeltaTime);
+		for (FWorldContext& Context : WorldContexts)
+		{
+			UWorld* World = Context.World;
+			assert(World);
+
+			World->Tick(DeltaTime);
+		}
 	}
 	{
 		SCOPE_CYCLE_COUNTER(STAT_EditorTick);
@@ -262,7 +285,12 @@ void UEditorEngine::TickWorldAndEditor(const float DeltaTime)
 	}
 	{
 		SCOPE_CYCLE_COUNTER(STAT_CaptureWorld);
-		MultipleViewportsAdapter.CaptureWorld(*World);
+		for (FWorldContext& Context : WorldContexts)
+		{
+			UWorld* World = Context.World;
+			assert(World);
+			MultipleViewportsAdapter.CaptureWorld(*World);
+		}
 	}
 	UpdateGizmoAndPicking();
 }
@@ -342,6 +370,8 @@ void UEditorEngine::UpdateGizmoAndPicking()
 
 	if (FInputSystem::IsMousePressed(EMouseButton::Left) && !Gizmo->IsUsing() && Gizmo->GetHoveredAxis() < 0)
 	{
+		// TODO: Remove UWorld parameter of PickActiveView
+		UWorld* World = WorldContexts[0].World;
 		MultipleViewportsAdapter.PickActiveView(LocalMousePosition, *World);
 		MultipleViewportsAdapter.ApplyLastPickToOutliner(*OutlinerPanel);
 	}
@@ -361,6 +391,9 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		if (SettingsPanel->GetSettings().bDrawBoundingBox)
 		{
 			LineBatcher->BuildVertexBuffer();
+
+			// TODO: Iterate WorldContexts to render each world
+			UWorld* World = WorldContexts[0].World;
 			World->GetPathTracker().OnRender(LineBatcher.get());
 		}
 
@@ -474,36 +507,42 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 
 	if (SettingsPanel->GetSettings().bShowUUID)
 	{
-		for (AActor* Actor : World->GetPersistentLevel()->GetActors())
+		for (FWorldContext& worldContext : WorldContexts)
 		{
-			if (!Actor)
-				continue;
+			assert(worldContext.World);
+			UWorld* World = worldContext.World;
 
-			UPrimitiveComponent* Primitive =
-				Cast<UPrimitiveComponent>(Actor->GetRootComponent());
+			for (AActor* Actor : World->GetPersistentLevel()->GetActors())
+			{
+				if (!Actor)
+					continue;
 
-			if (!Primitive)
-				continue;
+				UPrimitiveComponent* Primitive =
+					Cast<UPrimitiveComponent>(Actor->GetRootComponent());
 
-			FBox Box =
-				Primitive->CalcBounds();
+				if (!Primitive)
+					continue;
 
-			FVector UUIDLocation;
-			UUIDLocation.X = (Box.Min.X + Box.Max.X) * 0.5f;
-			UUIDLocation.Y = (Box.Min.Y + Box.Max.Y) * 0.5f;
-			UUIDLocation.Z = Box.Max.Z + 0.5f;
+				FBox Box =
+					Primitive->CalcBounds();
 
-			FString Text =
-				"UUID : " + std::to_string(Actor->GetUUID());
+				FVector UUIDLocation;
+				UUIDLocation.X = (Box.Min.X + Box.Max.X) * 0.5f;
+				UUIDLocation.Y = (Box.Min.Y + Box.Max.Y) * 0.5f;
+				UUIDLocation.Z = Box.Max.Z + 0.5f;
 
-			TextRenderer->BuildTextMesh(
-				Text,
-				0.5f,
-				*SystemFont
-			);
+				FString Text =
+					"UUID : " + std::to_string(Actor->GetUUID());
 
-			const FMatrix BillboardWorld = MultipleViewportsAdapter.BuildEngineBillboardMatrix(ViewIndex, UUIDLocation, 1.0f, 1.0f);
-			TextRenderer->OnRender(Text, BillboardWorld, 0.5f, *SystemFont, ViewProjection);
+				TextRenderer->BuildTextMesh(
+					Text,
+					0.5f,
+					*SystemFont
+				);
+
+				const FMatrix BillboardWorld = MultipleViewportsAdapter.BuildEngineBillboardMatrix(ViewIndex, UUIDLocation, 1.0f, 1.0f);
+				TextRenderer->OnRender(Text, BillboardWorld, 0.5f, *SystemFont, ViewProjection);
+			}
 		}
 	}
 
@@ -561,6 +600,7 @@ void UEditorEngine::ResetSceneSelection()
 // 새 씬 생성이 성공하면 에디터 선택 상태를 초기화한다.
 void UEditorEngine::CreateNewScene()
 {
+	UWorld* World = EditorWorldContextRef->World;
 	if (!FEditorFileUtils::NewScene(World))
 		return;
 
@@ -570,6 +610,7 @@ void UEditorEngine::CreateNewScene()
 // 씬 불러오기가 성공하면 에디터 선택 상태를 초기화한다.
 void UEditorEngine::OpenScene()
 {
+	UWorld* World = EditorWorldContextRef->World;
 	if (!FEditorFileUtils::LoadScene(World))
 		return;
 
@@ -579,11 +620,13 @@ void UEditorEngine::OpenScene()
 // 공통 파일 유틸리티로 현재 씬을 저장한다.
 void UEditorEngine::SaveCurrentScene()
 {
+	UWorld* World = EditorWorldContextRef->World;
 	FEditorFileUtils::SaveScene(World);
 }
 
 // 공통 파일 유틸리티로 새 경로에 씬을 저장한다.
 void UEditorEngine::SaveSceneAs()
 {
+	UWorld* World = EditorWorldContextRef->World;
 	FEditorFileUtils::SaveSceneAs(World);
 }

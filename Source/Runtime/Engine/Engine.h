@@ -39,12 +39,13 @@ public:
 	// UObject 일괄 정리와 GPU 자원 해제 전에 호출된다.
 	virtual void PreExit() {};
 
-	UWorld* GetWorld() const { return World; }
+	//UWorld* GetWorld() const { return World; }
 
 protected:
 	FEngineLoop& GetEngineLoop() const { return *EngineLoop; }
 
-	UWorld* World = nullptr;
+	//UWorld* World = nullptr;
+	TArray<FWorldContext> WorldContexts;
 private:
 	FEngineLoop* EngineLoop = nullptr;
 };

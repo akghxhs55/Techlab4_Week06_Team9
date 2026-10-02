@@ -48,6 +48,14 @@ bool UBenchmarkEngine::Init()
 	if (!Super::Init())
 		return false;
 
+	// Create a default world for the engine
+	{
+		World = FObjectFactory::ConstructObject<UWorld>();
+		if (!World || !World->Init()) return false;
+
+		World->SetWorldType(EWorldType::Editor);
+	}
+
 	ImGuiRenderer = MakeUnique<FImGuiRenderer>();
 	if (!ImGuiRenderer->Init(GetEngineLoop().GetMainWindow()->GetHandle(), GetEngineLoop().GetRenderDevice()->GetDevice(), GetEngineLoop().GetRenderDevice()->GetContext()))
 	{
