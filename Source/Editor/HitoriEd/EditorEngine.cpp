@@ -197,6 +197,9 @@ bool UEditorEngine::Init()
 		MultipleViewportsAdapter.SetViewWorld(ViewIndex, *EditorWorldContextRef->World);
 	}
 
+	// DEBUG
+	StartPIE(1);
+
 	return true;
 }
 
@@ -356,6 +359,14 @@ void UEditorEngine::UpdateGizmoAndPicking()
 	if (ViewIndex == InvalidViewIndex || !ViewportsPanel->IsHovered())
 		return;
 
+	// Do not pick gizmo if the current world of the active view is not the editor world.
+	{
+		const UWorld* ActiveViewWorld = MultipleViewportsAdapter.GetViewWorld(ViewIndex);
+		assert(ActiveViewWorld);
+		if (ActiveViewWorld->GetWorldType() != EWorldType::Editor)
+			return;
+	}
+
 	const FVector2 LocalMousePosition = ViewportsPanel->GetLocalMousePosition();
 	FRay Ray{};
 	if (!MultipleViewportsAdapter.TryGetActiveViewRay(LocalMousePosition, Ray))
@@ -493,13 +504,18 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		);
 	}
 
+	// Do not draw Gizmo and Outline if the world type of the current view is PIE
+	const UWorld* CurrentWorld = MultipleViewportsAdapter.GetViewWorld(ViewIndex);
+	assert(CurrentWorld);
+	bool bIsPIEWorld = CurrentWorld->GetWorldType() == EWorldType::PIE;
+
 	// 스텐실 기반이라 선택 대상의 가시성이 꺼져 있어도 외곽선만 그린다.
-	if (Outline->GetTarget())
+	if (Outline->GetTarget() && !bIsPIEWorld)
 	{
 		OutlineRenderer->OnRender(*Outline, ViewProjection, ViewRenderingInfo.ViewportSetting);
 	}
 
-	if (Gizmo->GetTarget())
+	if (Gizmo->GetTarget() && !bIsPIEWorld)
 	{
 		auto Target = Cast<UPrimitiveComponent>(Gizmo->GetTarget());
 
