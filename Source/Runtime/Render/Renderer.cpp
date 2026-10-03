@@ -142,6 +142,11 @@ void FRenderer::RenderOpaque(const FMatrix& ViewProjection)
 {
 	DrawStaticGroups();
 	DrawPackets(0, FirstTranslucentIndex, ViewProjection);
+
+	if (RenderCommand::GetRasterizerState() != ERasterizerState::Wireframe)
+	{
+		RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
+	}
 }
 
 // RenderOpaque가 남긴 반투명 패킷을 먼 것부터 그린다.
@@ -454,12 +459,16 @@ void FRenderer::EndObjectConstants()
 void FRenderer::BindMaterial(UMaterial* material)
 {
 	RenderCommand::BindShaderProgram(material->Shader);
-	RenderCommand::SetRasterizerState(material->RasterizerState);
 	RenderCommand::SetBlendState(material->BlendState);
 	// 반투명은 뒤에 그려지는 Grid·다른 반투명을 가리지 않도록 깊이를 쓰지 않는다.
 	const bool bTranslucent = material->BlendState != EBlendState::Opaque;
 	RenderCommand::SetDepthStencilState(bTranslucent && material->DepthStencilState == EDepthStencilState::Default
 		? EDepthStencilState::ReadOnly : material->DepthStencilState);
+
+	if (RenderCommand::GetRasterizerState() != ERasterizerState::Wireframe)
+	{
+		RenderCommand::SetRasterizerState(material->bTwoSided ? ERasterizerState::SolidNone : ERasterizerState::SolidBack);
+	}
 
 	for (int i = 0; i < material->Textures.size(); i++)
 	{

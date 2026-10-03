@@ -36,10 +36,10 @@ public:
 	FShaderProgram* Shader;
 	TArray<UTexture2D*> Textures;
 	TUniquePtr<FConstantBuffer> ParamBuffer;
-	ERasterizerState RasterizerState = ERasterizerState::SolidBack;
 	EBlendState BlendState = EBlendState::Opaque;
 	EDepthStencilState DepthStencilState = EDepthStencilState::Default;
 	ESamplerState SamplerState = ESamplerState::LinearClamp;
+	bool bTwoSided = false;
 
 	FVector4 BaseColor = FVector4(1, 1, 1, 1);
 	FVector2 UVScrollSpeed = FVector2(0.0f, 0.0f);

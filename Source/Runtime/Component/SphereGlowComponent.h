@@ -5,8 +5,8 @@
 struct alignas(16) FSphereGlowConstants
 {
     FVector Center;          
-    float Radius = 100.0f;    
-    FVector4 Color = FVector4(1.0f, 0.5f, 0.1f, 1.0f);           
+    float Radius = 1.0f;    
+    FVector4 Color = FVector4(1.0f, 0.0f, 0.0f, 1.0f);           
     float Intensity = 1.0f;
     float RadiusFallOff = 2.0f;
     float Padding[2] = { 0, 0 };
@@ -14,27 +14,34 @@ struct alignas(16) FSphereGlowConstants
 
 class USphereGlowComponent : public UPrimitiveComponent
 {
-	DECLARE_CLASS(USphereGlowComponent, UPrimitiveComponent)
+    DECLARE_CLASS(USphereGlowComponent, UPrimitiveComponent)
     REFLECT_START(USphereGlowComponent)
-        PROPERTY(CachedConstants.Intensity)
-        PROPERTY(CachedConstants.Radius)
-        PROPERTY(CachedConstants.RadiusFallOff)
-        PROPERTY_TYPE(CachedConstants.Color, Color)
-    REFLECT_END()
+        PROPERTY(Intensity)
+        PROPERTY(Radius)
+        PROPERTY(RadiusFallOff)
+        PROPERTY_TYPE(Color, Color)
+        REFLECT_END()
 
 public:
-	USphereGlowComponent();
+    USphereGlowComponent();
     virtual ~USphereGlowComponent() override = default;
 
-	void SubmitToRenderQueue(FRenderQueue& RenderQueue) override;
-	virtual const FStaticMeshData* GetMeshData() const override;
-	virtual FBox CalcLocalBounds() const override;
+    void SubmitToRenderQueue(FRenderQueue& RenderQueue) override;
+    virtual const FStaticMeshData* GetMeshData() const override;
+    virtual FBox CalcLocalBounds() const override;
 
 protected:
-    FSphereGlowConstants CachedConstants;
+    // 에디터/인스펙터 노출 속성
+    float Radius = 1.0f;
+    float Intensity = 1.0f;
+    float RadiusFallOff = 2.0f;
+    FVector4 Color = FVector4(1.0f, 0.0f, 0.0f, 1.0f);
+
     float LastRadius = -1.0f;
 
-	UStaticMesh* SphereGlowMesh = nullptr;
+    // GPU 렌더링 전달용 캐시
+    FSphereGlowConstants CachedConstants;
+
+    UStaticMesh* SphereGlowMesh = nullptr;
     UMaterial* SphereGlowMaterial = nullptr;
 };
-

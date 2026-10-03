@@ -12,11 +12,6 @@ USphereGlowComponent::USphereGlowComponent()
 
 void USphereGlowComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue)
 {
-    if (!SphereGlowMaterial)
-        SphereGlowMaterial = UAssetManager::GetAssetByPath<UMaterial>("SphereGlowMaterial");
-    if (!SphereGlowMesh)
-        SphereGlowMesh = UAssetManager::GetAssetByPath<UStaticMesh>("Sphere");
-
     const FPrimitiveSceneProxy* Proxy = GetSceneProxy();
     if (!SphereGlowMesh || !Proxy) return;
 
@@ -30,6 +25,11 @@ void USphereGlowComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue)
     }
 
     CachedConstants.Center = GetWorldLocation();
+    CachedConstants.Radius = Radius;
+    CachedConstants.Color = Color;
+    CachedConstants.Intensity = Intensity;
+    CachedConstants.RadiusFallOff = RadiusFallOff;
+
     FRenderPacket& Packet = RenderQueue.AddDefaulted_GetRef();
     Packet.Proxy = Proxy;
     Packet.Mesh = SphereGlowMesh;

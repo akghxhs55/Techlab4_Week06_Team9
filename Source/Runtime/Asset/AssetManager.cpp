@@ -304,9 +304,9 @@ void UAssetManager::CreateSphereGlowMaterial()
 {
 	UMaterial* GlowMat = FObjectFactory::ConstructObject<UMaterial>();
 	GlowMat->Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/SphereGlowShader.hlsl");
-	GlowMat->RasterizerState = ERasterizerState::SolidNone;
 	GlowMat->BlendState = EBlendState::Additive;
 	GlowMat->DepthStencilState = EDepthStencilState::ReadOnly;
+	GlowMat->bTwoSided = true;
 	GlowMat->ParamLayout = EMaterialParamLayout::SphereGlow;
 	GlowMat->ParamBuffer = RenderCommand::CreateConstantBuffer(512);
 	RegisterAsset("SphereGlowMaterial", GlowMat);

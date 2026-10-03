@@ -38,6 +38,7 @@ UMaterial* UMaterial::CreateInstance(const UMaterial* Source)
 	Instance->SamplerState = Source->SamplerState;
 	Instance->BaseColor = Source->BaseColor;
 	Instance->UVScrollSpeed = Source->UVScrollSpeed;
+	Instance->bTwoSided = Source->bTwoSided;
 
 	// ParamBuffer는 TUniquePtr라 복사할 수 없다.
 	// 원본이 갖고 있으면 같은 크기로 새로 만들어 준다. 내용은 매 프레임 갱신되므로 옮기지 않는다.
@@ -86,6 +87,7 @@ json UMaterial::SaveMaterial(const UMaterial* Material)
 	};
 	Out["SamplerState"] = Material->SamplerState == ESamplerState::LinearWrap ? "LinearWrap" : "LinearClamp";
 	Out["BlendState"] = Material->BlendState == EBlendState::AlphaBlend ? "AlphaBlend" : "Opaque";
+	Out["bTwoSided"] = Material->bTwoSided;
 
 	json Textures = json::array();
 	for (UTexture2D* Texture : Material->Textures)
@@ -150,6 +152,10 @@ UMaterial* UMaterial::LoadMaterial(const json& In)
 	{
 		const FString State = In["BlendState"].get<FString>();
 		Instance->BlendState = State == "AlphaBlend" ? EBlendState::AlphaBlend : EBlendState::Opaque;
+	}
+	if (In.contains("bTwoSided"))
+	{
+		Instance->bTwoSided = In["bTwoSided"].get<bool>();
 	}
 
 	return Instance;
