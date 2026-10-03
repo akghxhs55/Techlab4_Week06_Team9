@@ -13,7 +13,7 @@ public:
 	FLineBatcher() = default;
 	~FLineBatcher();
 	bool Init(FRenderer* InRenderer, UWorld* InWorld);
-	void BuildVertexBuffer();
+	void BuildVertexBuffer(const UWorld& World);
 
 	void BeginFrame();
 

@@ -35,6 +35,7 @@ public:
 	// UI에서 발생한 View별 Camera Preset 요청을 한 번 소비하도록 반환한다.
 	bool ConsumeCameraPresetRequest(int32& OutViewIndex, EMultipleViewportsCameraPreset& OutPreset);
 
+	FTexture2D* GetViewRenderTarget(int32 ViewIndex) const;
 private:
 	FMultipleViewportsAdapter* ViewportAdapter = nullptr;
 	struct FViewSlot
@@ -44,8 +45,14 @@ private:
 		bool bActive = false;
 		uint32 Width = 0;
 		uint32 Height = 0;
+
+		// Screen Quad를 그리고, 후처리를 적용시킬 렌더 타깃 버퍼. AddImage 의 대상이 이제 이 이미지가 되어야 한다. 
+		// 이 이미지는 RTV, SRV, UAV 모두 지원해야 한다. ( 뷰가 모두 있어야 한다 ) 
+		TUniquePtr<FTexture2D> RenderTarget; 
+
 		TUniquePtr<FTexture2D> ColorTarget;
 		TUniquePtr<FTexture2D> DepthTarget;
+
 		FRenderingInfo RenderingInfo{};
 	};
 

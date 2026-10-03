@@ -32,6 +32,7 @@
 #include "Core/EngineLog.h"
 #include "Core/Stats/LightweightStats.h"
 
+
 namespace
 {
 	DECLARE_CYCLE_STAT("Viewport Update", STAT_ViewportUpdate);
@@ -66,6 +67,21 @@ bool UEditorEngine::Init()
 {
 	if (!Super::Init())
 		return false;
+
+	// Create a default world context for the engine
+	{
+		UWorld* World = FObjectFactory::ConstructObject<UWorld>();
+		if (!World || !World->Init()) return false;
+
+		EWorldType WorldType = EWorldType::Editor;
+		FWorldContext WorldContext = {
+			.World = World,
+			.WorldType = WorldType
+		};
+		World->SetWorldType(WorldType);
+		WorldContexts.Add(MakeUnique<FWorldContext>(WorldContext));
+		EditorWorldContextRef = WorldContexts.Last().get();
+	}
 
 	MainWindow = GetEngineLoop().GetMainWindow();
 	MainWindowSC = GetEngineLoop().GetSwapchain();
@@ -118,6 +134,12 @@ bool UEditorEngine::Init()
 
 	TextRenderer = MakeUnique<FTextRenderer>();
 	TextRenderer->Init();
+
+	ScreenQuadRenderer = MakeUnique<FScreenQuadRenderer>();
+	ScreenQuadRenderer->Init(); 
+
+	// TODO: Iterate WorldContext to set each world
+	UWorld* World = WorldContexts[0]->World;
 
 	// 투영 행렬 생성 
 	MultipleViewportsAdapter.InitializeFromWorld(*World);
@@ -172,6 +194,15 @@ bool UEditorEngine::Init()
 
 	SkyboxRenderer = MakeUnique<FSkyboxRenderer>();
 	SkyboxRenderer->Init("Assets/SkySphere/Sky.jpg");
+
+	// TODO: Set World that each viewport is rendering.
+	for (int32 ViewIndex = 0; ViewIndex < 4; ++ViewIndex)
+	{
+		MultipleViewportsAdapter.SetViewWorld(ViewIndex, *EditorWorldContextRef->World);
+	}
+
+	// DEBUG
+	StartPIE(1);
 
 	return true;
 }
@@ -254,7 +285,17 @@ void UEditorEngine::TickWorldAndEditor(const float DeltaTime)
 	// 월드 상태는 프레임마다 정확히 한 번 갱신하고 캡처한다.
 	{
 		SCOPE_CYCLE_COUNTER(STAT_WorldTick);
-		World->Tick(DeltaTime);
+		for (auto& Context : WorldContexts)
+		{
+			UWorld* World = Context->World;
+			assert(World);
+
+			// Skip ticking PIE worlds if paused
+			if (Context->WorldType == EWorldType::PIE && bPIEPaused)
+				continue;
+
+			World->Tick(DeltaTime);
+		}
 	}
 	{
 		SCOPE_CYCLE_COUNTER(STAT_EditorTick);
@@ -262,7 +303,11 @@ void UEditorEngine::TickWorldAndEditor(const float DeltaTime)
 	}
 	{
 		SCOPE_CYCLE_COUNTER(STAT_CaptureWorld);
-		MultipleViewportsAdapter.CaptureWorld(*World);
+		for (int32 ViewIndex = 0; ViewIndex < 4; ++ViewIndex)
+		{
+			if (MultipleViewportsAdapter.IsViewActive(ViewIndex))
+				MultipleViewportsAdapter.CaptureWorld(ViewIndex);
+		}
 	}
 	UpdateGizmoAndPicking();
 }
@@ -289,7 +334,25 @@ void UEditorEngine::RenderMultipleViewports()
 			MultipleViewportsAdapter.GetEngineCameraLocation(ViewIndex),
 			MultipleViewportsAdapter.GetEngineCameraForward(ViewIndex),
 			RenderQueue);
+
+
+		// 지금까지 그린 결과를 Screen Quad 로 그리는 과정 추가... 
+		// 1. 현재 RT 는 어디에 -> Renderer 에 있다. 
+		// 1-1. Renderer 에 Screen Quad 를 그려야 하나?	
+		// RT 를 BackBuffer 에 그리는 것이 아니라, 화면 크기와 동일한 Texture 에 그리고, 모든 렌더링이 끝난 이후에 Screen Quad 를 그려서 BackBuffer 에 그린다.
+		
+		
+		auto info = ViewportsPanel->GetRenderingInfo(ViewIndex);
+		ScreenQuadRenderer->Render(ViewportsPanel->GetViewRenderTarget(ViewIndex), info, MultipleViewportsAdapter.GetEngineProjectionMatrix(ViewIndex));
+	
 	}
+
+
+	// 여기서 Screen Quad Render 를 수행한다. 
+	// Buffer Visualization 이 켜져있는 경우, 대상 버퍼를 Texture 로 바인딩 하고, Screen Quad 를 그린다. 
+	// 아닌 경우, 일반 RT 를 Texture 로 바인딩 하고, Screen Quad 를 그린다.
+	
+
 
 	EMultipleViewportsCameraPreset CameraPresets[4]{};
 	for (int32 ViewIndex = 0; ViewIndex < 4; ++ViewIndex)
@@ -318,6 +381,14 @@ void UEditorEngine::UpdateGizmoAndPicking()
 	if (ViewIndex == InvalidViewIndex || !ViewportsPanel->IsHovered())
 		return;
 
+	// Do not pick gizmo if the current world of the active view is not the editor world.
+	{
+		const UWorld* ActiveViewWorld = MultipleViewportsAdapter.GetViewWorld(ViewIndex);
+		assert(ActiveViewWorld);
+		if (ActiveViewWorld->GetWorldType() != EWorldType::Editor)
+			return;
+	}
+
 	const FVector2 LocalMousePosition = ViewportsPanel->GetLocalMousePosition();
 	FRay Ray{};
 	if (!MultipleViewportsAdapter.TryGetActiveViewRay(LocalMousePosition, Ray))
@@ -342,7 +413,7 @@ void UEditorEngine::UpdateGizmoAndPicking()
 
 	if (FInputSystem::IsMousePressed(EMouseButton::Left) && !Gizmo->IsUsing() && Gizmo->GetHoveredAxis() < 0)
 	{
-		MultipleViewportsAdapter.PickActiveView(LocalMousePosition, *World);
+		MultipleViewportsAdapter.PickActiveView(LocalMousePosition);
 		MultipleViewportsAdapter.ApplyLastPickToOutliner(*OutlinerPanel);
 	}
 
@@ -352,6 +423,11 @@ void UEditorEngine::UpdateGizmoAndPicking()
 void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& ViewRenderingInfo, const FMatrix& ViewProjection, const FVector& ViewCameraLocation, const FVector& ViewCameraForward, FRenderQueue& RenderQueue)
 {
 	RenderCommand::BeginRenderPass(ViewRenderingInfo);
+
+	// Get the world of the current viewport is using.
+	UWorld* CurrentWorld = MultipleViewportsAdapter.GetViewWorld(ViewIndex);
+	assert(CurrentWorld);
+
 	if (SettingsPanel->GetSettings().bDrawBatchLine)
 	{
 		// 라인 배처는 매 프레임 한 번만 비우고 한 번만 그린다.
@@ -360,8 +436,9 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 
 		if (SettingsPanel->GetSettings().bDrawBoundingBox)
 		{
-			LineBatcher->BuildVertexBuffer();
-			World->GetPathTracker().OnRender(LineBatcher.get());
+			LineBatcher->BuildVertexBuffer(*CurrentWorld);
+
+			CurrentWorld->GetPathTracker().OnRender(LineBatcher.get());
 		}
 
 		// 선택된 액터가 라이트면 원뿔을 같이 쌓는다
@@ -440,6 +517,11 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 			continue;
 		}
 
+		// Skip if this comopnent is not in current viewport world
+		// TODO: Modify TObjectIterator to support filtering by world type or find a better way
+		if (TextComponent->GetOwner()->GetWorld() != CurrentWorld)
+			continue;
+
 		TextRenderer->OnRender(
 			TextComponent->GetText(),
 			TextComponent->GetWorldMatrix(),
@@ -449,19 +531,20 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		);
 	}
 
+	// Do not draw Gizmo and Outline if the world type of the current view is PIE
+	bool bIsPIEWorld = CurrentWorld->GetWorldType() == EWorldType::PIE;
+
 	// 스텐실 기반이라 선택 대상의 가시성이 꺼져 있어도 외곽선만 그린다.
-	if (Outline->GetTarget())
+	if (Outline->GetTarget() && !bIsPIEWorld)
 	{
 		OutlineRenderer->OnRender(*Outline, ViewProjection, ViewRenderingInfo.ViewportSetting);
 	}
 
-	if (Gizmo->GetTarget())
+	if (Gizmo->GetTarget() && !bIsPIEWorld)
 	{
 		auto Target = Cast<UPrimitiveComponent>(Gizmo->GetTarget());
 
 		FBox box = Target->CalcBounds();
-
-		RenderCommand::ClearDepthStencil(ViewRenderingInfo.DepthStencil.Texture);
 
 		GizmoRenderer->OnRender(
 			*Gizmo,
@@ -470,11 +553,11 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 			MultipleViewportsAdapter.IsOrthographic(ViewIndex));
 	}
 
-	RenderCommand::ClearDepthStencil(ViewRenderingInfo.DepthStencil.Texture);
 
 	if (SettingsPanel->GetSettings().bShowUUID)
 	{
-		for (AActor* Actor : World->GetPersistentLevel()->GetActors())
+
+		for (AActor* Actor : CurrentWorld->GetPersistentLevel()->GetActors())
 		{
 			if (!Actor)
 				continue;
@@ -504,6 +587,7 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 
 			const FMatrix BillboardWorld = MultipleViewportsAdapter.BuildEngineBillboardMatrix(ViewIndex, UUIDLocation, 1.0f, 1.0f);
 			TextRenderer->OnRender(Text, BillboardWorld, 0.5f, *SystemFont, ViewProjection);
+
 		}
 	}
 
@@ -561,6 +645,7 @@ void UEditorEngine::ResetSceneSelection()
 // 새 씬 생성이 성공하면 에디터 선택 상태를 초기화한다.
 void UEditorEngine::CreateNewScene()
 {
+	UWorld* World = EditorWorldContextRef->World;
 	if (!FEditorFileUtils::NewScene(World))
 		return;
 
@@ -570,6 +655,7 @@ void UEditorEngine::CreateNewScene()
 // 씬 불러오기가 성공하면 에디터 선택 상태를 초기화한다.
 void UEditorEngine::OpenScene()
 {
+	UWorld* World = EditorWorldContextRef->World;
 	if (!FEditorFileUtils::LoadScene(World))
 		return;
 
@@ -579,11 +665,74 @@ void UEditorEngine::OpenScene()
 // 공통 파일 유틸리티로 현재 씬을 저장한다.
 void UEditorEngine::SaveCurrentScene()
 {
+	UWorld* World = EditorWorldContextRef->World;
 	FEditorFileUtils::SaveScene(World);
 }
 
 // 공통 파일 유틸리티로 새 경로에 씬을 저장한다.
 void UEditorEngine::SaveSceneAs()
 {
+	UWorld* World = EditorWorldContextRef->World;
 	FEditorFileUtils::SaveSceneAs(World);
+}
+
+bool UEditorEngine::StartPIE(int32 ViewIndex)
+{
+	if (ViewIndex < 0 || ViewIndex >= 4)
+	{
+		HTR_LOG(Error, "Invalid ViewIndex for StartPIE: {}", ViewIndex);
+		return false;
+	}
+
+	UWorld* OriginalWorld = MultipleViewportsAdapter.GetViewWorld(ViewIndex);
+
+	assert(OriginalWorld);
+	if (OriginalWorld->GetWorldType() != EWorldType::Editor)
+	{
+		HTR_LOG(Error, "StartPIE can only be called on an Editor world. Current world type: {}", static_cast<int>(OriginalWorld->GetWorldType()));
+		return false;
+	}
+
+	// Create a new PIE world
+	// TODO: Copy original world
+	UWorld* PIEWorld = FObjectFactory::ConstructObject<UWorld>();
+	if (!PIEWorld || !PIEWorld->Init())
+	{
+		HTR_LOG(Error, "Failed to create PIE world.");
+		return false;
+	}
+
+	PIEWorld->SetWorldType(EWorldType::PIE);
+	FWorldContext PIEWorldContext = {
+		.World = PIEWorld,
+		.WorldType = EWorldType::PIE
+	};
+
+	WorldContexts.Add(MakeUnique<FWorldContext>(PIEWorldContext));
+	MultipleViewportsAdapter.SetViewWorld(ViewIndex, *PIEWorld);
+	return true;
+}
+
+bool UEditorEngine::EndPIE(int32 ViewIndex)
+{
+	UWorld* PIEWorld = MultipleViewportsAdapter.GetViewWorld(ViewIndex);
+
+	assert(PIEWorld);
+	if (PIEWorld->GetWorldType() != EWorldType::PIE)
+	{
+		HTR_LOG(Error, "EndPIE can only be called on a PIE world. Current world type: {}", static_cast<int>(PIEWorld->GetWorldType()));
+		return false;
+	}
+
+	// Find FWorldContext for the PIE world and remove it
+	for (int32 i = 0; i < WorldContexts.Num(); ++i)
+	{
+		if (WorldContexts[i]->World == PIEWorld)
+		{
+			WorldContexts.RemoveAt(i, 1);
+			MultipleViewportsAdapter.SetViewWorld(ViewIndex, *EditorWorldContextRef->World);
+			return true;
+		}
+	}
+	return false;
 }

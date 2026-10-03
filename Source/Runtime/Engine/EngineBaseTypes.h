@@ -11,6 +11,16 @@ class FTickTaskManager;
 // 같은 그룹 안에서는 등록 순서대로, 그룹끼리는 선언 순서대로 실행
 enum class ETickingGroup : uint8 { PrePhysics, DuringPhysics, PostPhysics, PostUpdateWork, Max };
 
+enum class ELevelTick
+{
+	All,			// Tick everything. Used in game mode
+	ViewportsOnly,	// Tick for viewports only. Used in editor mode
+	PauseTick,
+
+	// TODO
+	//TimeOnly,
+};
+
 // UE의 FTickFunction 축소판. bCanEverTick이 켜진 함수만 FTickTaskManager에 등록되어
 // 등록되지 않은 Actor·Component는 매 프레임 순회 대상에서 빠진다.
 struct FTickFunction
@@ -26,7 +36,7 @@ public:
 	FTickFunction(const FTickFunction&) = delete;
 	FTickFunction& operator=(const FTickFunction&) = delete;
 
-	virtual void ExecuteTick(float DeltaTime) = 0;
+	virtual void ExecuteTick(float DeltaTime, ELevelTick LevelTick) = 0;
 
 	void RegisterTickFunction(FTickTaskManager& InManager);
 	void UnRegisterTickFunction();
@@ -36,6 +46,7 @@ public:
 
 	uint8 bTickEvenWhenPaused : 1 = false;
 	uint8 bCanEverTick : 1 = false;          // UE 기본값
+	uint8 bTickInEditor : 1 = false;         // 에디터에서 Tick을 켤 껀지?
 	uint8 bStartWithTickEnabled : 1 = true;  // 등록할때 바로 Tick을 켤 껀지?
 
 	ETickingGroup TickGroup = ETickingGroup::PrePhysics; // 실행 순서 그룹
@@ -56,13 +67,13 @@ private:
 struct FActorTickFunction : public FTickFunction
 {
 	AActor* Target = nullptr;
-	void ExecuteTick(float DeltaTime) override;
+	void ExecuteTick(float DeltaTime, ELevelTick LevelTick) override;
 };
 
 struct FActorComponentTickFunction : public FTickFunction
 {
 	UActorComponent* Target = nullptr;
-	void ExecuteTick(float DeltaTime) override;
+	void ExecuteTick(float DeltaTime, ELevelTick LevelTick) override;
 };
 
 // UWorld가 소유하며 등록된 Tick 함수만 그룹 순서대로 실행한다.
@@ -78,8 +89,8 @@ public:
 	void AddTickFunction(FTickFunction* Function);
 	void RemoveTickFunction(FTickFunction* Function);
 
-	void RunTickGroup(ETickingGroup Group, float DeltaTime);
-	void RunAllTickGroups(float DeltaTime);
+	void RunTickGroup(ETickingGroup Group, float DeltaTime, ELevelTick LevelTick);
+	void RunAllTickGroups(float DeltaTime, ELevelTick LevelTick);
 
 	int32 GetRegisteredCount() const;
 

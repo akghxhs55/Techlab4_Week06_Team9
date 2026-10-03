@@ -29,16 +29,57 @@ void FTickFunction::SetTickFunctionEnable(bool bEnable)
 	RelativeTickCooldown = TickInterval;
 }
 
-void FActorTickFunction::ExecuteTick(float DeltaTime)
+void FActorTickFunction::ExecuteTick(float DeltaTime, ELevelTick LevelTick)
 {
-	if (Target)
-		Target->TickActor(DeltaTime);
+#if defined(_DEBUG)
+	assert(Target);
+#else
+	if (!Target)
+		return;
+#endif
+
+	switch (LevelTick)
+	{
+	case ELevelTick::PauseTick:
+		if (!bTickEvenWhenPaused)
+			return;
+		[[fallthrough]];
+	case ELevelTick::ViewportsOnly:
+		if (!bTickInEditor)
+			return;
+		break;
+	default:
+		break;
+	}
+
+	Target->TickActor(DeltaTime);
 }
 
-void FActorComponentTickFunction::ExecuteTick(float DeltaTime)
+void FActorComponentTickFunction::ExecuteTick(float DeltaTime, ELevelTick LevelTick)
 {
-	if (Target)
-		Target->TickComponent(DeltaTime);
+#if defined(_DEBUG)
+	assert(Target);
+#else
+	if (!Target)
+		return;
+#endif
+
+	switch (LevelTick)
+	{
+	case ELevelTick::PauseTick:
+		if (!bTickEvenWhenPaused)
+			return;
+		[[fallthrough]];
+	case ELevelTick::ViewportsOnly:
+		if (!bTickInEditor)
+			return;
+		break;
+	default:
+		break;
+	}
+
+
+	Target->TickComponent(DeltaTime);
 }
 
 FTickTaskManager::~FTickTaskManager()
@@ -86,7 +127,7 @@ void FTickTaskManager::RemoveTickFunction(FTickFunction* Function)
 		Functions[Index]->ManagerIndex = Index;
 }
 
-void FTickTaskManager::RunTickGroup(ETickingGroup Group, float DeltaTime)
+void FTickTaskManager::RunTickGroup(ETickingGroup Group, float DeltaTime, ELevelTick LevelTick)
 {
 	TArray<FTickFunction*>& Functions = Groups[static_cast<uint8>(Group)];
 
@@ -114,7 +155,7 @@ void FTickTaskManager::RunTickGroup(ETickingGroup Group, float DeltaTime)
 			Function->TickState = FTickFunction::ETickState::Enabled;
 		}
 
-		Function->ExecuteTick(TickDelta);
+		Function->ExecuteTick(TickDelta, LevelTick);
 	}
 	bIsTicking = false;
 
@@ -122,10 +163,10 @@ void FTickTaskManager::RunTickGroup(ETickingGroup Group, float DeltaTime)
 		FlushPendingRemovals();
 }
 
-void FTickTaskManager::RunAllTickGroups(float DeltaTime)
+void FTickTaskManager::RunAllTickGroups(float DeltaTime, ELevelTick LevelTick)
 {
 	for (uint8 Group = 0; Group < static_cast<uint8>(ETickingGroup::Max); ++Group)
-		RunTickGroup(static_cast<ETickingGroup>(Group), DeltaTime);
+		RunTickGroup(static_cast<ETickingGroup>(Group), DeltaTime, LevelTick);
 }
 
 int32 FTickTaskManager::GetRegisteredCount() const

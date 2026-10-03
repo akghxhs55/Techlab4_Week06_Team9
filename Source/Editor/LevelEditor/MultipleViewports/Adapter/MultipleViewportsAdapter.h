@@ -51,7 +51,7 @@ public:
     // 우클릭 Capture View에 이동·Euler Yaw/Pitch·줌 입력을 적용한다.
     void UpdateInput(float DeltaTime, FVector2 LocalMousePosition, float MoveSpeed, float MouseSensitivity);
     // Tick 뒤 현재 World의 ID·경계만 캡처하며 피킹은 Component에 위임한다.
-    void CaptureWorld(UWorld& World);
+    void CaptureWorld(int32 ViewIndex);
 
     // 레이아웃과 Rect 상태를 기준으로 지정 View의 활성 여부를 반환한다.
     bool IsViewActive(int32 ViewIndex) const;
@@ -74,6 +74,8 @@ public:
     const FRect& GetViewRect(int32 ViewIndex) const;
     // Native View·Projection을 row-vector 순서로 합성한 엔진 행렬을 반환한다.
     FMatrix GetEngineViewProjection(int32 ViewIndex) const;
+	// 지정 View의 엔진 Projection 행렬을 반환한다.
+	FMatrix GetEngineProjectionMatrix(int32 ViewIndex) const;
     // 지정 View 카메라 위치를 엔진 FVector 그대로 반환한다.
     FVector GetEngineCameraLocation(int32 ViewIndex) const;
     // 지정 View의 카메라 Forward를 엔진 FVector로 계산해 반환한다.
@@ -94,7 +96,7 @@ public:
     // View별 가시 ID를 엔진 컴포넌트로 역매핑해 렌더 큐를 구성한다.
     void BuildRenderQueue(int32 ViewIndex, FRenderQueue& OutQueue);
     // 활성 View Ray를 World·Component 피킹으로 전달하고 마지막 결과를 보관한다.
-    FPickHit PickActiveView(FVector2 LocalMousePosition, UWorld& World);
+    FPickHit PickActiveView(FVector2 LocalMousePosition);
     // 마지막 Hit Component의 Owner를 찾아 Outliner 선택에 반영한다.
     void ApplyLastPickToOutliner(FOutlinerPanel& OutlinerPanel) const;
 
@@ -103,6 +105,9 @@ public:
     // 현재 가로·세로 Split 비율을 반환한다.
     const FSplitRatio& GetSplitRatio() const { return SplitRatio; }
 
+    void SetViewWorld(int32 ViewIndex, UWorld& World);
+	UWorld* GetViewWorld(int32 ViewIndex) const;
+
 private:
     // 직교 View의 논리 위치는 유지하고 렌더·컬링·피킹용 깊이 범위만 확장한다.
     FViewCamera GetRenderCamera(int32 ViewIndex) const;
@@ -110,6 +115,8 @@ private:
     struct PreparedView
     {
         FFrustumPlanes Frustum{};
+		FMatrix Projection{};
+		FMatrix View{};
         FMatrix EngineViewProjection{};
     };
     // 호출할 때마다 현재 카메라로 VP와 절두체를 계산한다.
@@ -128,6 +135,8 @@ private:
     bool ViewWireframe[4]{};
     FPickHit LastPick{};
 
+    UWorld* ViewWorlds[4]{};
+
     // 이번 프레임의 엔진 객체와 파티클 준비 상태를 보관한다. 포인터는 다음 캡처 전까지 유효해야 한다.
     struct PrimitiveSnapshot
     {
@@ -138,7 +147,7 @@ private:
     };
     TMap<ObjectId, PrimitiveSnapshot> PrimitiveById;
     // Host가 컬링 입력 버퍼를 소유하고 용량을 재사용한다.
-    TArray<FRenderableObject> RenderObjects;
+    TArray<FRenderableObject> RenderObjects[4];
     // 불투명 파티클은 최종 렌더러가 거리 정렬하지 않아 기존 Core 정렬을 유지한다.
     TArray<FParticleSortInput> SortInputs;
     TArray<ObjectId> SortedParticleIds;

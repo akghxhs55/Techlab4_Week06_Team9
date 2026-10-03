@@ -132,6 +132,10 @@ bool FViewportsPanel::ConsumeCameraPresetRequest(int32& OutViewIndex, EMultipleV
 	return true;
 }
 
+FTexture2D* FViewportsPanel::GetViewRenderTarget(int32 ViewIndex) const {
+	return Slots[ViewIndex].RenderTarget.get();
+}
+
 // View Texture와 Splitter·Layout·Preset UI를 그리고 요청을 기록한다.
 void FViewportsPanel::OnRender()
 {
@@ -163,7 +167,7 @@ void FViewportsPanel::OnRender()
 
 		const ImVec2 ViewMin{ContentOrigin.x + Slot.Rect.X, ContentOrigin.y + Slot.Rect.Y};
 		const ImVec2 ViewMax{ViewMin.x + Slot.Rect.Width, ViewMin.y + Slot.Rect.Height};
-		DrawList->AddImage(Slot.ColorTarget->GetSRV(), ViewMin, ViewMax);
+		DrawList->AddImage(Slot.RenderTarget->GetSRV(), ViewMin, ViewMax);
 	}
 	DrawList->PopClipRect();
 
@@ -247,6 +251,11 @@ void FViewportsPanel::OnRender()
                 ViewportAdapter->SetViewWireframe(ViewIndex, Mode == 1);
             ImGui::SameLine();
         }
+
+		// ImGui::SeparatorText("Depth View");
+		ImGui::SetNextItemWidth(120.0f);
+		ImGui::Combo("##DepthViewMode", reinterpret_cast<int*>(&Slots[ViewIndex].RenderingInfo.RenderBufferType), "Color\0Depth\0");
+
         if (CurrentLayoutMode == ELayoutMode::QuadSplit)
 		{
 			if (ImGui::SmallButton("Single"))
@@ -441,11 +450,12 @@ void FViewportsPanel::ResizeSlot(FViewSlot& Slot, const uint32 Width, const uint
 	Desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 	Desc.SampleDesc.Count = 1;
 	Desc.Usage = D3D11_USAGE_DEFAULT;
-	Desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+	Desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS;
 	Slot.ColorTarget = RenderCommand::CreateTexture2D(Desc);
+	Slot.RenderTarget = RenderCommand::CreateTexture2D(Desc);
 
-	Desc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	Desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+	Desc.Format = DXGI_FORMAT_R24G8_TYPELESS;
+	Desc.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
 	Slot.DepthTarget = RenderCommand::CreateTexture2D(Desc);
 
 	Slot.Width = Width;
@@ -453,6 +463,7 @@ void FViewportsPanel::ResizeSlot(FViewSlot& Slot, const uint32 Width, const uint
 	Slot.RenderingInfo.ColorRenderTargets.Reset();
 	Slot.RenderingInfo.ViewportSetting.Width = Width;
 	Slot.RenderingInfo.ViewportSetting.Height = Height;
+
 	FRenderingDesc ColorDesc{};
 	ColorDesc.Texture = Slot.ColorTarget.get();
 	Slot.RenderingInfo.ColorRenderTargets.Add(ColorDesc);
