@@ -74,6 +74,8 @@ public:
     const FRect& GetViewRect(int32 ViewIndex) const;
     // Native View·Projection을 row-vector 순서로 합성한 엔진 행렬을 반환한다.
     FMatrix GetEngineViewProjection(int32 ViewIndex) const;
+	// 지정 View의 엔진 Projection 행렬을 반환한다.
+	FMatrix GetEngineProjectionMatrix(int32 ViewIndex) const;
     // 지정 View 카메라 위치를 엔진 FVector 그대로 반환한다.
     FVector GetEngineCameraLocation(int32 ViewIndex) const;
     // 지정 View의 카메라 Forward를 엔진 FVector로 계산해 반환한다.
@@ -113,6 +115,8 @@ private:
     struct PreparedView
     {
         FFrustumPlanes Frustum{};
+		FMatrix Projection{};
+		FMatrix View{};
         FMatrix EngineViewProjection{};
     };
     // 호출할 때마다 현재 카메라로 VP와 절두체를 계산한다.

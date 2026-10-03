@@ -251,6 +251,11 @@ void FViewportsPanel::OnRender()
                 ViewportAdapter->SetViewWireframe(ViewIndex, Mode == 1);
             ImGui::SameLine();
         }
+
+		// ImGui::SeparatorText("Depth View");
+		ImGui::SetNextItemWidth(120.0f);
+		ImGui::Combo("##DepthViewMode", reinterpret_cast<int*>(&Slots[ViewIndex].RenderingInfo.RenderBufferType), "Color\0Depth\0");
+
         if (CurrentLayoutMode == ELayoutMode::QuadSplit)
 		{
 			if (ImGui::SmallButton("Single"))

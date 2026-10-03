@@ -6,6 +6,11 @@
 
 #include "RenderResourceManager.h"
 
+struct FScreenQuadCB
+{
+	FMatrix InverseProj; 
+};
+
 class FScreenQuadRenderer {
 public:
 	FScreenQuadRenderer() = default;
@@ -19,8 +24,11 @@ public:
 
 public:
 	void Init();
-	void Render(FTexture2D* TargetTexture, const FRenderingInfo& Sources);
+	void Render(FTexture2D* TargetTexture, const FRenderingInfo& Sources, const FMatrix& proj);
 
 private:
-	FPipelineState ps;
+	FPipelineState Colorps;
+	FPipelineState Depthps;
+
+	TUniquePtr<FConstantBuffer> ScreenQuadCB;
 };

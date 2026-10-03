@@ -29,5 +29,5 @@ VS_OUT mainVS(uint VertexID : SV_VertexID)
 float4 mainPS(VS_OUT In) : SV_Target
 {
     float4 Color = g_Texture.Sample(g_Sampler, In.UV);
-    return Color.rrrr;
+    return Color.rgba;
 }

@@ -341,10 +341,12 @@ void UEditorEngine::RenderMultipleViewports()
 		// 1-1. Renderer 에 Screen Quad 를 그려야 하나?	
 		// RT 를 BackBuffer 에 그리는 것이 아니라, 화면 크기와 동일한 Texture 에 그리고, 모든 렌더링이 끝난 이후에 Screen Quad 를 그려서 BackBuffer 에 그린다.
 		
+		
 		auto info = ViewportsPanel->GetRenderingInfo(ViewIndex);
-		ScreenQuadRenderer->Render(ViewportsPanel->GetViewRenderTarget(ViewIndex), info);
+		ScreenQuadRenderer->Render(ViewportsPanel->GetViewRenderTarget(ViewIndex), info, MultipleViewportsAdapter.GetEngineProjectionMatrix(ViewIndex));
 	
 	}
+
 
 	// 여기서 Screen Quad Render 를 수행한다. 
 	// Buffer Visualization 이 켜져있는 경우, 대상 버퍼를 Texture 로 바인딩 하고, Screen Quad 를 그린다. 
@@ -544,8 +546,6 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 
 		FBox box = Target->CalcBounds();
 
-		RenderCommand::ClearDepthStencil(ViewRenderingInfo.DepthStencil.Texture);
-
 		GizmoRenderer->OnRender(
 			*Gizmo,
 			ViewProjection,
@@ -553,7 +553,6 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 			MultipleViewportsAdapter.IsOrthographic(ViewIndex));
 	}
 
-	RenderCommand::ClearDepthStencil(ViewRenderingInfo.DepthStencil.Texture);
 
 	if (SettingsPanel->GetSettings().bShowUUID)
 	{

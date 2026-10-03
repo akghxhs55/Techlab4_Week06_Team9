@@ -18,6 +18,13 @@ enum class ERenderTargetStoreOp
 	DontCare,
 };
 
+enum class ERenderBuffer : uint32
+{
+	Color, 
+	Depth, 
+	END, 
+};
+
 struct FViewportSettings
 {
 	int32 StartX = 0;
@@ -49,4 +56,7 @@ struct FRenderingInfo
 
 	TArray<FRenderingDesc> ColorRenderTargets;
 	FRenderingDesc DepthStencil;
+
+	ERenderBuffer RenderBufferType{ ERenderBuffer::Color };
+
 };

@@ -4,6 +4,9 @@
 #include "Editor/EditorUI/EditorPanel.h"
 #include "Math/Quat.h"
 #include "Math/Vector.h"
+#include "../../Runtime/Render/RenderingInfo.h"
+
+
 class FMultipleViewportsAdapter;
 
 class UWorld;
@@ -38,8 +41,6 @@ struct FEditorSettings
     FQuat ViewRotation[4]{};
     bool bViewLocationSaved[4]{};
     bool bViewRotationSaved[4]{};
-
-	bool bDepthView = false;
 };
 
 

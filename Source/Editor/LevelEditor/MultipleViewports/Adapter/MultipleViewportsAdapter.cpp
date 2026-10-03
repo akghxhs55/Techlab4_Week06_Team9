@@ -532,8 +532,9 @@ const FMultipleViewportsAdapter::PreparedView& FMultipleViewportsAdapter::Prepar
     const FViewCamera Camera = GetRenderCamera(ViewIndex);
     const auto& Rect = ViewRects[ViewIndex];
     PreparedView& Prepared = PreparedViews[ViewIndex];
-    Prepared.EngineViewProjection = BuildViewMatrix(Camera.Transform) *
-        BuildProjectionMatrix(Camera.Projection, Rect.Width / Rect.Height);
+	Prepared.View = BuildViewMatrix(Camera.Transform);
+	Prepared.Projection = BuildProjectionMatrix(Camera.Projection, Rect.Width / Rect.Height);
+	Prepared.EngineViewProjection = Prepared.View * Prepared.Projection;
     Prepared.Frustum = ExtractFrustumPlanes(Prepared.EngineViewProjection);
     return Prepared;
 }
@@ -543,6 +544,11 @@ FMatrix FMultipleViewportsAdapter::GetEngineViewProjection(const int32 ViewIndex
 {
     assert(IsViewActive(ViewIndex));
     return PrepareView(ViewIndex).EngineViewProjection;
+}
+
+FMatrix FMultipleViewportsAdapter::GetEngineProjectionMatrix(int32 ViewIndex) const {
+	assert(IsViewActive(ViewIndex));
+    return PrepareView(ViewIndex).Projection;
 }
 
 // Native 카메라 위치를 엔진 FVector 그대로 반환한다.

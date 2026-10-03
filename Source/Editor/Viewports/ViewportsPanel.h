@@ -52,6 +52,7 @@ private:
 
 		TUniquePtr<FTexture2D> ColorTarget;
 		TUniquePtr<FTexture2D> DepthTarget;
+
 		FRenderingInfo RenderingInfo{};
 	};
 
