@@ -91,10 +91,22 @@ private:
 	FOutlinerPanel* OutlinerPanel = nullptr;
 	FContentDrawerPanel* ContentDrawerPanel = nullptr;
 
+	// Currently editing world context which type is EWorldType::Editor.
+	FWorldContext* EditorWorldContextRef = nullptr;
+
+	// If enabled, all the PIE world will not tick
+	bool bPIEPaused = false;
+
 	void ResetSceneSelection();
 
 	void CreateNewScene();
 	void OpenScene();
 	void SaveCurrentScene();
 	void SaveSceneAs();
+
+	/* PIE */
+	void PausePIE(bool bPause) { bPIEPaused = bPause; }
+	bool IsPIEPaused() const { return bPIEPaused; }
+	bool StartPIE(int32 ViewIndex);
+	bool EndPIE(int32 ViewIndex);
 };

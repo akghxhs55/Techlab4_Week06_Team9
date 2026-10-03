@@ -5,11 +5,6 @@
 
 #include "Engine/World.h"
 
-enum class EWorldType
-{
-
-};
-
 class FEngineLoop;
 
 // 엔진 모드별 실행 설정. UE에서는 ini가 맡는 부분이다.
@@ -44,12 +39,13 @@ public:
 	// UObject 일괄 정리와 GPU 자원 해제 전에 호출된다.
 	virtual void PreExit() {};
 
-	UWorld* GetWorld() const { return World; }
+	//UWorld* GetWorld() const { return World; }
 
 protected:
 	FEngineLoop& GetEngineLoop() const { return *EngineLoop; }
 
-	UWorld* World = nullptr;
+	//UWorld* World = nullptr;
+	TArray<TUniquePtr<FWorldContext>> WorldContexts;
 private:
 	FEngineLoop* EngineLoop = nullptr;
 };

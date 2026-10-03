@@ -441,13 +441,16 @@ void FMultipleViewportsAdapter::UpdateInput(
 }
 
 // 현재 World의 가시 컴포넌트에서 경계만 캡처한다. Mesh·삼각형은 복사하지 않는다.
-void FMultipleViewportsAdapter::CaptureWorld(UWorld& World)
+void FMultipleViewportsAdapter::CaptureWorld(int32 ViewIndex)
 {
-    RenderObjects.Reset();
+    assert(ViewIndex >= 0 && ViewIndex < 4);
+    RenderObjects[ViewIndex].Reset();
+
     for (auto& Entry : PrimitiveById) Entry.second.bCaptured = false;
     bCapturedBillboard = false;
     bCapturedParticle = false;
 
+    UWorld& World = *ViewWorlds[ViewIndex];
     const FScene& Scene = World.GetScene();
     const int32 Count = Scene.Proxies.Num();
     for (int32 i = 0; i < Count;++i)
@@ -464,7 +467,7 @@ void FMultipleViewportsAdapter::CaptureWorld(UWorld& World)
         const FPrimitiveSceneProxy* Proxy = Primitive->GetSceneProxy();
         RenderObject.WorldBounds = Proxy && Proxy->GetMesh()
             ? Proxy->GetBounds() : MakeWorldBounds(Primitive->CalcBounds());
-        RenderObjects.Add(RenderObject);
+        RenderObjects[ViewIndex].Add(RenderObject);
         PrimitiveSnapshot& Snapshot = PrimitiveById[Id];
         Snapshot.Primitive = Primitive;
         Snapshot.bCaptured = true;
@@ -628,7 +631,7 @@ void FMultipleViewportsAdapter::BuildRenderQueue(const int32 ViewIndex, FRenderQ
     LODInputs.Reset();
     if (!IsViewActive(ViewIndex)) return;
     {
-        CullForView(RenderObjects, PrepareView(ViewIndex).Frustum, VisibleIds[ViewIndex]);
+        CullForView(RenderObjects[ViewIndex], PrepareView(ViewIndex).Frustum, VisibleIds[ViewIndex]);
     }
     const FRect& Rect = GetViewRect(ViewIndex);
     const FViewCamera& ViewCamera = Views.Cameras[ViewIndex];
@@ -719,9 +722,10 @@ void FMultipleViewportsAdapter::BuildRenderQueue(const int32 ViewIndex, FRenderQ
 }
 
 // 클릭한 View의 Ray를 World에 전달하고 Component의 최근접 교차 결과를 보관한다.
-FPickHit FMultipleViewportsAdapter::PickActiveView(const FVector2 LocalMousePosition, UWorld& World)
+FPickHit FMultipleViewportsAdapter::PickActiveView(const FVector2 LocalMousePosition)
 {
     SCOPE_CYCLE_COUNTER_ALWAYS(EditorStats::STAT_PickingTime);
+    const int32 ViewIndex = GetActiveViewIndex();
 
 	LastPick = {};
     FRay Ray{};
@@ -735,6 +739,8 @@ FPickHit FMultipleViewportsAdapter::PickActiveView(const FVector2 LocalMousePosi
         return Adapter.BuildEngineBillboardMatrix(Adapter.GetActiveViewIndex(),
             Billboard.GetWorldLocation(), Scale.Y, Scale.Z);
     };
+
+	UWorld& World = *ViewWorlds[ViewIndex];
     FHitResult Hit;
     if (World.LineTraceSingle(Ray, Hit, ResolveBillboardTransform, this))
     {
@@ -767,4 +773,16 @@ void FMultipleViewportsAdapter::ApplyLastPickToOutliner(FOutlinerPanel& Outliner
 void FMultipleViewportsAdapter::SetSplitRatio(const FSplitRatio& Value)
 {
     SplitRatio = ClampSplitRatio(Value, MinimumSplitRatio);
+}
+
+void FMultipleViewportsAdapter::SetViewWorld(int32 ViewIndex, UWorld& World)
+{
+	assert(ViewIndex >= 0 && ViewIndex < 4);
+    ViewWorlds[ViewIndex] = &World;
+}
+
+UWorld* FMultipleViewportsAdapter::GetViewWorld(int32 ViewIndex) const
+{
+	assert(ViewIndex >= 0 && ViewIndex < 4);
+	return ViewWorlds[ViewIndex];
 }

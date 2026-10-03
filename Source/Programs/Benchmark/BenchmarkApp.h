@@ -72,4 +72,7 @@ private:
 	// 오버레이 버튼으로 요청하면 다음 프레임 한 번만 오클루전 가시 비율을 측정한다.
 	bool bMeasureOcclusionRequested = false;
 	FOcclusionMeasureResult LastOcclusionMeasure;
+
+	// Benchmark app only has one world, so we can store it here for convenience.
+	UWorld* World = nullptr;
 };
