@@ -145,7 +145,7 @@ private:
         bool bParticlesPrepared = false;
         TArray<int32> AliveParticleIndices;
     };
-    TMap<ObjectId, PrimitiveSnapshot> PrimitiveById;
+    TMap<ObjectId, PrimitiveSnapshot> PrimitiveById[4];
     // Host가 컬링 입력 버퍼를 소유하고 용량을 재사용한다.
     TArray<FRenderableObject> RenderObjects[4];
     // 불투명 파티클은 최종 렌더러가 거리 정렬하지 않아 기존 Core 정렬을 유지한다.
@@ -155,6 +155,6 @@ private:
     TArray<UStaticMeshComponent*> PendingStaticMeshes;
     TArray<FLODSelectionInput> LODInputs;
     TArray<uint8> SelectedLODs;
-    bool bCapturedBillboard = false;
-    bool bCapturedParticle = false;
+    bool bCapturedBillboard[4] = { false };
+    bool bCapturedParticle[4] = { false };
 };
