@@ -45,7 +45,7 @@ protected:
 	FEngineLoop& GetEngineLoop() const { return *EngineLoop; }
 
 	//UWorld* World = nullptr;
-	TArray<FWorldContext> WorldContexts;
+	TArray<TUniquePtr<FWorldContext>> WorldContexts;
 private:
 	FEngineLoop* EngineLoop = nullptr;
 };

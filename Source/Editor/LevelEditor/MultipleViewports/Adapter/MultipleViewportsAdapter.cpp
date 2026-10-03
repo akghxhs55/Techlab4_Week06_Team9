@@ -780,3 +780,9 @@ void FMultipleViewportsAdapter::SetViewWorld(int32 ViewIndex, UWorld& World)
 	assert(ViewIndex >= 0 && ViewIndex < 4);
     ViewWorlds[ViewIndex] = &World;
 }
+
+UWorld* FMultipleViewportsAdapter::GetViewWorld(int32 ViewIndex) const
+{
+	assert(ViewIndex >= 0 && ViewIndex < 4);
+	return ViewWorlds[ViewIndex];
+}

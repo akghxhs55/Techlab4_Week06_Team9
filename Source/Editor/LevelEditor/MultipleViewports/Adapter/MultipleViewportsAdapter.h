@@ -104,6 +104,7 @@ public:
     const FSplitRatio& GetSplitRatio() const { return SplitRatio; }
 
     void SetViewWorld(int32 ViewIndex, UWorld& World);
+	UWorld* GetViewWorld(int32 ViewIndex) const;
 
 private:
     // 직교 View의 논리 위치는 유지하고 렌더·컬링·피킹용 깊이 범위만 확장한다.

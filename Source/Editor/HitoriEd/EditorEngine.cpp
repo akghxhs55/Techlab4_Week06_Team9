@@ -78,8 +78,8 @@ bool UEditorEngine::Init()
 			.WorldType = WorldType
 		};
 		World->SetWorldType(WorldType);
-		WorldContexts.Add(std::move(WorldContext));
-		EditorWorldContextRef = &WorldContexts.Last();
+		WorldContexts.Add(MakeUnique<FWorldContext>(WorldContext));
+		EditorWorldContextRef = WorldContexts.Last().get();
 	}
 
 	MainWindow = GetEngineLoop().GetMainWindow();
@@ -135,7 +135,7 @@ bool UEditorEngine::Init()
 	TextRenderer->Init();
 
 	// TODO: Iterate WorldContext to set each world
-	UWorld* World = WorldContexts[0].World;
+	UWorld* World = WorldContexts[0]->World;
 
 	// 투영 행렬 생성 
 	MultipleViewportsAdapter.InitializeFromWorld(*World);
@@ -191,6 +191,12 @@ bool UEditorEngine::Init()
 	SkyboxRenderer = MakeUnique<FSkyboxRenderer>();
 	SkyboxRenderer->Init("Assets/SkySphere/Sky.jpg");
 
+	// TODO: Set World that each viewport is rendering.
+	for (int32 ViewIndex = 0; ViewIndex < 4; ++ViewIndex)
+	{
+		MultipleViewportsAdapter.SetViewWorld(ViewIndex, *EditorWorldContextRef->World);
+	}
+
 	return true;
 }
 
@@ -213,12 +219,6 @@ void UEditorEngine::BeginFrame(const float DeltaTime)
 
 	if (!ImGui::GetIO().WantTextInput && FInputSystem::IsKeyPressed(EKeyCode::Delete))
 		DeleteActor(OutlinerPanel->GetSelectedActor());
-
-	// TODO: Set World that each viewport is rendering.
-	for (int32 ViewIndex = 0; ViewIndex < 4; ++ViewIndex)
-	{
-		MultipleViewportsAdapter.SetViewWorld(ViewIndex, *EditorWorldContextRef->World);
-	}
 }
 
 // 패널의 Layout·Preset 요청과 입력을 Adapter에 반영한다.
@@ -278,13 +278,13 @@ void UEditorEngine::TickWorldAndEditor(const float DeltaTime)
 	// 월드 상태는 프레임마다 정확히 한 번 갱신하고 캡처한다.
 	{
 		SCOPE_CYCLE_COUNTER(STAT_WorldTick);
-		for (FWorldContext& Context : WorldContexts)
+		for (auto& Context : WorldContexts)
 		{
-			UWorld* World = Context.World;
+			UWorld* World = Context->World;
 			assert(World);
 
 			// Skip ticking PIE worlds if paused
-			if (Context.WorldType == EWorldType::PIE && bPIEPaused)
+			if (Context->WorldType == EWorldType::PIE && bPIEPaused)
 				continue;
 
 			World->Tick(DeltaTime);
@@ -402,8 +402,8 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 
 			for (auto& WorldContext : WorldContexts)
 			{
-				assert(WorldContext.World);
-				UWorld& World = *WorldContext.World;
+				assert(WorldContext->World);
+				UWorld& World = *WorldContext->World;
 				World.GetPathTracker().OnRender(LineBatcher.get());
 			}
 		}
@@ -518,10 +518,10 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 
 	if (SettingsPanel->GetSettings().bShowUUID)
 	{
-		for (FWorldContext& worldContext : WorldContexts)
+		for (auto& worldContext : WorldContexts)
 		{
-			assert(worldContext.World);
-			UWorld* World = worldContext.World;
+			assert(worldContext->World);
+			UWorld* World = worldContext->World;
 
 			for (AActor* Actor : World->GetPersistentLevel()->GetActors())
 			{
@@ -640,4 +640,65 @@ void UEditorEngine::SaveSceneAs()
 {
 	UWorld* World = EditorWorldContextRef->World;
 	FEditorFileUtils::SaveSceneAs(World);
+}
+
+bool UEditorEngine::StartPIE(int32 ViewIndex)
+{
+	if (ViewIndex < 0 || ViewIndex >= 4)
+	{
+		HTR_LOG(Error, "Invalid ViewIndex for StartPIE: {}", ViewIndex);
+		return false;
+	}
+
+	UWorld* OriginalWorld = MultipleViewportsAdapter.GetViewWorld(ViewIndex);
+
+	assert(OriginalWorld);
+	if (OriginalWorld->GetWorldType() != EWorldType::Editor)
+	{
+		HTR_LOG(Error, "StartPIE can only be called on an Editor world. Current world type: {}", static_cast<int>(OriginalWorld->GetWorldType()));
+		return false;
+	}
+
+	// Create a new PIE world
+	// TODO: Copy original world
+	UWorld* PIEWorld = FObjectFactory::ConstructObject<UWorld>();
+	if (!PIEWorld || !PIEWorld->Init())
+	{
+		HTR_LOG(Error, "Failed to create PIE world.");
+		return false;
+	}
+
+	PIEWorld->SetWorldType(EWorldType::PIE);
+	FWorldContext PIEWorldContext = {
+		.World = PIEWorld,
+		.WorldType = EWorldType::PIE
+	};
+
+	WorldContexts.Add(MakeUnique<FWorldContext>(PIEWorldContext));
+	MultipleViewportsAdapter.SetViewWorld(ViewIndex, *PIEWorld);
+	return true;
+}
+
+bool UEditorEngine::EndPIE(int32 ViewIndex)
+{
+	UWorld* PIEWorld = MultipleViewportsAdapter.GetViewWorld(ViewIndex);
+
+	assert(PIEWorld);
+	if (PIEWorld->GetWorldType() != EWorldType::PIE)
+	{
+		HTR_LOG(Error, "EndPIE can only be called on a PIE world. Current world type: {}", static_cast<int>(PIEWorld->GetWorldType()));
+		return false;
+	}
+
+	// Find FWorldContext for the PIE world and remove it
+	for (int32 i = 0; i < WorldContexts.Num(); ++i)
+	{
+		if (WorldContexts[i]->World == PIEWorld)
+		{
+			WorldContexts.RemoveAt(i, 1);
+			MultipleViewportsAdapter.SetViewWorld(ViewIndex, *EditorWorldContextRef->World);
+			return true;
+		}
+	}
+	return false;
 }
