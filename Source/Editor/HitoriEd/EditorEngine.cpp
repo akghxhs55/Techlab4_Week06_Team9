@@ -401,6 +401,11 @@ void UEditorEngine::UpdateGizmoAndPicking()
 void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& ViewRenderingInfo, const FMatrix& ViewProjection, const FVector& ViewCameraLocation, const FVector& ViewCameraForward, FRenderQueue& RenderQueue)
 {
 	RenderCommand::BeginRenderPass(ViewRenderingInfo);
+
+	// Get the world of the current viewport is using.
+	const UWorld* CurrentWorld = MultipleViewportsAdapter.GetViewWorld(ViewIndex);
+	assert(CurrentWorld);
+
 	if (SettingsPanel->GetSettings().bDrawBatchLine)
 	{
 		// 라인 배처는 매 프레임 한 번만 비우고 한 번만 그린다.
@@ -495,6 +500,11 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 			continue;
 		}
 
+		// Skip if this comopnent is not in current viewport world
+		// TODO: Modify TObjectIterator to support filtering by world type or find a better way
+		if (TextComponent->GetOwner()->GetWorld() != CurrentWorld)
+			continue;
+
 		TextRenderer->OnRender(
 			TextComponent->GetText(),
 			TextComponent->GetWorldMatrix(),
@@ -505,8 +515,6 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 	}
 
 	// Do not draw Gizmo and Outline if the world type of the current view is PIE
-	const UWorld* CurrentWorld = MultipleViewportsAdapter.GetViewWorld(ViewIndex);
-	assert(CurrentWorld);
 	bool bIsPIEWorld = CurrentWorld->GetWorldType() == EWorldType::PIE;
 
 	// 스텐실 기반이라 선택 대상의 가시성이 꺼져 있어도 외곽선만 그린다.
