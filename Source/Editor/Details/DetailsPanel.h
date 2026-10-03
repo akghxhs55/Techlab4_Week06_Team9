@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <format>
 #include "Editor/EditorUI/EditorPanel.h"
@@ -25,6 +25,10 @@ public:
 	ImFont* GetCustomFont() { return CustomFont; }
 
 private:
+	void DrawComponentSection(AActor* Actor);
+	void DrawSceneComponentNode(USceneComponent* Component);
+	void DrawActorComponent(UActorComponent* Component);
+
 	UWorld* World = nullptr;
 	USceneComponent* Target = nullptr;
 	ImFont* CustomFont = nullptr;

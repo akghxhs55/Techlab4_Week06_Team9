@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "ObjectSystem/Object.h"
 #include "Component/PrimitiveComponent.h"
@@ -57,6 +57,8 @@ public:
 		Components.Add(Component);
 		return Component;
 	}
+
+	UActorComponent* AddComponentByClass(UClass* Class, bool bManualAttachment = false);
 
 	// bCanEverTick이 켜진 액터·컴포넌트의 Tick 함수만 World의 FTickTaskManager에 등록하거나 해제한다.
 	void RegisterAllActorTickFunctions(bool bRegister);

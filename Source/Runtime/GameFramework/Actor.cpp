@@ -1,4 +1,4 @@
-#include "EnginePCH.h"
+﻿#include "EnginePCH.h"
 #include "Actor.h"
 #include "Engine/World.h"
 #include "Engine/Level.h"
@@ -69,6 +69,30 @@ void AActor::BeginPlay()
 	}
 
 	RegisterAllActorTickFunctions(true);
+}
+
+UActorComponent* AActor::AddComponentByClass(UClass* Class, bool bManualAttachment)
+{
+	UActorComponent* Component = CastChecked<UActorComponent>(FObjectFactory::ConstructObject(Class, this));
+    Component->SetOwner(this);
+    Components.Add(Component);
+
+    if (!bManualAttachment)
+    {
+        if (USceneComponent* SceneComponent = Cast<USceneComponent>(Component))
+        {
+            if (!RootComponent)
+            {
+                RootComponent = SceneComponent;
+            }
+            else
+            {
+	            SceneComponent->SetupAttachment(RootComponent);
+            }
+        }
+    }
+
+    return Component;
 }
 
 void AActor::RegisterAllActorTickFunctions(bool bRegister)
