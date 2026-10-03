@@ -8,6 +8,7 @@
 #include <backends/imgui_impl_win32.h>
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
+void ImGui_ImplDX11_SetSwapChainDescs(const DXGI_SWAP_CHAIN_DESC* DescTemplates, int DescTemplateCount);
 
 namespace
 {
@@ -103,6 +104,16 @@ bool FImGuiRenderer::Init(HWND WindowHandle, ID3D11Device* Device, ID3D11DeviceC
 
 	ImGui_ImplWin32_Init(WindowHandle);
 	ImGui_ImplDX11_Init(Device, DeviceContext);
+
+	DXGI_SWAP_CHAIN_DESC ViewportSwapChainDesc{};
+	ViewportSwapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	ViewportSwapChainDesc.SampleDesc.Count = 1;
+	ViewportSwapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+	ViewportSwapChainDesc.BufferCount = 2;
+	ViewportSwapChainDesc.Windowed = TRUE;
+	ViewportSwapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+	ImGui_ImplDX11_SetSwapChainDescs(&ViewportSwapChainDesc, 1);
+
 	FWindow::SetWndProcHook(&ImGuiWndProcHook);
 
 	ApplyDefaultStyle();

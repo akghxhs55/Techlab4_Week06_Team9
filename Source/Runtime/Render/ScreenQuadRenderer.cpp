@@ -46,6 +46,7 @@ void FScreenQuadRenderer::Render(FTexture2D* TargetTexture, const FRenderingInfo
 	ID3D11RenderTargetView* targets[] = { TargetTexture->GetRTV() };
 
 	// Quad Rendering 에 사용할 Texutre... 
+	// 깊이 버퍼를 바인딩 하지 않아서... 아웃라이너 그리는 데 문제가 있다.
 
 	RenderCommand::GetContext()->OMSetRenderTargets(1, targets, nullptr);
 	
@@ -56,4 +57,8 @@ void FScreenQuadRenderer::Render(FTexture2D* TargetTexture, const FRenderingInfo
 	
 	ID3D11ShaderResourceView* NullSRV{ nullptr };
 	RenderCommand::GetContext()->PSSetShaderResources(0, 1, &NullSRV);
+	
+
+
+	RenderCommand::GetContext()->OMSetRenderTargets(1, targets, Sources.DepthStencil.Texture->GetDSV()); 
 }

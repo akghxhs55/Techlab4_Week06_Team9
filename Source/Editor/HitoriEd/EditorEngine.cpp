@@ -342,9 +342,16 @@ void UEditorEngine::RenderMultipleViewports()
 		// RT 를 BackBuffer 에 그리는 것이 아니라, 화면 크기와 동일한 Texture 에 그리고, 모든 렌더링이 끝난 이후에 Screen Quad 를 그려서 BackBuffer 에 그린다.
 		
 		
-		auto info = ViewportsPanel->GetRenderingInfo(ViewIndex);
+		auto& info = ViewportsPanel->GetRenderingInfo(ViewIndex);
 		ScreenQuadRenderer->Render(ViewportsPanel->GetViewRenderTarget(ViewIndex), info, MultipleViewportsAdapter.GetEngineProjectionMatrix(ViewIndex));
-	
+		
+		RenderOverlay(
+			ViewIndex,
+			ViewportsPanel->GetRenderingInfo(ViewIndex),
+			MultipleViewportsAdapter.GetEngineViewProjection(ViewIndex),
+			MultipleViewportsAdapter.GetEngineCameraLocation(ViewIndex),
+			MultipleViewportsAdapter.GetEngineCameraForward(ViewIndex),
+			RenderQueue);
 	}
 
 
@@ -460,7 +467,12 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		? ERasterizerState::Wireframe : ERasterizerState::SolidBack;
 
 	// 렌더 루프 — 반드시 RenderAll보다 먼저
-	SkyboxRenderer->OnRender(ViewProjection, ViewCameraLocation);
+	if(!MultipleViewportsAdapter.IsOrthographic(ViewIndex))
+	{
+		SkyboxRenderer->OnRender(ViewProjection, ViewCameraLocation);
+	}	
+
+
 	if (bDrawPrimitives)
 	{
 		RenderCommand::SetRasterizerState(SceneRasterizerState);
@@ -473,31 +485,6 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		Renderer->RenderOpaque(ViewProjection);
 		// 장면 Wireframe이 Grid·Gizmo·UI로 전파되지 않도록 복원한다.
 		RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
-	}
-
-	if (SettingsPanel->GetSettings().bDrawBatchLine)
-	{
-		const EGridPlane GridPlane = MultipleViewportsAdapter.GetGridPlane(ViewIndex);
-
-		if (SettingsPanel->GetSettings().bDrawPSGrid && !MultipleViewportsAdapter.IsOrthographic(ViewIndex))
-		{
-			GridRenderer->OnRenderPSGrid(
-				ViewProjection, ViewCameraLocation, SettingsPanel->GetSettings(), ViewRenderingInfo.ViewportSetting
-			);
-		}
-		else
-		{
-			GridRenderer->OnRenderBatchGrid(
-				ViewProjection,
-				ViewCameraLocation,
-				ViewCameraForward,
-				GridPlane,
-				static_cast<float>(SettingsPanel->GetSettings().GridSpacing),
-				!MultipleViewportsAdapter.IsOrthographic(ViewIndex) ||
-				MultipleViewportsAdapter.GetCameraPreset(ViewIndex) == EMultipleViewportsCameraPreset::OrthographicView,
-				ViewRenderingInfo.ViewportSetting
-			);
-		}
 	}
 
 	if (bDrawPrimitives)
@@ -594,6 +581,61 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 
 
 	RenderCommand::EndRenderPass(ViewRenderingInfo);
+}
+
+void UEditorEngine::RenderOverlay(int32 ViewIndex, const FRenderingInfo& ViewRenderingInfo, const FMatrix& ViewProjection, const FVector& ViewCameraLocation, const FVector& ViewCameraForward, FRenderQueue& RenderQueue) {
+	
+	UWorld* CurrentWorld = MultipleViewportsAdapter.GetViewWorld(ViewIndex);
+	assert(CurrentWorld);
+	bool bIsPIEWorld = CurrentWorld->GetWorldType() == EWorldType::PIE;
+
+	// 직교일 때애는 무조건 그리고, 직교가 아니라면, 깊이 렌더링이 아닐 때 그린다. 
+	if (MultipleViewportsAdapter.IsOrthographic(ViewIndex) or ViewRenderingInfo.RenderBufferType != ERenderBuffer::Depth) {
+
+
+		if (SettingsPanel->GetSettings().bDrawBatchLine)
+		{
+			const EGridPlane GridPlane = MultipleViewportsAdapter.GetGridPlane(ViewIndex);
+
+			if (SettingsPanel->GetSettings().bDrawPSGrid && !MultipleViewportsAdapter.IsOrthographic(ViewIndex))
+			{
+				GridRenderer->OnRenderPSGrid(
+					ViewProjection, ViewCameraLocation, SettingsPanel->GetSettings(), ViewRenderingInfo.ViewportSetting
+				);
+			}
+			else
+			{
+				GridRenderer->OnRenderBatchGrid(
+					ViewProjection,
+					ViewCameraLocation,
+					ViewCameraForward,
+					GridPlane,
+					static_cast<float>(SettingsPanel->GetSettings().GridSpacing),
+					!MultipleViewportsAdapter.IsOrthographic(ViewIndex) ||
+					MultipleViewportsAdapter.GetCameraPreset(ViewIndex) == EMultipleViewportsCameraPreset::OrthographicView,
+					ViewRenderingInfo.ViewportSetting
+				);
+			}
+		}
+	} 
+
+	if (Outline->GetTarget() && !bIsPIEWorld)
+	{
+		OutlineRenderer->OnRender(*Outline, ViewProjection, ViewRenderingInfo.ViewportSetting);
+	}
+
+	if (Gizmo->GetTarget() && !bIsPIEWorld)
+	{
+		auto Target = Cast<UPrimitiveComponent>(Gizmo->GetTarget());
+
+		FBox box = Target->CalcBounds();
+
+		GizmoRenderer->OnRender(
+			*Gizmo,
+			ViewProjection,
+			ViewCameraLocation,
+			MultipleViewportsAdapter.IsOrthographic(ViewIndex));
+	}
 }
 
 

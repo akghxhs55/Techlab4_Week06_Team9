@@ -62,12 +62,18 @@ float3 ReconstructViewPosition(float2 UV, float Depth)
 
 float4 mainPS(VS_OUT In) : SV_Target {
     float Depth = { g_Texture.Sample(g_Sampler, In.UV) };
+    
+    if (Depth >= 1.0f)
+    {
+        return float4(0.0f, 0.0f, 0.0f, 1.0f);
+    }
 
     float3 ViewPosition = { ReconstructViewPosition(In.UV, Depth) };
 
     float ViewDepth = { ViewPosition.x }; // Near ~ Far 
 
+    
     float Visualization = { frac(ViewDepth / 50.0f) }; // 50.f 마다 반복 
-
+    
     return float4(Visualization.rrr, 1.0f);
 }
