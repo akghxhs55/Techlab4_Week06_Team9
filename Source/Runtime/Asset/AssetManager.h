@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "ObjectSystem/Object.h"
 #include "ObjectSystem/Property.h"
@@ -41,6 +41,7 @@ public:
 	void CreateDefaultMaterial();
 	void CreateParticleMaterial();
 	void CreateSphereGlowMaterial();
+	void CreateIconMaterials();
 
 	template <typename T>
 	static T* GetAssetByPath(const FString& Path)

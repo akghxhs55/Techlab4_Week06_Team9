@@ -7,6 +7,7 @@
 #include "Component/StaticMeshComponent.h"
 #include "Component/TextRenderComponent.h"
 #include "Asset/AssetManager.h"
+#include "Component/SphereGlowComponent.h"
 #include "Component/SpotLightComponent.h"
 #include "Render/Material.h"
 #include "Render/Texture2D.h"
@@ -742,7 +743,7 @@ void FDetailsPanel::DrawComponentSection(AActor* Actor)
 			UTextRenderComponent::StaticClass(), 
 			UBillboardComponent::StaticClass(), 
 			USpotLightComponent::StaticClass(), 
-			UCameraComponent::StaticClass()
+			USphereGlowComponent::StaticClass()
 		};
 		for (UClass* Type : AddableComponentTypes)
 		{
