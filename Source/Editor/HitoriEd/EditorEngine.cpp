@@ -403,7 +403,7 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 	RenderCommand::BeginRenderPass(ViewRenderingInfo);
 
 	// Get the world of the current viewport is using.
-	const UWorld* CurrentWorld = MultipleViewportsAdapter.GetViewWorld(ViewIndex);
+	UWorld* CurrentWorld = MultipleViewportsAdapter.GetViewWorld(ViewIndex);
 	assert(CurrentWorld);
 
 	if (SettingsPanel->GetSettings().bDrawBatchLine)
@@ -414,14 +414,9 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 
 		if (SettingsPanel->GetSettings().bDrawBoundingBox)
 		{
-			LineBatcher->BuildVertexBuffer();
+			LineBatcher->BuildVertexBuffer(*CurrentWorld);
 
-			for (auto& WorldContext : WorldContexts)
-			{
-				assert(WorldContext->World);
-				UWorld& World = *WorldContext->World;
-				World.GetPathTracker().OnRender(LineBatcher.get());
-			}
+			CurrentWorld->GetPathTracker().OnRender(LineBatcher.get());
 		}
 
 		// 선택된 액터가 라이트면 원뿔을 같이 쌓는다

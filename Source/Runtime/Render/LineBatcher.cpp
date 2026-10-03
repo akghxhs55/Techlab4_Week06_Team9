@@ -7,6 +7,8 @@
 
 #include "UObject/UObjectIterator.h"
 
+#include "Engine/World.h"
+
 FLineBatcher::~FLineBatcher()
 {
 	delete[] VertexBufferBase;
@@ -32,12 +34,21 @@ bool FLineBatcher::Init(FRenderer* InRenderer, UWorld* InWorld)
 	return true;
 }
 
-void FLineBatcher::BuildVertexBuffer()
+void FLineBatcher::BuildVertexBuffer(const UWorld& World)
 {
 	for (TObjectIterator<UPrimitiveComponent> Itr; Itr; ++Itr)
 	{
 		// 로컬 AABB와 월드 행렬을 그대로 넘기고 변환은 AddOrientedBox가 한다.
 		// (월드 행렬이어야 부모에 붙은 컴포넌트도 제자리에 그려진다)
+
+		// Skip drawing bounding box if the world is not an editor world
+		// TODO: Replacing TObjectIterator with a more efficient method to get world specific components
+		bool bIsEditorWorld = World.GetWorldType() == EWorldType::Editor;
+		if (!bIsEditorWorld)
+		{
+			continue;
+		}
+
 		AddOrientedBox(
 			Itr->CalcLocalBounds(),
 			Itr->GetWorldMatrix(),
