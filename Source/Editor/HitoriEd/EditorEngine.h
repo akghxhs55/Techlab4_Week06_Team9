@@ -27,6 +27,8 @@
 
 #include "Render/SkyboxRenderer.h"
 
+#include "../../Runtime/Render/ScreenQuadRenderer.h"
+
 //Temp
 #include "Text/Font.h"
 #include "Text/TextRenderer.h"
@@ -77,6 +79,7 @@ private:
 	TUniquePtr<FOutline> Outline;
 	TUniquePtr<FOutlineRenderer> OutlineRenderer;
 	TUniquePtr<FSkyboxRenderer> SkyboxRenderer;
+	TUniquePtr<FScreenQuadRenderer> ScreenQuadRenderer;
 
 	UFont* SystemFont;
 

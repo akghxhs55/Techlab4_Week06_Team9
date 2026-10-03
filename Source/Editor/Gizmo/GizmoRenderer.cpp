@@ -38,7 +38,7 @@ bool FGizmoRenderer::Init(FRenderer* InRenderer)
 
 	PipelineState.Shader = Shader;
 	PipelineState.Topology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-
+	PipelineState.DepthStencilState = EDepthStencilState::Disabled;
 	return false;
 }
 

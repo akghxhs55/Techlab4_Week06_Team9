@@ -32,6 +32,7 @@
 #include "Core/EngineLog.h"
 #include "Core/Stats/LightweightStats.h"
 
+
 namespace
 {
 	DECLARE_CYCLE_STAT("Viewport Update", STAT_ViewportUpdate);
@@ -133,6 +134,9 @@ bool UEditorEngine::Init()
 
 	TextRenderer = MakeUnique<FTextRenderer>();
 	TextRenderer->Init();
+
+	ScreenQuadRenderer = MakeUnique<FScreenQuadRenderer>();
+	ScreenQuadRenderer->Init(); 
 
 	// TODO: Iterate WorldContext to set each world
 	UWorld* World = WorldContexts[0]->World;
@@ -330,7 +334,25 @@ void UEditorEngine::RenderMultipleViewports()
 			MultipleViewportsAdapter.GetEngineCameraLocation(ViewIndex),
 			MultipleViewportsAdapter.GetEngineCameraForward(ViewIndex),
 			RenderQueue);
+
+
+		// 지금까지 그린 결과를 Screen Quad 로 그리는 과정 추가... 
+		// 1. 현재 RT 는 어디에 -> Renderer 에 있다. 
+		// 1-1. Renderer 에 Screen Quad 를 그려야 하나?	
+		// RT 를 BackBuffer 에 그리는 것이 아니라, 화면 크기와 동일한 Texture 에 그리고, 모든 렌더링이 끝난 이후에 Screen Quad 를 그려서 BackBuffer 에 그린다.
+		
+		
+		auto info = ViewportsPanel->GetRenderingInfo(ViewIndex);
+		ScreenQuadRenderer->Render(ViewportsPanel->GetViewRenderTarget(ViewIndex), info, MultipleViewportsAdapter.GetEngineProjectionMatrix(ViewIndex));
+	
 	}
+
+
+	// 여기서 Screen Quad Render 를 수행한다. 
+	// Buffer Visualization 이 켜져있는 경우, 대상 버퍼를 Texture 로 바인딩 하고, Screen Quad 를 그린다. 
+	// 아닌 경우, 일반 RT 를 Texture 로 바인딩 하고, Screen Quad 를 그린다.
+	
+
 
 	EMultipleViewportsCameraPreset CameraPresets[4]{};
 	for (int32 ViewIndex = 0; ViewIndex < 4; ++ViewIndex)
@@ -524,8 +546,6 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 
 		FBox box = Target->CalcBounds();
 
-		RenderCommand::ClearDepthStencil(ViewRenderingInfo.DepthStencil.Texture);
-
 		GizmoRenderer->OnRender(
 			*Gizmo,
 			ViewProjection,
@@ -533,7 +553,6 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 			MultipleViewportsAdapter.IsOrthographic(ViewIndex));
 	}
 
-	RenderCommand::ClearDepthStencil(ViewRenderingInfo.DepthStencil.Texture);
 
 	if (SettingsPanel->GetSettings().bShowUUID)
 	{
