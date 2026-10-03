@@ -542,42 +542,38 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 
 	if (SettingsPanel->GetSettings().bShowUUID)
 	{
-		for (auto& worldContext : WorldContexts)
+
+		for (AActor* Actor : CurrentWorld->GetPersistentLevel()->GetActors())
 		{
-			assert(worldContext->World);
-			UWorld* World = worldContext->World;
+			if (!Actor)
+				continue;
 
-			for (AActor* Actor : World->GetPersistentLevel()->GetActors())
-			{
-				if (!Actor)
-					continue;
+			UPrimitiveComponent* Primitive =
+				Cast<UPrimitiveComponent>(Actor->GetRootComponent());
 
-				UPrimitiveComponent* Primitive =
-					Cast<UPrimitiveComponent>(Actor->GetRootComponent());
+			if (!Primitive)
+				continue;
 
-				if (!Primitive)
-					continue;
+			FBox Box =
+				Primitive->CalcBounds();
 
-				FBox Box =
-					Primitive->CalcBounds();
+			FVector UUIDLocation;
+			UUIDLocation.X = (Box.Min.X + Box.Max.X) * 0.5f;
+			UUIDLocation.Y = (Box.Min.Y + Box.Max.Y) * 0.5f;
+			UUIDLocation.Z = Box.Max.Z + 0.5f;
 
-				FVector UUIDLocation;
-				UUIDLocation.X = (Box.Min.X + Box.Max.X) * 0.5f;
-				UUIDLocation.Y = (Box.Min.Y + Box.Max.Y) * 0.5f;
-				UUIDLocation.Z = Box.Max.Z + 0.5f;
+			FString Text =
+				"UUID : " + std::to_string(Actor->GetUUID());
 
-				FString Text =
-					"UUID : " + std::to_string(Actor->GetUUID());
+			TextRenderer->BuildTextMesh(
+				Text,
+				0.5f,
+				*SystemFont
+			);
 
-				TextRenderer->BuildTextMesh(
-					Text,
-					0.5f,
-					*SystemFont
-				);
+			const FMatrix BillboardWorld = MultipleViewportsAdapter.BuildEngineBillboardMatrix(ViewIndex, UUIDLocation, 1.0f, 1.0f);
+			TextRenderer->OnRender(Text, BillboardWorld, 0.5f, *SystemFont, ViewProjection);
 
-				const FMatrix BillboardWorld = MultipleViewportsAdapter.BuildEngineBillboardMatrix(ViewIndex, UUIDLocation, 1.0f, 1.0f);
-				TextRenderer->OnRender(Text, BillboardWorld, 0.5f, *SystemFont, ViewProjection);
-			}
 		}
 	}
 
