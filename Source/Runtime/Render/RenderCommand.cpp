@@ -257,6 +257,7 @@ void RenderCommand::SetViewport(uint32 InX, uint32 InY, uint32 InWidth, uint32 I
 
 void RenderCommand::SetRasterizerState(ERasterizerState State)
 {
+	ChachedRasterizerState = State;
 	RenderDevice->GetContext()->RSSetState(RenderDevice->GetRasterizerState(State));
 }
 

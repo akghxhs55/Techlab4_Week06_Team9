@@ -142,6 +142,11 @@ void FRenderer::RenderOpaque(const FMatrix& ViewProjection)
 {
 	DrawStaticGroups();
 	DrawPackets(0, FirstTranslucentIndex, ViewProjection);
+
+	if (RenderCommand::GetRasterizerState() != ERasterizerState::Wireframe)
+	{
+		RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
+	}
 }
 
 // RenderOpaque가 남긴 반투명 패킷을 먼 것부터 그린다.
@@ -243,7 +248,7 @@ void FRenderer::DrawPackets(uint32 Begin, uint32 End, const FMatrix& ViewProject
 	LastMaterial = nullptr;
 	uint8 LastLODIndex = 0;
 
-	RenderCommand::BindConstantBuffer(0, ViewCB.get(), EShaderBindFlagBits::Vertex);
+	RenderCommand::BindConstantBuffer(0, ViewCB.get(), EShaderBindFlagBits::Vertex | EShaderBindFlagBits::Pixel);
 
 
 	for (uint32 k = Begin; k < End; ++k)          // k = 정렬된 위치
@@ -460,6 +465,11 @@ void FRenderer::BindMaterial(UMaterial* material)
 	RenderCommand::SetDepthStencilState(bTranslucent && material->DepthStencilState == EDepthStencilState::Default
 		? EDepthStencilState::ReadOnly : material->DepthStencilState);
 
+	if (RenderCommand::GetRasterizerState() != ERasterizerState::Wireframe)
+	{
+		RenderCommand::SetRasterizerState(material->bTwoSided ? ERasterizerState::SolidNone : ERasterizerState::SolidBack);
+	}
+
 	for (int i = 0; i < material->Textures.size(); i++)
 	{
 		RenderCommand::BindShaderResource(i, material->Textures[i], EShaderBindFlagBits::Pixel);
@@ -493,6 +503,15 @@ void FRenderer::UpdateMaterialParams(const FRenderPacket& RenderPacket)
 		{
 			RenderCommand::UpdateBufferData(RenderPacket.Material->ParamBuffer.get(), RenderPacket.MaterialParamData, RenderPacket.MaterialParamDataSize);
 			RenderCommand::BindConstantBuffer(1, RenderPacket.Material->ParamBuffer.get(), EShaderBindFlagBits::Pixel);
+		}
+		break;
+	}
+	case EMaterialParamLayout::SphereGlow:
+	{
+		if (RenderPacket.Material->ParamBuffer && RenderPacket.MaterialParamData != nullptr)
+		{
+			RenderCommand::UpdateBufferData(RenderPacket.Material->ParamBuffer.get(), RenderPacket.MaterialParamData, RenderPacket.MaterialParamDataSize);
+			RenderCommand::BindConstantBuffer(1, RenderPacket.Material->ParamBuffer.get(), EShaderBindFlagBits::Vertex | EShaderBindFlagBits::Pixel);
 		}
 		break;
 	}

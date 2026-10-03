@@ -1,0 +1,88 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ClassDiagram MajorVersion="1" MinorVersion="1">
+  <Class Name="UTextRenderComponent" Collapsed="true">
+    <Position X="5.75" Y="7.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAABAAAAhAAIABIAIIEAACAQAgAMAAAAAAACAQmIAA=</HashCode>
+      <FileName>Component\TextRenderComponent.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="UStaticMeshComponent" Collapsed="true">
+    <Position X="8" Y="9" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AQAAAQAAQgAAIAAAAAAAAAAAwAECGAAAAAAAAAAgAAA=</HashCode>
+      <FileName>Component\StaticMeshComponent.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="USpotLightComponent" Collapsed="true">
+    <Position X="10.25" Y="6.25" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AQCAAAEAAQAQAAUAAQAAAQAMMAAAAAAIAIAAAAAAsAA=</HashCode>
+      <FileName>Component\SpotLightComponent.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="USceneComponent" Collapsed="true">
+    <Position X="10.25" Y="4.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>gAAAAAIgEokCACCQAQFAABagAAAAAAAAAAAAAAaAEAQ=</HashCode>
+      <FileName>Component\SceneComponent.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="UPrimitiveComponent" Collapsed="true">
+    <Position X="8" Y="6.25" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AgAAEEAAQAEIMAACEAAIEAAAwAAAAAAEEAAAAACgEAA=</HashCode>
+      <FileName>Component\PrimitiveComponent.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="UParticleSubUVComponent" Collapsed="true">
+    <Position X="10.25" Y="9" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>gwAAAAAAQgIgCAAEAgQggJAAQwAQACkAgSAAAQAgACA=</HashCode>
+      <FileName>Component\ParticleSubUVComponent.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="UMeshComponent" Collapsed="true">
+    <Position X="8" Y="7.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>BAAAAEAAIgAAAAAAAACAAAAAgCADCAAEAAAAAAAgAQA=</HashCode>
+      <FileName>Component\MeshComponent.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="ULightComponent" Collapsed="true">
+    <Position X="12.25" Y="6.25" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Component\LightComponent.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="UBillboardComponent" Collapsed="true">
+    <Position X="10.25" Y="7.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AEAAAEAQAgAAIAAAAAAAEAAAwCAAAQAEAAAACAAwAAA=</HashCode>
+      <FileName>Component\BillboardComponent.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="UActorComponent" Collapsed="true">
+    <Position X="10.25" Y="3.25" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAACIAoAAAAAAAAAAAAAAAAAAAAAAAAIBAAAgAAA=</HashCode>
+      <FileName>Component\ActorComponent.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="UObject" Collapsed="true">
+    <Position X="10.25" Y="2" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>BACIBBIAIQABAAAAAQQAAQUACCBAAAgAgACgQmBABAA=</HashCode>
+      <FileName>ObjectSystem\Object.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="USphereGlowComponent" Collapsed="true">
+    <Position X="12.25" Y="7.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAQAAAAAAIEAAAAAAAACAQAAAAAAAAAAAAAAEEAA=</HashCode>
+      <FileName>SphereGlowComponent.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Font Name="맑은 고딕" Size="9" />
+</ClassDiagram>

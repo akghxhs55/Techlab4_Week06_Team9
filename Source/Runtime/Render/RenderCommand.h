@@ -81,6 +81,7 @@ public:
 	static void SetViewport(uint32 InX, uint32 InY, uint32 InWidth, uint32 InHeight);
 
 	static void SetRasterizerState(ERasterizerState State);
+	static ERasterizerState GetRasterizerState() { return ChachedRasterizerState; }
 	static void SetBlendState(EBlendState State);
 	static void SetDepthStencilState(EDepthStencilState State);
 	static void BindSamplerState(uint32 Slot, ESamplerState SamplerState, EShaderBindFlagBits FlagBits);
@@ -109,4 +110,7 @@ public:
 
 private:
 	inline static FRenderDevice* RenderDevice = nullptr;
+
+	// RasterizerState::SolideNone 에 대한 뷰포트 와이어프레임(Wireframe) 모드 보호를 위한 상태 저장.
+	inline static ERasterizerState ChachedRasterizerState = ERasterizerState::SolidBack;
 };

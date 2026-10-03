@@ -12,7 +12,8 @@ enum class EMaterialParamLayout
 {
 	None,
 	StaticMesh,
-	ParticleSubUV
+	ParticleSubUV,
+	SphereGlow
 };
 
 struct FStaticMeshMaterialParams
@@ -38,6 +39,7 @@ public:
 	EBlendState BlendState = EBlendState::Opaque;
 	EDepthStencilState DepthStencilState = EDepthStencilState::Default;
 	ESamplerState SamplerState = ESamplerState::LinearClamp;
+	bool bTwoSided = false;
 
 	FVector4 BaseColor = FVector4(1, 1, 1, 1);
 	FVector2 UVScrollSpeed = FVector2(0.0f, 0.0f);
