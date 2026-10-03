@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "PrimitiveComponent.h"
 
@@ -7,7 +7,8 @@ class UBillboardComponent : public UPrimitiveComponent
 	DECLARE_CLASS(UBillboardComponent, UPrimitiveComponent)
 
 	REFLECT_START(ClassName)
-		REFLECT_END()
+		PROPERTY(Material)
+	REFLECT_END()
 
 public:
 	UBillboardComponent();

@@ -1,4 +1,4 @@
-#include "EnginePCH.h"
+﻿#include "EnginePCH.h"
 #include "AssetManager.h"
 #include "Render/Buffer.h"
 #include "Render/Material.h"
@@ -118,6 +118,7 @@ void UAssetManager::Init(const FAssetLoadProgress& OnProgress)
 	Get().CreateDefaultMeshes();
 	Get().CreateParticleMaterial();
 	Get().CreateSphereGlowMaterial();
+	Get().CreateIconMaterials();
 }
 
 void UAssetManager::ScanAssets(const fs::path& AssetRoot, const FAssetLoadProgress& OnProgress)
@@ -310,6 +311,21 @@ void UAssetManager::CreateSphereGlowMaterial()
 	GlowMat->ParamLayout = EMaterialParamLayout::SphereGlow;
 	GlowMat->ParamBuffer = RenderCommand::CreateConstantBuffer(512);
 	RegisterAsset("SphereGlowMaterial", GlowMat);
+}
+
+void UAssetManager::CreateIconMaterials()
+{
+	UMaterial* BillboardIconMat = FObjectFactory::ConstructObject<UMaterial>();
+	BillboardIconMat->Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/DefaultShader.hlsl");
+	BillboardIconMat->Textures.Add(GetAssetByPath<UTexture2D>("Assets/Icons/S_Actor.png"));
+	BillboardIconMat->BlendState = EBlendState::AlphaBlend;
+	RegisterAsset("BillboardIcon", BillboardIconMat);
+
+	UMaterial* SpotlightIconMat = FObjectFactory::ConstructObject<UMaterial>();
+	SpotlightIconMat->Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/DefaultShader.hlsl");
+	SpotlightIconMat->Textures.Add(GetAssetByPath<UTexture2D>("Assets/Icons/SpotLight_64x.png"));
+	SpotlightIconMat->BlendState = EBlendState::AlphaBlend;
+	RegisterAsset("SpotlightIcon", SpotlightIconMat);
 }
 
 void UAssetManager::Shutdown()

@@ -1,4 +1,4 @@
-#include "EnginePCH.h"
+﻿#include "EnginePCH.h"
 #include "TextRenderer.h"
 
 #include "Camera/CameraComponent.h"
@@ -55,7 +55,7 @@ void FTextRenderer::Init(uint32 InMaxCharacters)
 
 	PipelineState.Shader = TextShader;
 	PipelineState.Topology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	PipelineState.DepthStencilState = EDepthStencilState::Disabled;
+	PipelineState.RasterizerState = ERasterizerState::SolidNone;
 }
 
 // Atlas 글리프 위치·UV로 문자별 사각형 Mesh를 만든다.
