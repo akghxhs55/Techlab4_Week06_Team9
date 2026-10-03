@@ -96,6 +96,9 @@ public:
 
 	virtual void Serialize(json& Handle, bool bIsLoading);
 
+	// Create a object and duplicate all subobjects. This is a deep copy operation.
+	virtual UObject* Duplicate();
+
 	void* operator new(uint64 Size)
 	{
 		void* Ptr = malloc(Size);
@@ -114,6 +117,10 @@ public:
 		free(Ptr);
 	}
 
+protected:
+	// Deep copy subobjects
+	virtual void DuplicateSubObjects();
+
 private:
 	uint32 ObjectUUID;
 	uint32 InternalIndex;
@@ -128,6 +135,7 @@ private:
 
 	TMap<FString, int32> ChildNameCounters;
 	friend class FObjectFactory;
+
 };
 
 extern TArray<UObject*> GUObjectArray;
