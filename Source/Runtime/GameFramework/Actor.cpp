@@ -22,6 +22,40 @@ AActor::~AActor()
     }
 }
 
+AActor::AActor(const AActor& Other)
+	: UObject(Other)
+    , Components(Other.Components)
+	, PrimaryActorTick(Other.PrimaryActorTick)
+{
+}
+
+void AActor::DuplicateSubObjects()
+{
+    Super::DuplicateSubObjects();
+
+    for (UActorComponent*& Component : Components)
+    {
+		assert(Component); // Component should not be nullptr
+
+		bool bIsRootComponent = (Component == RootComponent);
+
+		//Component = Component->Duplicate<UActorComponent>();
+		Component = Cast<UActorComponent>(Component->Duplicate(Component->GetClass()));
+		Component->SetOwner(this);
+        
+		if (bIsRootComponent)
+		{
+			RootComponent = static_cast<USceneComponent*>(Component);
+		}
+    }
+
+	PrimaryActorTick.Target = this;
+
+    // World and Level are set by the caller (UWorld::DuplicateSubObjects)
+
+    RegisterAllActorTickFunctions(true);
+}
+
 void AActor::BeginPlay()
 {
 	//if (UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(RootComponent))

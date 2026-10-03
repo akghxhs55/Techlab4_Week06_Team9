@@ -43,6 +43,13 @@ UPrimitiveComponent::~UPrimitiveComponent()
 
 }
 
+UPrimitiveComponent::UPrimitiveComponent(const UPrimitiveComponent& Other)
+	: Super(Other)
+	, bVisible(Other.bVisible)
+	, SceneProxy(nullptr) // SceneProxy should be created in the scene, not copied
+{
+}
+
 void UPrimitiveComponent::BeginPlay()
 {
 	Super::BeginPlay();

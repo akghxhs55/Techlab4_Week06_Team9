@@ -4,6 +4,16 @@
 #include "GameFramework/Actor.h"
 #include "Component/ActorComponent.h"
 
+// Only copy the configs.
+FTickFunction::FTickFunction(const FTickFunction& Other)
+	: bTickEvenWhenPaused(Other.bTickEvenWhenPaused)
+	, bCanEverTick(Other.bCanEverTick)
+	, bTickInEditor(Other.bTickInEditor)
+	, bStartWithTickEnabled(Other.bStartWithTickEnabled)
+	, TickGroup(Other.TickGroup)
+	, TickInterval(Other.TickInterval)
+{}
+
 void FTickFunction::RegisterTickFunction(FTickTaskManager& InManager)
 {
 	if (!bCanEverTick || Manager == &InManager)

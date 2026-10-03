@@ -22,6 +22,28 @@ USceneComponent::~USceneComponent()
 	DetachFromParent();
 }
 
+//USceneComponent::USceneComponent(const USceneComponent& Other)
+//	: UActorComponent(Other)
+//	, Transform(Other.Transform)
+//	, AttachParent(nullptr)
+//	, AttachChildren(Other.AttachChildren)
+//{
+//}
+
+void USceneComponent::DuplicateSubObjects()
+{
+	Super::DuplicateSubObjects();
+
+	for (USceneComponent*& Child : AttachChildren)
+	{
+		if (Child)
+		{
+			Child = Child->Duplicate<USceneComponent>();
+			Child->AttachParent = this;
+		}
+	}
+}
+
 void USceneComponent::SetupAttachment(USceneComponent* InParent)
 {
 	if (InParent == this || AttachParent == InParent) return;

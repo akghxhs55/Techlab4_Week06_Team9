@@ -28,6 +28,10 @@ class UEngine : public UObject
 	DECLARE_CLASS(UEngine, UObject)
 	friend class FEngineLoop;
 public:
+	UEngine() = default;
+	UEngine(const UEngine&) = delete;
+	UEngine& operator=(const UEngine&) = delete;
+
 	// 창을 만들기 전에 호출된다.
 	virtual FEngineConfig GetConfig() const { return {}; }
 
