@@ -77,6 +77,14 @@ UActorComponent* AActor::AddComponentByClass(UClass* Class, bool bManualAttachme
     Component->SetOwner(this);
     Components.Add(Component);
 
+	if (UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Component))
+	{
+		if (World)
+		{
+			World->GetScene().AddPrimitive(Primitive);
+		}
+	}
+
     if (!bManualAttachment)
     {
         if (USceneComponent* SceneComponent = Cast<USceneComponent>(Component))

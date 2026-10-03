@@ -1,6 +1,7 @@
-#include "EnginePCH.h"
+﻿#include "EnginePCH.h"
 #include "BillboardComponent.h"
 
+#include "ParticleSubUVComponent.h"
 #include "Asset/AssetManager.h"
 #include "Serialization/TypeSerializer.h"
 
@@ -68,10 +69,18 @@ void UBillboardComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue, const F
 	if (QuadMesh == nullptr || Material == nullptr)
 		return;
 
+	static const FSubUVConstants MaterialParam{
+		.AtlasRowSize = 1,
+		.AtlasColSize = 1,
+		.Alpha = 1.0f
+	};
+
 	FRenderPacket Packet;
 	Packet.Mesh = QuadMesh;
 	Packet.Material = Material;
 	Packet.Model = RenderQueue.StoreWorldMatrix(BillboardWorldMatrix);
+	Packet.MaterialParamData = &MaterialParam;
+	Packet.MaterialParamDataSize = sizeof(FSubUVConstants);
 	RenderQueue.Add(Packet);
 }
 

@@ -738,7 +738,7 @@ void FDetailsPanel::DrawComponentSection(AActor* Actor)
 	if (ImGui::BeginPopup("AddComponentPopup"))
 	{
 		static UClass* AddableComponentTypes[] = {
-			UMeshComponent::StaticClass(), 
+			UStaticMeshComponent::StaticClass(), 
 			UTextRenderComponent::StaticClass(), 
 			UBillboardComponent::StaticClass(), 
 			USpotLightComponent::StaticClass(), 
