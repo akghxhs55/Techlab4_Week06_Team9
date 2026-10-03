@@ -48,6 +48,8 @@ public:
 	UWorld() = default;
 	virtual ~UWorld();
 
+	UWorld(const UWorld& Other);
+
 	bool Init();
 	/*UPrimitiveComponent* SpawnPrimitive(FClass* Class);*/
 	AActor* SpawnActor(UClass* Class, FName InName = NAME_None, const FTransform* Transform = nullptr);
@@ -99,6 +101,10 @@ public:
 
 	inline EWorldType GetWorldType() const { return WorldType; }
 	inline void SetWorldType(EWorldType InWorldType) { WorldType = InWorldType; }
+
+	virtual void DuplicateSubObjects() override;
+
+protected:
 private:
 	struct alignas(64) FGatherChunk
 	{

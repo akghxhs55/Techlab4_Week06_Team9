@@ -14,6 +14,7 @@ class ULevel : public UObject
 public:
     ULevel() = default;
     virtual ~ULevel() = default;
+    ULevel(const ULevel& Other);
 
     UWorld* GetWorld() const { return OwningWorld; }
     void SetWorld(UWorld* InWorld) { OwningWorld = InWorld; }
@@ -25,6 +26,7 @@ public:
     void ClearActors();
 
     //virtual void Serialize(FArchive& Ar) override; // Save Level 구현예정
+	virtual void DuplicateSubObjects() override;
 
 private:
     UWorld* OwningWorld = nullptr;

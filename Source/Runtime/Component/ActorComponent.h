@@ -17,6 +17,9 @@ public:
 	UActorComponent() { PrimaryComponentTick.Target = this; }
 	virtual ~UActorComponent() override;
 
+	UActorComponent(const UActorComponent& Other);
+	virtual void DuplicateSubObjects() override;
+
 	virtual void BeginPlay() {};
 	virtual void TickComponent(float DeltaTime) {};
 

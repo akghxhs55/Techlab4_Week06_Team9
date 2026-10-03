@@ -446,9 +446,9 @@ void FMultipleViewportsAdapter::CaptureWorld(int32 ViewIndex)
     assert(ViewIndex >= 0 && ViewIndex < 4);
     RenderObjects[ViewIndex].Reset();
 
-    for (auto& Entry : PrimitiveById) Entry.second.bCaptured = false;
-    bCapturedBillboard = false;
-    bCapturedParticle = false;
+    for (auto& Entry : PrimitiveById[ViewIndex]) Entry.second.bCaptured = false;
+    bCapturedBillboard[ViewIndex] = false;
+    bCapturedParticle[ViewIndex] = false;
 
     UWorld& World = *ViewWorlds[ViewIndex];
     const FScene& Scene = World.GetScene();
@@ -468,18 +468,18 @@ void FMultipleViewportsAdapter::CaptureWorld(int32 ViewIndex)
         RenderObject.WorldBounds = Proxy && Proxy->GetMesh()
             ? Proxy->GetBounds() : MakeWorldBounds(Primitive->CalcBounds());
         RenderObjects[ViewIndex].Add(RenderObject);
-        PrimitiveSnapshot& Snapshot = PrimitiveById[Id];
+        PrimitiveSnapshot& Snapshot = PrimitiveById[ViewIndex][Id];
         Snapshot.Primitive = Primitive;
         Snapshot.bCaptured = true;
         Snapshot.bParticlesPrepared = false;
-        if (Cast<UParticleSubUVComponent>(Primitive)) bCapturedParticle = true;
-        else if (Cast<UBillboardComponent>(Primitive)) bCapturedBillboard = true;
+        if (Cast<UParticleSubUVComponent>(Primitive)) bCapturedParticle[ViewIndex] = true;
+        else if (Cast<UBillboardComponent>(Primitive)) bCapturedBillboard[ViewIndex] = true;
     }
 
-    for (auto Iterator = PrimitiveById.begin(); Iterator != PrimitiveById.end();)
+    for (auto Iterator = PrimitiveById[ViewIndex].begin(); Iterator != PrimitiveById[ViewIndex].end();)
     {
         const auto Current = Iterator++;
-        if (!Current->second.bCaptured) PrimitiveById.Remove(Current->first);
+        if (!Current->second.bCaptured) PrimitiveById[ViewIndex].Remove(Current->first);
     }
 }
 
@@ -660,7 +660,7 @@ void FMultipleViewportsAdapter::BuildRenderQueue(const int32 ViewIndex, FRenderQ
 
     for (const ObjectId Id : VisibleIds[ViewIndex])
     {
-        const auto Found = PrimitiveById.Find(Id);
+        const auto Found = PrimitiveById[ViewIndex].Find(Id);
         if (!Found || !Found->Primitive)
             continue;
 

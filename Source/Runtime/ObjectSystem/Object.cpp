@@ -3,6 +3,7 @@
 
 #include "Core/EngineStatics.h"
 #include "ObjectSystem/Class.h"
+#include "ObjectSystem/ObjectFactory.h"
 
 #include "Serialization/TypeSerializer.h"
 #include "Asset/AssetManager.h"
@@ -185,5 +186,31 @@ void UObject::Serialize(json& Handle, bool bIsLoading)
 	}
 }
 
+//UObject* UObject::Duplicate() const
+//{
+//	UObject* NewObject = new UObject(*this);
+//
+//	NewObject->DuplicateSubObjects();
+//	return NewObject;
+//}
 
+void UObject::DuplicateSubObjects()
+{
+	// Assign a new UUID and register this
+	ObjectUUID = FEngineStatics::GetUUID();
+	InternalIndex = GUObjectArray.Num();
+	GUObjectArray.Add(this);
+}
 
+UObject* UObject::Duplicate(const UClass* Class) const
+{
+	if (!Class)
+		return nullptr;
+
+	UObject* NewObject = Class->CopyConstructor(*this);
+	if (!NewObject)
+		return nullptr;
+
+	NewObject->DuplicateSubObjects();
+	return NewObject;
+}

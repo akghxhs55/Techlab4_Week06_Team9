@@ -19,6 +19,9 @@ class AActor : public UObject
 public:
 	AActor();
 	virtual ~AActor();
+	AActor(const AActor& Other);
+
+	virtual void DuplicateSubObjects() override;
 
 	virtual void BeginPlay(); // xx World->AddPrimitive 책임이동 필요
 	// 액터 자신의 로직. 컴포넌트는 각자의 PrimaryComponentTick으로 따로 실행된다.

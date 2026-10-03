@@ -736,9 +736,8 @@ bool UEditorEngine::StartPIE(int32 ViewIndex)
 	}
 
 	// Create a new PIE world
-	// TODO: Copy original world
-	UWorld* PIEWorld = FObjectFactory::ConstructObject<UWorld>();
-	if (!PIEWorld || !PIEWorld->Init())
+	UWorld* PIEWorld = OriginalWorld->Duplicate<UWorld>();
+	if (!PIEWorld)
 	{
 		HTR_LOG(Error, "Failed to create PIE world.");
 		return false;

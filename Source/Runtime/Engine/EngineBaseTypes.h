@@ -33,7 +33,7 @@ public:
 	virtual ~FTickFunction() { UnRegisterTickFunction(); }
 
 	// 등록 상태(Manager·Index)가 복사되면 같은 슬롯을 두 객체가 가리키게 된다.
-	FTickFunction(const FTickFunction&) = delete;
+	FTickFunction(const FTickFunction&); // Used in DuplicateSubObjects. Only copy the configs, not the registration state.
 	FTickFunction& operator=(const FTickFunction&) = delete;
 
 	virtual void ExecuteTick(float DeltaTime, ELevelTick LevelTick) = 0;
@@ -44,6 +44,7 @@ public:
 	bool IsTickFunctionRegistered() const { return Manager != nullptr; }
 	bool IsTickFunctionEnabled() const { return TickState != ETickState::Disabled; }
 
+	/* Configurations */
 	uint8 bTickEvenWhenPaused : 1 = false;
 	uint8 bCanEverTick : 1 = false;          // UE 기본값
 	uint8 bTickInEditor : 1 = false;         // 에디터에서 Tick을 켤 껀지?
@@ -54,6 +55,8 @@ public:
 
 private:
 	friend class FTickTaskManager;
+
+	/* Registration State */
 	// 현재 Tick의 상태
 	ETickState TickState = ETickState::Disabled;
 	// 다음 Tick 실행까지 남은 시간

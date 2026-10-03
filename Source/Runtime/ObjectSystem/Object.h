@@ -38,6 +38,13 @@ public:                                                                 \
         if constexpr (std::is_abstract_v<T>) { return nullptr; }        \
         else { return new T(); }                                        \
     }                                                                   \
+	template <typename T = ClassName>                                   \
+	static UObject* InternalCopyContructInstance(const UObject& Other)		\
+	{																	\
+		if constexpr (std::is_abstract_v<T> ||							\
+					!std::is_copy_constructible_v<T>) { return nullptr; } \
+		else { return new T(static_cast<const T&>(Other)); }									\
+	}																	\
     static UClass* StaticClass()                                        \
     {                                                                   \
         static UClass c;                                                \
@@ -47,6 +54,7 @@ public:                                                                 \
             c.Name  = #ClassName;                                       \
             c.Super = Super::StaticClass();								\
 			c.Constructor = std::is_abstract_v<ClassName> ? nullptr : &InternalConstructInstance<ClassName>;\
+			c.CopyConstructor = std::is_abstract_v<ClassName> ? nullptr : &InternalCopyContructInstance<ClassName>;\
 			if (&ClassName::RegisterProperties != &Super::RegisterProperties) \
 			{															\
 				ClassName::RegisterProperties(&c);						\
@@ -96,6 +104,15 @@ public:
 
 	virtual void Serialize(json& Handle, bool bIsLoading);
 
+	// Create a object and duplicate all subobjects. This is a deep copy operation.
+	// NOTE: Shallow copy must be overriden in this function
+	template<typename TObject>
+		requires std::derived_from<TObject, UObject>
+	TObject* Duplicate() const;
+	UObject* Duplicate(const UClass* Class) const;
+	// Deep copy subobjects
+	virtual void DuplicateSubObjects();
+
 	void* operator new(uint64 Size)
 	{
 		void* Ptr = malloc(Size);
@@ -114,6 +131,8 @@ public:
 		free(Ptr);
 	}
 
+protected:
+
 private:
 	uint32 ObjectUUID;
 	uint32 InternalIndex;
@@ -128,6 +147,18 @@ private:
 
 	TMap<FString, int32> ChildNameCounters;
 	friend class FObjectFactory;
+
 };
 
 extern TArray<UObject*> GUObjectArray;
+
+template<typename TObject>
+	requires std::derived_from<TObject, UObject>
+TObject* UObject::Duplicate() const
+{
+	TObject* NewObject = new TObject(static_cast<const TObject&>(*this));
+
+	NewObject->DuplicateSubObjects();
+
+	return NewObject;
+}
