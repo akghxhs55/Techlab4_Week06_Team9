@@ -51,7 +51,7 @@ FRenderDevice::FRenderDevice()
 	ComPtr<IDXGIDevice1> DXGIDevice;
 	if (SUCCEEDED(Device->QueryInterface(IID_PPV_ARGS(DXGIDevice.GetAddressOf()))))
 	{
-		DXGIDevice->SetMaximumFrameLatency(1);
+		DXGIDevice->SetMaximumFrameLatency(0);
 	}
 	ComPtr<IDXGIAdapter> DXGIAdapter;
 	DXGIDevice->GetParent(IID_PPV_ARGS(DXGIAdapter.GetAddressOf()));
