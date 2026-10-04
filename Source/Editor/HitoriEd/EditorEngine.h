@@ -98,6 +98,9 @@ private:
 
 	// Currently editing world context which type is EWorldType::Editor.
 	FWorldContext* EditorWorldContextRef = nullptr;
+	// Currently editing world context which type is EWorldType::PIE.
+	// NOTE?: Should we limit the number of PIE world context to one?
+	FWorldContext* PIEWorldContextRef = nullptr;
 
 	// If enabled, all the PIE world will not tick
 	bool bPIEPaused = false;
@@ -112,6 +115,7 @@ private:
 	/* PIE */
 	void PausePIE(bool bPause) { bPIEPaused = bPause; }
 	bool IsPIEPaused() const { return bPIEPaused; }
+	bool IsPIERunning() const { return PIEWorldContextRef != nullptr; }
 	bool StartPIE(int32 ViewIndex);
 	bool EndPIE(int32 ViewIndex);
 };
