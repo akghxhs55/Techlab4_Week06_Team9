@@ -536,31 +536,6 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		);
 	}
 
-	// Do not draw Gizmo and Outline if the world type of the current view is PIE
-	bool bIsPIEWorld = CurrentWorld->GetWorldType() == EWorldType::PIE;
-
-	// 스텐실 기반이라 선택 대상의 가시성이 꺼져 있어도 외곽선만 그린다.
-	if (Outline->GetTarget() && !bIsPIEWorld &&
-		Outline->GetTarget()->GetOwner()->GetWorld() == CurrentWorld) 
-	{
-		OutlineRenderer->OnRender(*Outline, ViewProjection, ViewRenderingInfo.ViewportSetting);
-	}
-
-	if (Gizmo->GetTarget() && !bIsPIEWorld &&
-		Gizmo->GetTarget()->GetOwner()->GetWorld() == CurrentWorld)
-	{
-		auto Target = Cast<UPrimitiveComponent>(Gizmo->GetTarget());
-
-		FBox box = Target->CalcBounds();
-
-		GizmoRenderer->OnRender(
-			*Gizmo,
-			ViewProjection,
-			ViewCameraLocation,
-			MultipleViewportsAdapter.IsOrthographic(ViewIndex));
-	}
-
-
 	if (SettingsPanel->GetSettings().bShowUUID)
 	{
 
