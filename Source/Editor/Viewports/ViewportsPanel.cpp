@@ -170,6 +170,46 @@ void FViewportsPanel::OnRender()
 		ImGuiWindowFlags_NoScrollWithMouse |
 		ImGuiWindowFlags_NoTitleBar);
 
+	// Draw toolbar (PIE, etc,)
+	{
+		const uint32 ViewIndex = ViewportAdapter->GetEditorViewIndex();
+
+		UWorld* World = ViewportAdapter->GetViewWorld(ViewIndex);
+		assert(World);
+
+		EWorldType WorldType = World->GetWorldType();
+
+		ImGui::BeginDisabled(WorldType != EWorldType::Editor);
+		if (ImGui::SmallButton("Play"))
+		{
+			RequestedPIEViewIndex = ViewIndex;
+			RequestedPIECommand = EPIECommand::Start;
+			bHasPIERequest = true;
+		}
+		ImGui::EndDisabled();
+
+		ImGui::SameLine();
+
+		const char* PauseResumeLabel = bCurrentPIEPaused ? "Resume" : "Pause";
+		if (ImGui::SmallButton(PauseResumeLabel))
+		{
+			RequestedPIEViewIndex = ViewIndex;
+			RequestedPIECommand = EPIECommand::Pause;
+			bHasPIERequest = true;
+		}
+
+		ImGui::SameLine();
+
+		ImGui::BeginDisabled(WorldType != EWorldType::PIE);
+		if (ImGui::SmallButton("Stop"))
+		{
+			RequestedPIEViewIndex = ViewIndex;
+			RequestedPIECommand = EPIECommand::Stop;
+			bHasPIERequest = true;
+		}
+		ImGui::EndDisabled();
+	}
+
 	ContentOrigin = ImGui::GetCursorScreenPos();
 	ContentSize = ImGui::GetContentRegionAvail();
 	ContentSize.x = std::max(1.0f, ContentSize.x);
@@ -311,50 +351,6 @@ void FViewportsPanel::OnRender()
 			StatResetButtonMin = ImGui::GetItemRectMin();
 			StatResetButtonMax = ImGui::GetItemRectMax();
 			bStatResetButtonVisible = true;
-		}
-
-		/* PIE Control UI */
-		if (ViewIndex == ActiveViewIndex)
-		{
-			UWorld* World = ViewportAdapter->GetViewWorld(ViewIndex);
-			assert(World);
-
-			EWorldType WorldType = World->GetWorldType();
-
-			// Next Line
-			ImGui::SetCursorScreenPos({
-				ContentOrigin.x + Slots[ViewIndex].Rect.X + 8.0f,
-				ContentOrigin.y + Slots[ViewIndex].Rect.Y + 8.0f + ImGui::GetFrameHeight() + 4.0f });
-
-			ImGui::BeginDisabled(WorldType != EWorldType::Editor);
-			if (ImGui::SmallButton("Play"))
-			{
-				RequestedPIEViewIndex = ViewIndex;
-				RequestedPIECommand = EPIECommand::Start;
-				bHasPIERequest = true;
-			}
-			ImGui::EndDisabled();
-
-			ImGui::SameLine();
-
-			const char* PauseResumeLabel = bCurrentPIEPaused ? "Resume" : "Pause";
-			if (ImGui::SmallButton(PauseResumeLabel))
-			{
-				RequestedPIEViewIndex = ViewIndex;
-				RequestedPIECommand = EPIECommand::Pause;
-				bHasPIERequest = true;
-			}
-
-			ImGui::SameLine();
-
-			ImGui::BeginDisabled(WorldType != EWorldType::PIE);
-			if (ImGui::SmallButton("Stop"))
-			{
-				RequestedPIEViewIndex = ViewIndex;
-				RequestedPIECommand = EPIECommand::Stop;
-				bHasPIERequest = true;
-			}
-			ImGui::EndDisabled();
 		}
 
 		ImGui::PopID();
