@@ -26,6 +26,7 @@ AActor::AActor(const AActor& Other)
 	: UObject(Other)
     , Components(Other.Components)
 	, PrimaryActorTick(Other.PrimaryActorTick)
+	, RootComponent(Other.RootComponent)
 {
 }
 
