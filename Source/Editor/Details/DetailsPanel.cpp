@@ -443,7 +443,7 @@ namespace
 							Effective = Override;
 						}
 					}
-					
+
 					ImGui::TableNextRow();
 
 					// 4: UV Scroll Speed
@@ -529,7 +529,7 @@ namespace
 			ImGui::Separator();
 		}
 	}
-	
+
 	// UClass에 등록된 프로퍼티를 타입에 맞는 위젯으로 그린다
 	void DrawProperty(UObject* Object, const FProperty& Property, ImFont* CustomFont)
 	{
@@ -606,10 +606,27 @@ namespace
 		{
 			FTransform* Value = static_cast<FTransform*>(ValuePtr);
 
+			FTransform EditedTransform = *Value;
+			bool bChanged = false;
+
 			ImGui::NewLine();
-			DrawVector3Controller("Location", Value->Location.V, 0.0f, 55.0f);
-			DrawRotatorAsXYZ("Rotation", Value->Rotation);
-			DrawVector3Controller("Scale", Value->Scale.V, 1.0f, 55.0f);
+			bChanged |= DrawVector3Controller("Location", EditedTransform.Location.V, 0.0f, 55.0f);
+			bChanged |= DrawRotatorAsXYZ("Rotation", EditedTransform.Rotation);
+			bChanged |= DrawVector3Controller("Scale", EditedTransform.Scale.V, 1.0f, 55.0f);
+
+			if (bChanged)
+			{
+				// USceneComponent should be updated via SetTransform to mark dirty and update world transform
+				if (USceneComponent* SceneComp = Cast<USceneComponent>(Object))
+				{
+					SceneComp->SetTransform(EditedTransform);
+				}
+				else
+				{
+					*Value = EditedTransform;
+				}
+			}
+
 			break;
 		}
 		case EPropertyType::Object:
@@ -739,10 +756,10 @@ void FDetailsPanel::DrawComponentSection(AActor* Actor)
 	if (ImGui::BeginPopup("AddComponentPopup"))
 	{
 		static UClass* AddableComponentTypes[] = {
-			UStaticMeshComponent::StaticClass(), 
-			UTextRenderComponent::StaticClass(), 
-			UBillboardComponent::StaticClass(), 
-			USpotLightComponent::StaticClass(), 
+			UStaticMeshComponent::StaticClass(),
+			UTextRenderComponent::StaticClass(),
+			UBillboardComponent::StaticClass(),
+			USpotLightComponent::StaticClass(),
 			USphereGlowComponent::StaticClass()
 		};
 		for (UClass* Type : AddableComponentTypes)
