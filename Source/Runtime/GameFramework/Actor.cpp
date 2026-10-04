@@ -7,53 +7,80 @@
 
 AActor::AActor()
 {
-    PrimaryActorTick.Target = this;
+	PrimaryActorTick.Target = this;
 }
 
 AActor::~AActor()
 {
-    TArray<UActorComponent*> ToDelete = Components;
-    Components.Reset();
-    RootComponent = nullptr;
+	TArray<UActorComponent*> ToDelete = Components;
+	Components.Reset();
+	RootComponent = nullptr;
 
-    for (UActorComponent* Component : ToDelete)
-    {
-        delete Component;
-    }
+	for (UActorComponent* Component : ToDelete)
+	{
+		delete Component;
+	}
 }
 
 AActor::AActor(const AActor& Other)
 	: UObject(Other)
-    , Components(Other.Components)
+	, Components(Other.Components)
 	, PrimaryActorTick(Other.PrimaryActorTick)
+	, RootComponent(Other.RootComponent)
 {
 }
 
 void AActor::DuplicateSubObjects()
 {
-    Super::DuplicateSubObjects();
+	Super::DuplicateSubObjects();
 
-    for (UActorComponent*& Component : Components)
-    {
+	TMap<USceneComponent*, USceneComponent*> OldToNewMap;
+	// Duplicate all components
+	for (UActorComponent*& Component : Components)
+	{
 		assert(Component); // Component should not be nullptr
 
-		bool bIsRootComponent = (Component == RootComponent);
+		UActorComponent* OldComponent = Component;
+		UActorComponent* NewComponent = Cast<UActorComponent>(OldComponent->Duplicate(OldComponent->GetClass()));
 
-		//Component = Component->Duplicate<UActorComponent>();
-		Component = Cast<UActorComponent>(Component->Duplicate(Component->GetClass()));
-		Component->SetOwner(this);
-        
-		if (bIsRootComponent)
+		NewComponent->SetOwner(this);
+
+		if (OldComponent->IsA<USceneComponent>())
 		{
-			RootComponent = static_cast<USceneComponent*>(Component);
+			USceneComponent* OldSceneComponent = Cast<USceneComponent>(OldComponent);
+			USceneComponent* NewSceneComponent = Cast<USceneComponent>(NewComponent);
+			OldToNewMap.Add(OldSceneComponent, NewSceneComponent);
 		}
-    }
+
+		Component = NewComponent;
+	}
+
+	// Re-establish attachment relationships
+	for (UActorComponent* Component : Components)
+	{
+		if (USceneComponent* SceneComponent = Cast<USceneComponent>(Component))
+		{
+			if (USceneComponent* OldParent = SceneComponent->GetAttachParent())
+			{
+				if (USceneComponent** NewParentPtr = OldToNewMap.Find(OldParent))
+				{
+					SceneComponent->SetupAttachment(*NewParentPtr);
+				}
+			}
+		}
+	}
+
+	// Reset the root component if it was duplicated
+	if (USceneComponent** NewRootComponentPtr = OldToNewMap.Find(RootComponent))
+	{
+		RootComponent = *NewRootComponentPtr;
+	}
 
 	PrimaryActorTick.Target = this;
 
-    // World and Level are set by the caller (UWorld::DuplicateSubObjects)
+	// World and Level are set by the caller (UWorld::DuplicateSubObjects)
 
-    RegisterAllActorTickFunctions(true);
+	RegisterAllActorTickFunctions(true);
 }
 
 void AActor::BeginPlay()
@@ -74,8 +101,8 @@ void AActor::BeginPlay()
 UActorComponent* AActor::AddComponentByClass(UClass* Class, bool bManualAttachment)
 {
 	UActorComponent* Component = CastChecked<UActorComponent>(FObjectFactory::ConstructObject(Class, this));
-    Component->SetOwner(this);
-    Components.Add(Component);
+	Component->SetOwner(this);
+	Components.Add(Component);
 
 	if (UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Component))
 	{
@@ -85,22 +112,22 @@ UActorComponent* AActor::AddComponentByClass(UClass* Class, bool bManualAttachme
 		}
 	}
 
-    if (!bManualAttachment)
-    {
-        if (USceneComponent* SceneComponent = Cast<USceneComponent>(Component))
-        {
-            if (!RootComponent)
-            {
-                RootComponent = SceneComponent;
-            }
-            else
-            {
-	            SceneComponent->SetupAttachment(RootComponent);
-            }
-        }
-    }
+	if (!bManualAttachment)
+	{
+		if (USceneComponent* SceneComponent = Cast<USceneComponent>(Component))
+		{
+			if (!RootComponent)
+			{
+				RootComponent = SceneComponent;
+			}
+			else
+			{
+				SceneComponent->SetupAttachment(RootComponent);
+			}
+		}
+	}
 
-    return Component;
+	return Component;
 }
 
 void AActor::RegisterAllActorTickFunctions(bool bRegister)
@@ -110,12 +137,12 @@ void AActor::RegisterAllActorTickFunctions(bool bRegister)
 
 	// bCanEverTick이 꺼진 함수는 등록하지 않으므로 정적 메시 액터는 매 프레임 순회 대상에서 빠진다.
 	auto Apply = [&](FTickFunction& Function)
-	{
-		if (bRegister)
-			Function.RegisterTickFunction(World->GetTickTaskManager());
-		else
-			Function.UnRegisterTickFunction();
-	};
+		{
+			if (bRegister)
+				Function.RegisterTickFunction(World->GetTickTaskManager());
+			else
+				Function.UnRegisterTickFunction();
+		};
 
 	Apply(PrimaryActorTick);
 	for (UActorComponent* Component : Components)
@@ -127,28 +154,28 @@ void AActor::RegisterAllActorTickFunctions(bool bRegister)
 
 void AActor::RemoveOwnedComponent(UActorComponent* Component)
 {
-    for (uint32 i = 0; i < Components.Num(); ++i)
-    {
-        if (Components[i] == Component)
-        {
-            Components.RemoveAt(i, 1);
-            break;
-        }
-    }
+	for (uint32 i = 0; i < Components.Num(); ++i)
+	{
+		if (Components[i] == Component)
+		{
+			Components.RemoveAt(i, 1);
+			break;
+		}
+	}
 
-    if (RootComponent == Component)
-    {
-        RootComponent = nullptr;
-    }
+	if (RootComponent == Component)
+	{
+		RootComponent = nullptr;
+	}
 }
 
 FVector AActor::GetActorLocation() const
 {
-    if (RootComponent)
-    {
-        return RootComponent->GetWorldLocation();
-    }
-    return FVector::ZeroVector;
+	if (RootComponent)
+	{
+		return RootComponent->GetWorldLocation();
+	}
+	return FVector::ZeroVector;
 }
 
 //FRotator AActor::GetActorRotation() const
@@ -163,11 +190,11 @@ FVector AActor::GetActorLocation() const
 
 FVector AActor::GetActorScale3D() const
 {
-    if (RootComponent)
-    {
-        return RootComponent->GetWorldScale3D();
-    }
-    return FVector::OneVector;
+	if (RootComponent)
+	{
+		return RootComponent->GetWorldScale3D();
+	}
+	return FVector::OneVector;
 }
 
 //FQuat AActor::GetActorQuat() const
@@ -181,23 +208,23 @@ FVector AActor::GetActorScale3D() const
 
 FTransform AActor::GetActorTransform() const
 {
-    if (RootComponent)
-    {
-        return FTransform(
-            RootComponent->GetWorldRotation(),
-            RootComponent->GetWorldLocation(),
-            RootComponent->GetWorldScale3D()
-        );
+	if (RootComponent)
+	{
+		return FTransform(
+			RootComponent->GetWorldRotation(),
+			RootComponent->GetWorldLocation(),
+			RootComponent->GetWorldScale3D()
+		);
 
-        // return FTransform(RootComponent->GetWorldMatrix());
-    }
-    return FTransform::Identity;
+		// return FTransform(RootComponent->GetWorldMatrix());
+	}
+	return FTransform::Identity;
 }
 
 bool AActor::Destroy()
 {
-    if (!World)
-        return false;
+	if (!World)
+		return false;
 
-    return World->DestroyActor(this);
+	return World->DestroyActor(this);
 }

@@ -15,7 +15,7 @@ class USceneComponent : public UActorComponent
 public:
 	USceneComponent() = default;
 	virtual ~USceneComponent() override;
-	//USceneComponent(const USceneComponent& Other);
+	USceneComponent(const USceneComponent& Other);
 
 	virtual void DuplicateSubObjects() override;
 

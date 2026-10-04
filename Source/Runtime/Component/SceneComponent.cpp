@@ -22,26 +22,26 @@ USceneComponent::~USceneComponent()
 	DetachFromParent();
 }
 
-//USceneComponent::USceneComponent(const USceneComponent& Other)
-//	: UActorComponent(Other)
-//	, Transform(Other.Transform)
-//	, AttachParent(nullptr)
-//	, AttachChildren(Other.AttachChildren)
-//{
-//}
+USceneComponent::USceneComponent(const USceneComponent& Other)
+	: UActorComponent(Other)
+	, Transform(Other.Transform)
+	, AttachParent(Other.AttachParent) // Copy original parent's ptr to find the new parent's ptr.
+	//, AttachChildren(Other.AttachChildren) // Do not copy children.
+{
+}
 
 void USceneComponent::DuplicateSubObjects()
 {
 	Super::DuplicateSubObjects();
 
-	for (USceneComponent*& Child : AttachChildren)
-	{
-		if (Child)
-		{
-			Child = Child->Duplicate<USceneComponent>();
-			Child->AttachParent = this;
-		}
-	}
+	//for (USceneComponent*& Child : AttachChildren)
+	//{
+	//	if (Child)
+	//	{
+	//		Child = Child->Duplicate<USceneComponent>();
+	//		Child->AttachParent = this;
+	//	}
+	//}
 }
 
 void USceneComponent::SetupAttachment(USceneComponent* InParent)

@@ -136,7 +136,7 @@ bool UEditorEngine::Init()
 	TextRenderer->Init();
 
 	ScreenQuadRenderer = MakeUnique<FScreenQuadRenderer>();
-	ScreenQuadRenderer->Init(); 
+	ScreenQuadRenderer->Init();
 
 	// TODO: Iterate WorldContext to set each world
 	UWorld* World = WorldContexts[0]->World;
@@ -201,9 +201,6 @@ bool UEditorEngine::Init()
 		MultipleViewportsAdapter.SetViewWorld(ViewIndex, *EditorWorldContextRef->World);
 	}
 
-	// DEBUG
-	StartPIE(1);
-
 	return true;
 }
 
@@ -267,6 +264,26 @@ void UEditorEngine::UpdateMultipleViewportState(const float DeltaTime)
 		const FSplitRatio Ratio = MultipleViewportsAdapter.GetSplitRatio();
 		SettingsPanel->GetMutableSettings().MultipleViewportsHorizontal = Ratio.Horizontal;
 		SettingsPanel->GetMutableSettings().MultipleViewportsVertical = Ratio.Vertical;
+	}
+
+	int32 PIEViewIndex = InvalidViewIndex;
+	EPIECommand PIECommand = EPIECommand::None;
+	if (ViewportsPanel->ConsumePIERequest(PIEViewIndex, PIECommand))
+	{
+		switch (PIECommand)
+		{
+		case EPIECommand::Start:
+			StartPIE(PIEViewIndex);
+			break;
+		case EPIECommand::Pause:
+			PausePIE(!IsPIEPaused());
+			break;
+		case EPIECommand::Stop:
+			EndPIE();
+			break;
+		default:
+			break;
+		}
 	}
 
 	MultipleViewportsAdapter.UpdateInput(
@@ -340,11 +357,11 @@ void UEditorEngine::RenderMultipleViewports()
 		// 1. 현재 RT 는 어디에 -> Renderer 에 있다. 
 		// 1-1. Renderer 에 Screen Quad 를 그려야 하나?	
 		// RT 를 BackBuffer 에 그리는 것이 아니라, 화면 크기와 동일한 Texture 에 그리고, 모든 렌더링이 끝난 이후에 Screen Quad 를 그려서 BackBuffer 에 그린다.
-		
-		
+
+
 		auto& info = ViewportsPanel->GetRenderingInfo(ViewIndex);
 		ScreenQuadRenderer->Render(ViewportsPanel->GetViewRenderTarget(ViewIndex), info, MultipleViewportsAdapter.GetEngineProjectionMatrix(ViewIndex));
-		
+
 		RenderOverlay(
 			ViewIndex,
 			ViewportsPanel->GetRenderingInfo(ViewIndex),
@@ -358,7 +375,7 @@ void UEditorEngine::RenderMultipleViewports()
 	// 여기서 Screen Quad Render 를 수행한다. 
 	// Buffer Visualization 이 켜져있는 경우, 대상 버퍼를 Texture 로 바인딩 하고, Screen Quad 를 그린다. 
 	// 아닌 경우, 일반 RT 를 Texture 로 바인딩 하고, Screen Quad 를 그린다.
-	
+
 
 
 	EMultipleViewportsCameraPreset CameraPresets[4]{};
@@ -367,7 +384,8 @@ void UEditorEngine::RenderMultipleViewports()
 	ViewportsPanel->SetControlState(
 		MultipleViewportsAdapter.GetLayoutMode(),
 		MultipleViewportsAdapter.GetSingleViewIndex(),
-		CameraPresets);
+		CameraPresets,
+		bPIEPaused, IsPIERunning());
 }
 
 // 화면을 표시하고 UI 변경 후 View 설정을 보관한다.
@@ -467,10 +485,10 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		? ERasterizerState::Wireframe : ERasterizerState::SolidBack;
 
 	// 렌더 루프 — 반드시 RenderAll보다 먼저
-	if(!MultipleViewportsAdapter.IsOrthographic(ViewIndex))
+	if (!MultipleViewportsAdapter.IsOrthographic(ViewIndex))
 	{
 		SkyboxRenderer->OnRender(ViewProjection, ViewCameraLocation);
-	}	
+	}
 
 
 	if (bDrawPrimitives)
@@ -518,29 +536,6 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		);
 	}
 
-	// Do not draw Gizmo and Outline if the world type of the current view is PIE
-	bool bIsPIEWorld = CurrentWorld->GetWorldType() == EWorldType::PIE;
-
-	// 스텐실 기반이라 선택 대상의 가시성이 꺼져 있어도 외곽선만 그린다.
-	if (Outline->GetTarget() && !bIsPIEWorld)
-	{
-		OutlineRenderer->OnRender(*Outline, ViewProjection, ViewRenderingInfo.ViewportSetting);
-	}
-
-	if (Gizmo->GetTarget() && !bIsPIEWorld)
-	{
-		auto Target = Cast<UPrimitiveComponent>(Gizmo->GetTarget());
-
-		FBox box = Target->CalcBounds();
-
-		GizmoRenderer->OnRender(
-			*Gizmo,
-			ViewProjection,
-			ViewCameraLocation,
-			MultipleViewportsAdapter.IsOrthographic(ViewIndex));
-	}
-
-
 	if (SettingsPanel->GetSettings().bShowUUID)
 	{
 
@@ -584,7 +579,7 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 }
 
 void UEditorEngine::RenderOverlay(int32 ViewIndex, const FRenderingInfo& ViewRenderingInfo, const FMatrix& ViewProjection, const FVector& ViewCameraLocation, const FVector& ViewCameraForward, FRenderQueue& RenderQueue) {
-	
+
 	UWorld* CurrentWorld = MultipleViewportsAdapter.GetViewWorld(ViewIndex);
 	assert(CurrentWorld);
 	bool bIsPIEWorld = CurrentWorld->GetWorldType() == EWorldType::PIE;
@@ -617,14 +612,16 @@ void UEditorEngine::RenderOverlay(int32 ViewIndex, const FRenderingInfo& ViewRen
 				);
 			}
 		}
-	} 
+	}
 
-	if (Outline->GetTarget() && !bIsPIEWorld)
+	if (Outline->GetTarget() && !bIsPIEWorld 
+		&& Outline->GetTarget()->GetOwner()->GetWorld() == CurrentWorld)
 	{
 		OutlineRenderer->OnRender(*Outline, ViewProjection, ViewRenderingInfo.ViewportSetting);
 	}
 
-	if (Gizmo->GetTarget() && !bIsPIEWorld)
+	if (Gizmo->GetTarget() && !bIsPIEWorld 
+		&& Gizmo->GetTarget()->GetOwner()->GetWorld() == CurrentWorld)
 	{
 		auto Target = Cast<UPrimitiveComponent>(Gizmo->GetTarget());
 
@@ -726,6 +723,12 @@ bool UEditorEngine::StartPIE(int32 ViewIndex)
 		return false;
 	}
 
+	if (IsPIERunning())
+	{
+		HTR_LOG(Error, "PIE is already running.");
+		return false;
+	}
+
 	UWorld* OriginalWorld = MultipleViewportsAdapter.GetViewWorld(ViewIndex);
 
 	assert(OriginalWorld);
@@ -750,13 +753,29 @@ bool UEditorEngine::StartPIE(int32 ViewIndex)
 	};
 
 	WorldContexts.Add(MakeUnique<FWorldContext>(PIEWorldContext));
+	PIEWorldContextRef = WorldContexts.Last().get();
 	MultipleViewportsAdapter.SetViewWorld(ViewIndex, *PIEWorld);
+	PIEViewIndex = ViewIndex;
+
+	// Set UI panels to use the PIE world
+	{
+		OutlinerPanel->SetWorld(PIEWorld);
+	}
+
 	return true;
 }
 
-bool UEditorEngine::EndPIE(int32 ViewIndex)
+bool UEditorEngine::EndPIE()
 {
-	UWorld* PIEWorld = MultipleViewportsAdapter.GetViewWorld(ViewIndex);
+	if (!IsPIERunning())
+	{
+		HTR_LOG(Error, "PIE is not running.");
+		return false;
+	}
+
+	assert(PIEViewIndex != InvalidViewIndex);
+
+	UWorld* PIEWorld = PIEWorldContextRef->World;
 
 	assert(PIEWorld);
 	if (PIEWorld->GetWorldType() != EWorldType::PIE)
@@ -766,14 +785,28 @@ bool UEditorEngine::EndPIE(int32 ViewIndex)
 	}
 
 	// Find FWorldContext for the PIE world and remove it
+	int32 PIEWorldContextIndex = -1;
 	for (int32 i = 0; i < WorldContexts.Num(); ++i)
 	{
-		if (WorldContexts[i]->World == PIEWorld)
+		if (WorldContexts[i].get() == PIEWorldContextRef)
 		{
-			WorldContexts.RemoveAt(i, 1);
-			MultipleViewportsAdapter.SetViewWorld(ViewIndex, *EditorWorldContextRef->World);
-			return true;
+			PIEWorldContextIndex = i;
 		}
 	}
-	return false;
+	if (PIEWorldContextIndex == -1)
+	{
+		return false;
+	}
+
+	WorldContexts.RemoveAt(PIEWorldContextIndex, 1);
+	MultipleViewportsAdapter.SetViewWorld(PIEViewIndex, *EditorWorldContextRef->World);
+	PIEViewIndex = InvalidViewIndex;
+	PIEWorldContextRef = nullptr;
+
+	// Reset UI panels to use the Editor world
+	{
+		OutlinerPanel->SetWorld(EditorWorldContextRef->World);
+	}
+
+	return true;
 }
