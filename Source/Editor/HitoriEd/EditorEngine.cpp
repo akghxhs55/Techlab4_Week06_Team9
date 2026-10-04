@@ -384,7 +384,8 @@ void UEditorEngine::RenderMultipleViewports()
 	ViewportsPanel->SetControlState(
 		MultipleViewportsAdapter.GetLayoutMode(),
 		MultipleViewportsAdapter.GetSingleViewIndex(),
-		CameraPresets);
+		CameraPresets,
+		bPIEPaused);
 }
 
 // 화면을 표시하고 UI 변경 후 View 설정을 보관한다.

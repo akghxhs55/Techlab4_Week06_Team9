@@ -1,4 +1,5 @@
 ﻿#include "EnginePCH.h"
+#include "Engine/World.h"
 #include "Editor/Viewports/ViewportsPanel.h"
 #include "Editor/LevelEditor/MultipleViewports/Adapter/MultipleViewportsAdapter.h"
 
@@ -102,12 +103,17 @@ float FViewportsPanel::ConsumeVerticalDrag()
 }
 
 // Layout·Single 대상·Preset을 UI 표시와 동기화한다.
-void FViewportsPanel::SetControlState(const ELayoutMode LayoutMode, const int32 SingleViewIndex, const EMultipleViewportsCameraPreset CameraPresets[4])
+void FViewportsPanel::SetControlState(
+	const ELayoutMode LayoutMode, const int32 SingleViewIndex, 
+	const EMultipleViewportsCameraPreset CameraPresets[4], 
+	bool bPIEPaused)
 {
 	CurrentLayoutMode = LayoutMode;
 	CurrentSingleViewIndex = SingleViewIndex;
 	for (int32 Index = 0; Index < 4; ++Index)
 		CurrentCameraPresets[Index] = CameraPresets[Index];
+	
+	bCurrentPIEPaused = bPIEPaused;
 }
 
 // 대기 Layout 요청을 한 번 반환하고 플래그를 지운다.
@@ -307,23 +313,32 @@ void FViewportsPanel::OnRender()
 			bStatResetButtonVisible = true;
 		}
 
+		/* PIE Control UI */
 		if (ViewIndex == ActiveViewIndex)
 		{
+			UWorld* World = ViewportAdapter->GetViewWorld(ViewIndex);
+			assert(World);
+
+			EWorldType WorldType = World->GetWorldType();
+
 			// Next Line
 			ImGui::SetCursorScreenPos({
 				ContentOrigin.x + Slots[ViewIndex].Rect.X + 8.0f,
 				ContentOrigin.y + Slots[ViewIndex].Rect.Y + 8.0f + ImGui::GetFrameHeight() + 4.0f });
 
+			ImGui::BeginDisabled(WorldType != EWorldType::Editor);
 			if (ImGui::SmallButton("Play"))
 			{
 				RequestedPIEViewIndex = ViewIndex;
 				RequestedPIECommand = EPIECommand::Start;
 				bHasPIERequest = true;
 			}
+			ImGui::EndDisabled();
 
 			ImGui::SameLine();
 
-			if (ImGui::SmallButton("Pause"))
+			const char* PauseResumeLabel = bCurrentPIEPaused ? "Resume" : "Pause";
+			if (ImGui::SmallButton(PauseResumeLabel))
 			{
 				RequestedPIEViewIndex = ViewIndex;
 				RequestedPIECommand = EPIECommand::Pause;
@@ -332,12 +347,14 @@ void FViewportsPanel::OnRender()
 
 			ImGui::SameLine();
 
+			ImGui::BeginDisabled(WorldType != EWorldType::PIE);
 			if (ImGui::SmallButton("Stop"))
 			{
 				RequestedPIEViewIndex = ViewIndex;
 				RequestedPIECommand = EPIECommand::Stop;
 				bHasPIERequest = true;
 			}
+			ImGui::EndDisabled();
 		}
 
 		ImGui::PopID();
