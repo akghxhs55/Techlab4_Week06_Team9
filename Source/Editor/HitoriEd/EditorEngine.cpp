@@ -279,7 +279,7 @@ void UEditorEngine::UpdateMultipleViewportState(const float DeltaTime)
 			PausePIE(!IsPIEPaused());
 			break;
 		case EPIECommand::Stop:
-			EndPIE(PIEViewIndex);
+			EndPIE();
 			break;
 		default:
 			break;
@@ -385,7 +385,7 @@ void UEditorEngine::RenderMultipleViewports()
 		MultipleViewportsAdapter.GetLayoutMode(),
 		MultipleViewportsAdapter.GetSingleViewIndex(),
 		CameraPresets,
-		bPIEPaused);
+		bPIEPaused, IsPIERunning());
 }
 
 // 화면을 표시하고 UI 변경 후 View 설정을 보관한다.
@@ -755,6 +755,7 @@ bool UEditorEngine::StartPIE(int32 ViewIndex)
 	WorldContexts.Add(MakeUnique<FWorldContext>(PIEWorldContext));
 	PIEWorldContextRef = WorldContexts.Last().get();
 	MultipleViewportsAdapter.SetViewWorld(ViewIndex, *PIEWorld);
+	PIEViewIndex = ViewIndex;
 
 	// Set UI panels to use the PIE world
 	{
@@ -764,7 +765,7 @@ bool UEditorEngine::StartPIE(int32 ViewIndex)
 	return true;
 }
 
-bool UEditorEngine::EndPIE(int32 ViewIndex)
+bool UEditorEngine::EndPIE()
 {
 	if (!IsPIERunning())
 	{
@@ -772,7 +773,9 @@ bool UEditorEngine::EndPIE(int32 ViewIndex)
 		return false;
 	}
 
-	UWorld* PIEWorld = MultipleViewportsAdapter.GetViewWorld(ViewIndex);
+	assert(PIEViewIndex != InvalidViewIndex);
+
+	UWorld* PIEWorld = PIEWorldContextRef->World;
 
 	assert(PIEWorld);
 	if (PIEWorld->GetWorldType() != EWorldType::PIE)
@@ -796,7 +799,8 @@ bool UEditorEngine::EndPIE(int32 ViewIndex)
 	}
 
 	WorldContexts.RemoveAt(PIEWorldContextIndex, 1);
-	MultipleViewportsAdapter.SetViewWorld(ViewIndex, *EditorWorldContextRef->World);
+	MultipleViewportsAdapter.SetViewWorld(PIEViewIndex, *EditorWorldContextRef->World);
+	PIEViewIndex = InvalidViewIndex;
 	PIEWorldContextRef = nullptr;
 
 	// Reset UI panels to use the Editor world

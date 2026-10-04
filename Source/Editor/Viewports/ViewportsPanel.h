@@ -35,7 +35,7 @@ public:
 	void SetControlState(
 		ELayoutMode LayoutMode, int32 SingleViewIndex, 
 		const EMultipleViewportsCameraPreset CameraPresets[4],
-		bool bPIEPaused);
+		bool bPIEPaused, bool bPIERunning);
 	// UI에서 발생한 Layout 변경 요청을 한 번 소비하도록 반환한다.
 	bool ConsumeLayoutRequest(ELayoutMode& OutMode, int32& OutSingleViewIndex);
 	// UI에서 발생한 View별 Camera Preset 요청을 한 번 소비하도록 반환한다.
@@ -92,6 +92,7 @@ private:
 
 	/* PIE command */
 	bool bCurrentPIEPaused = false;
+	bool bCurrentPIERunning = false;
 	int32 RequestedPIEViewIndex = InvalidViewIndex;
 	EPIECommand RequestedPIECommand = EPIECommand::None;
 	bool bHasPIERequest = false;

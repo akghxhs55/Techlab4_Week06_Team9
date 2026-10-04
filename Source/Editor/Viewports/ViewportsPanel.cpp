@@ -106,7 +106,7 @@ float FViewportsPanel::ConsumeVerticalDrag()
 void FViewportsPanel::SetControlState(
 	const ELayoutMode LayoutMode, const int32 SingleViewIndex, 
 	const EMultipleViewportsCameraPreset CameraPresets[4], 
-	bool bPIEPaused)
+	bool bPIEPaused, bool bPIERunning)
 {
 	CurrentLayoutMode = LayoutMode;
 	CurrentSingleViewIndex = SingleViewIndex;
@@ -114,6 +114,7 @@ void FViewportsPanel::SetControlState(
 		CurrentCameraPresets[Index] = CameraPresets[Index];
 	
 	bCurrentPIEPaused = bPIEPaused;
+	bCurrentPIERunning = bPIERunning;
 }
 
 // 대기 Layout 요청을 한 번 반환하고 플래그를 지운다.
@@ -174,12 +175,12 @@ void FViewportsPanel::OnRender()
 	{
 		const uint32 ViewIndex = ViewportAdapter->GetEditorViewIndex();
 
-		UWorld* World = ViewportAdapter->GetViewWorld(ViewIndex);
-		assert(World);
+		//UWorld* World = ViewportAdapter->GetViewWorld(ViewIndex);
+		//assert(World);
 
-		EWorldType WorldType = World->GetWorldType();
+		//EWorldType WorldType = World->GetWorldType();
 
-		ImGui::BeginDisabled(WorldType != EWorldType::Editor);
+		ImGui::BeginDisabled(bCurrentPIERunning);
 		if (ImGui::SmallButton("Play"))
 		{
 			RequestedPIEViewIndex = ViewIndex;
@@ -200,7 +201,7 @@ void FViewportsPanel::OnRender()
 
 		ImGui::SameLine();
 
-		ImGui::BeginDisabled(WorldType != EWorldType::PIE);
+		ImGui::BeginDisabled(!bCurrentPIERunning);
 		if (ImGui::SmallButton("Stop"))
 		{
 			RequestedPIEViewIndex = ViewIndex;

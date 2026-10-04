@@ -104,6 +104,7 @@ private:
 
 	// If enabled, all the PIE world will not tick
 	bool bPIEPaused = false;
+	int32 PIEViewIndex = InvalidViewIndex;
 
 	void ResetSceneSelection();
 
@@ -117,5 +118,5 @@ private:
 	bool IsPIEPaused() const { return bPIEPaused; }
 	bool IsPIERunning() const { return PIEWorldContextRef != nullptr; }
 	bool StartPIE(int32 ViewIndex);
-	bool EndPIE(int32 ViewIndex);
+	bool EndPIE();
 };
