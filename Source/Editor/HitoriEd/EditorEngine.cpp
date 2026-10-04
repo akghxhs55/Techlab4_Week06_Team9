@@ -201,9 +201,6 @@ bool UEditorEngine::Init()
 		MultipleViewportsAdapter.SetViewWorld(ViewIndex, *EditorWorldContextRef->World);
 	}
 
-	// DEBUG
-	StartPIE(1);
-
 	return true;
 }
 
@@ -267,6 +264,26 @@ void UEditorEngine::UpdateMultipleViewportState(const float DeltaTime)
 		const FSplitRatio Ratio = MultipleViewportsAdapter.GetSplitRatio();
 		SettingsPanel->GetMutableSettings().MultipleViewportsHorizontal = Ratio.Horizontal;
 		SettingsPanel->GetMutableSettings().MultipleViewportsVertical = Ratio.Vertical;
+	}
+
+	int32 PIEViewIndex = InvalidViewIndex;
+	EPIECommand PIECommand = EPIECommand::None;
+	if (ViewportsPanel->ConsumePIERequest(PIEViewIndex, PIECommand))
+	{
+		switch (PIECommand)
+		{
+		case EPIECommand::Start:
+			StartPIE(PIEViewIndex);
+			break;
+		case EPIECommand::Pause:
+			PausePIE(!IsPIEPaused());
+			break;
+		case EPIECommand::Stop:
+			EndPIE(PIEViewIndex);
+			break;
+		default:
+			break;
+		}
 	}
 
 	MultipleViewportsAdapter.UpdateInput(

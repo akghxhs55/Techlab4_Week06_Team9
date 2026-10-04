@@ -3,6 +3,9 @@
 #include "Editor/EditorUI/EditorPanel.h"
 #include "Editor/LevelEditor/MultipleViewports/Adapter/MultipleViewportsAdapterTypes.h"
 #include "Render/RenderingInfo.h"
+
+enum class EPIECommand : uint8 { None, Start, Pause, Stop };
+
 class FMultipleViewportsAdapter;
 
 class FViewportsPanel : public IEditorPanel
@@ -34,6 +37,8 @@ public:
 	bool ConsumeLayoutRequest(ELayoutMode& OutMode, int32& OutSingleViewIndex);
 	// UI에서 발생한 View별 Camera Preset 요청을 한 번 소비하도록 반환한다.
 	bool ConsumeCameraPresetRequest(int32& OutViewIndex, EMultipleViewportsCameraPreset& OutPreset);
+	// UI에서 발생한 PIE 요청을 한 번 소비하도록 반환한다.
+	bool ConsumePIERequest(int32& OutViewIndex, EPIECommand& OutCommand);
 
 	FTexture2D* GetViewRenderTarget(int32 ViewIndex) const;
 private:
@@ -81,4 +86,9 @@ private:
 	int32 RequestedSingleViewIndex = 0;
 	int32 PendingCameraPresetViewIndex = InvalidViewIndex;
 	EMultipleViewportsCameraPreset PendingCameraPreset = EMultipleViewportsCameraPreset::Perspective;
+
+	/* PIE command */
+	int32 RequestedPIEViewIndex = InvalidViewIndex;
+	EPIECommand RequestedPIECommand = EPIECommand::None;
+	bool bHasPIERequest = false;
 };

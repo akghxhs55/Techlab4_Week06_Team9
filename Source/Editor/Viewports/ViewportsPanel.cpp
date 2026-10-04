@@ -14,17 +14,17 @@
 
 namespace
 {
-constexpr ImU32 SplitterColor = IM_COL32(55, 55, 55, 230);
-constexpr ImU32 SplitterHoverColor = IM_COL32(255, 192, 0, 255);
-constexpr const char* CameraPresetLabels[] = {
-	"Perspective", "Ortho (Current)", "Top", "Bottom", "Front", "Back", "Left", "Right"};
+	constexpr ImU32 SplitterColor = IM_COL32(55, 55, 55, 230);
+	constexpr ImU32 SplitterHoverColor = IM_COL32(255, 192, 0, 255);
+	constexpr const char* CameraPresetLabels[] = {
+		"Perspective", "Ortho (Current)", "Top", "Bottom", "Front", "Back", "Left", "Right" };
 
-// Stat Overlay
-constexpr float StatOverlayMargin = 8.0f;
-constexpr float StatOverlayPadding = 6.0f;
-constexpr ImU32 StatOverlayBackgroundColor = IM_COL32(0, 0, 0, 140);
-constexpr ImU32 TitleColor = IM_COL32(255, 210, 60, 255);
-constexpr ImU32 ValueColor = IM_COL32(235, 235, 235, 255);
+	// Stat Overlay
+	constexpr float StatOverlayMargin = 8.0f;
+	constexpr float StatOverlayPadding = 6.0f;
+	constexpr ImU32 StatOverlayBackgroundColor = IM_COL32(0, 0, 0, 140);
+	constexpr ImU32 TitleColor = IM_COL32(255, 210, 60, 255);
+	constexpr ImU32 ValueColor = IM_COL32(235, 235, 235, 255);
 }
 
 // 네 View의 렌더 타깃을 최소 크기로 초기화한다.
@@ -68,7 +68,7 @@ const FRenderingInfo& FViewportsPanel::GetRenderingInfo(const int32 ViewIndex) c
 FVector2 FViewportsPanel::GetLocalMousePosition() const
 {
 	const ImVec2 Mouse = ImGui::GetMousePos();
-	return {Mouse.x - ContentOrigin.x, Mouse.y - ContentOrigin.y};
+	return { Mouse.x - ContentOrigin.x, Mouse.y - ContentOrigin.y };
 }
 
 // 엔진 입력 처리는 ImGui NewFrame보다 먼저 실행되므로 현재 OS 커서로 버튼 영역을 검사한다.
@@ -132,6 +132,25 @@ bool FViewportsPanel::ConsumeCameraPresetRequest(int32& OutViewIndex, EMultipleV
 	return true;
 }
 
+// 대기 PIE 요청을 한 번 반환하고 플래그를 지운다.
+bool FViewportsPanel::ConsumePIERequest(int32& OutViewIndex, EPIECommand& OutCommand)
+{
+	if (!bHasPIERequest)
+		return false;
+
+	assert(RequestedPIEViewIndex >= 0 && RequestedPIEViewIndex < 4);
+	assert(RequestedPIECommand != EPIECommand::None);
+
+	OutViewIndex = RequestedPIEViewIndex;
+	OutCommand = RequestedPIECommand;
+
+	RequestedPIEViewIndex = InvalidViewIndex;
+	RequestedPIECommand = EPIECommand::None;
+	bHasPIERequest = false;
+
+	return true;
+}
+
 FTexture2D* FViewportsPanel::GetViewRenderTarget(int32 ViewIndex) const {
 	return Slots[ViewIndex].RenderTarget.get();
 }
@@ -139,7 +158,7 @@ FTexture2D* FViewportsPanel::GetViewRenderTarget(int32 ViewIndex) const {
 // View Texture와 Splitter·Layout·Preset UI를 그리고 요청을 기록한다.
 void FViewportsPanel::OnRender()
 {
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0.0f, 0.0f});
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 0.0f, 0.0f });
 	ImGui::Begin("Viewports", nullptr,
 		ImGuiWindowFlags_NoScrollbar |
 		ImGuiWindowFlags_NoScrollWithMouse |
@@ -152,21 +171,24 @@ void FViewportsPanel::OnRender()
 	bHovered = ImGui::IsWindowHovered();
 	bStatResetButtonVisible = false;
 
+	assert(ViewportAdapter);
+	const int32 ActiveViewIndex = ViewportAdapter->GetEditorViewIndex();
+
 	// 전체 캔버스를 한 번 확보한 뒤 각 렌더 타깃을 창 DrawList에 직접 그린다.
 	// Image 항목 네 개를 따로 배치하면 ImGui 레이아웃과 클리핑 상태가 삽입 순서에
 	// 영향을 받아, Core가 올바른 사각형을 줘도 아래쪽 행이 잘릴 수 있다.
 	ImGui::Dummy(ContentSize);
 	ImDrawList* DrawList = ImGui::GetWindowDrawList();
 	DrawList->PushClipRect(ContentOrigin,
-		{ContentOrigin.x + ContentSize.x, ContentOrigin.y + ContentSize.y}, true);
+		{ ContentOrigin.x + ContentSize.x, ContentOrigin.y + ContentSize.y }, true);
 	for (int32 ViewIndex = 0; ViewIndex < 4; ++ViewIndex)
 	{
 		const FViewSlot& Slot = Slots[ViewIndex];
 		if (!Slot.bActive || !Slot.ColorTarget)
 			continue;
 
-		const ImVec2 ViewMin{ContentOrigin.x + Slot.Rect.X, ContentOrigin.y + Slot.Rect.Y};
-		const ImVec2 ViewMax{ViewMin.x + Slot.Rect.Width, ViewMin.y + Slot.Rect.Height};
+		const ImVec2 ViewMin{ ContentOrigin.x + Slot.Rect.X, ContentOrigin.y + Slot.Rect.Y };
+		const ImVec2 ViewMax{ ViewMin.x + Slot.Rect.Width, ViewMin.y + Slot.Rect.Height };
 		DrawList->AddImage(Slot.RenderTarget->GetSRV(), ViewMin, ViewMax);
 	}
 	DrawList->PopClipRect();
@@ -177,15 +199,15 @@ void FViewportsPanel::OnRender()
 		const float SplitX = (Slots[0].Rect.X + Slots[0].Rect.Width + Slots[1].Rect.X) * 0.5f;
 		const float SplitY = (Slots[0].Rect.Y + Slots[0].Rect.Height + Slots[2].Rect.Y) * 0.5f;
 
-		const ImVec2 VerticalMin{ContentOrigin.x + SplitX - SplitterThickness * 0.5f, ContentOrigin.y};
-		const ImVec2 VerticalMax{VerticalMin.x + SplitterThickness, ContentOrigin.y + ContentSize.y};
-		const ImVec2 HorizontalMin{ContentOrigin.x, ContentOrigin.y + SplitY - SplitterThickness * 0.5f};
-		const ImVec2 HorizontalMax{ContentOrigin.x + ContentSize.x, HorizontalMin.y + SplitterThickness};
+		const ImVec2 VerticalMin{ ContentOrigin.x + SplitX - SplitterThickness * 0.5f, ContentOrigin.y };
+		const ImVec2 VerticalMax{ VerticalMin.x + SplitterThickness, ContentOrigin.y + ContentSize.y };
+		const ImVec2 HorizontalMin{ ContentOrigin.x, ContentOrigin.y + SplitY - SplitterThickness * 0.5f };
+		const ImVec2 HorizontalMax{ ContentOrigin.x + ContentSize.x, HorizontalMin.y + SplitterThickness };
 
 		ImGui::SetCursorScreenPos(VerticalMin);
-		ImGui::InvisibleButton("##MultipleViewportsHorizontalSplitter", {SplitterThickness, ContentSize.y});
+		ImGui::InvisibleButton("##MultipleViewportsHorizontalSplitter", { SplitterThickness, ContentSize.y });
 		ImGui::SetCursorScreenPos(HorizontalMin);
-		ImGui::InvisibleButton("##MultipleViewportsVerticalSplitter", {ContentSize.x, SplitterThickness});
+		ImGui::InvisibleButton("##MultipleViewportsVerticalSplitter", { ContentSize.x, SplitterThickness });
 
 		const bool bVerticalHovered = bHovered && ImGui::IsMouseHoveringRect(VerticalMin, VerticalMax);
 		const bool bHorizontalHovered = bHovered && ImGui::IsMouseHoveringRect(HorizontalMin, HorizontalMax);
@@ -231,7 +253,7 @@ void FViewportsPanel::OnRender()
 			continue;
 		ImGui::SetCursorScreenPos({
 			ContentOrigin.x + Slots[ViewIndex].Rect.X + 8.0f,
-			ContentOrigin.y + Slots[ViewIndex].Rect.Y + 8.0f});
+			ContentOrigin.y + Slots[ViewIndex].Rect.Y + 8.0f });
 		ImGui::PushID(100 + ViewIndex);
 		int SelectedPreset = static_cast<int>(CurrentCameraPresets[ViewIndex]);
 		ImGui::SetNextItemWidth(120.0f);
@@ -242,21 +264,22 @@ void FViewportsPanel::OnRender()
 		}
 		ImGui::SameLine();
 		// 레이아웃과 독립적으로 각 View의 장면 Fill Mode를 편집한다.
-        if (ViewportAdapter)
-        {
-            int Mode = ViewportAdapter->IsViewWireframe(ViewIndex) ? 1 : 0;
-            const char* Labels[] = {"Solid", "Wireframe"};
-            ImGui::SetNextItemWidth(100.0f);
-            if (ImGui::Combo("##FillMode", &Mode, Labels, 2))
-                ViewportAdapter->SetViewWireframe(ViewIndex, Mode == 1);
-            ImGui::SameLine();
-        }
+		if (ViewportAdapter)
+		{
+			int Mode = ViewportAdapter->IsViewWireframe(ViewIndex) ? 1 : 0;
+			const char* Labels[] = { "Solid", "Wireframe" };
+			ImGui::SetNextItemWidth(100.0f);
+			if (ImGui::Combo("##FillMode", &Mode, Labels, 2))
+				ViewportAdapter->SetViewWireframe(ViewIndex, Mode == 1);
+			ImGui::SameLine();
+		}
 
 		// ImGui::SeparatorText("Depth View");
 		ImGui::SetNextItemWidth(120.0f);
 		ImGui::Combo("##DepthViewMode", reinterpret_cast<int*>(&Slots[ViewIndex].RenderingInfo.RenderBufferType), "Color\0Depth\0");
 
-        if (CurrentLayoutMode == ELayoutMode::QuadSplit)
+		ImGui::SameLine();
+		if (CurrentLayoutMode == ELayoutMode::QuadSplit)
 		{
 			if (ImGui::SmallButton("Single"))
 			{
@@ -283,18 +306,49 @@ void FViewportsPanel::OnRender()
 			StatResetButtonMax = ImGui::GetItemRectMax();
 			bStatResetButtonVisible = true;
 		}
+
+		if (ViewIndex == ActiveViewIndex)
+		{
+			// Next Line
+			ImGui::SetCursorScreenPos({
+				ContentOrigin.x + Slots[ViewIndex].Rect.X + 8.0f,
+				ContentOrigin.y + Slots[ViewIndex].Rect.Y + 8.0f + ImGui::GetFrameHeight() + 4.0f });
+
+			if (ImGui::SmallButton("Play"))
+			{
+				RequestedPIEViewIndex = ViewIndex;
+				RequestedPIECommand = EPIECommand::Start;
+				bHasPIERequest = true;
+			}
+
+			ImGui::SameLine();
+
+			if (ImGui::SmallButton("Pause"))
+			{
+				RequestedPIEViewIndex = ViewIndex;
+				RequestedPIECommand = EPIECommand::Pause;
+				bHasPIERequest = true;
+			}
+
+			ImGui::SameLine();
+
+			if (ImGui::SmallButton("Stop"))
+			{
+				RequestedPIEViewIndex = ViewIndex;
+				RequestedPIECommand = EPIECommand::Stop;
+				bHasPIERequest = true;
+			}
+		}
+
 		ImGui::PopID();
 	}
 
 	// 마지막으로 선택된 뷰포트만 오버레이
-	for (int32 ViewIndex = 0; ViewIndex < 4; ++ViewIndex)
+	if (Slots[ActiveViewIndex].bActive)
 	{
-		if (ViewIndex != ViewportAdapter->GetEditorViewIndex()) continue;
-		if (!Slots[ViewIndex].bActive)
-			continue;
 		DrawStatOverlay(DrawList, {
-			ContentOrigin.x + Slots[ViewIndex].Rect.X,
-			ContentOrigin.y + Slots[ViewIndex].Rect.Y});
+			ContentOrigin.x + Slots[ActiveViewIndex].Rect.X,
+			ContentOrigin.y + Slots[ActiveViewIndex].Rect.Y });
 	}
 
 	ImGui::End();
@@ -319,19 +373,19 @@ void FViewportsPanel::DrawStatOverlay(ImDrawList* DrawList, const ImVec2& ViewMi
 
 	if (FStatOverlay::IsEnabled(EStatFlags::FPS))
 	{
-		Lines.Add({"FPS", TitleColor});
-		Lines.Add({std::format("  {:.1f} fps", FStatOverlay::GetFPS()), ValueColor});
-		Lines.Add({std::format("  {:.2f} ms", FStatOverlay::GetFrameTimeMs()), ValueColor});
+		Lines.Add({ "FPS", TitleColor });
+		Lines.Add({ std::format("  {:.1f} fps", FStatOverlay::GetFPS()), ValueColor });
+		Lines.Add({ std::format("  {:.2f} ms", FStatOverlay::GetFrameTimeMs()), ValueColor });
 	}
 
 	if (FStatOverlay::IsEnabled(EStatFlags::Memory))
 	{
-		Lines.Add({"Memory", TitleColor});
-		Lines.Add({std::format("  Object  {:.2f} MB ({} allocs)",
+		Lines.Add({ "Memory", TitleColor });
+		Lines.Add({ std::format("  Object  {:.2f} MB ({} allocs)",
 			static_cast<double>(FStatOverlay::GetObjectAllocationBytes()) / BytesPerMegabyte,
-			FStatOverlay::GetObjectAllocationCount()), ValueColor});
-		Lines.Add({std::format("  Process {:.2f} MB",
-			static_cast<double>(FStatOverlay::GetProcessWorkingSetBytes()) / BytesPerMegabyte), ValueColor});
+			FStatOverlay::GetObjectAllocationCount()), ValueColor });
+		Lines.Add({ std::format("  Process {:.2f} MB",
+			static_cast<double>(FStatOverlay::GetProcessWorkingSetBytes()) / BytesPerMegabyte), ValueColor });
 	}
 
 	struct FProfileStatLine
@@ -343,14 +397,14 @@ void FViewportsPanel::DrawStatOverlay(ImDrawList* DrawList, const ImVec2& ViewMi
 	TArray<FProfileStatLine> ProfileLines;
 	if (FStatOverlay::IsEnabled(EStatFlags::Profile))
 	{
-		ProfileLines.Add({"CPU Profile (ms)", TitleColor, {"Last", "Avg", "Max"}});
+		ProfileLines.Add({ "CPU Profile (ms)", TitleColor,{ "Last", "Avg", "Max" } });
 
 		for (const auto& [Name, Data] : FStatRegistry::GetAll())
 		{
 			if (TStatId{ Name } == EditorStats::STAT_PickingTime)
 				continue;
 
-			FProfileStatLine Line{"  " + FString(Name), ValueColor};
+			FProfileStatLine Line{ "  " + FString(Name), ValueColor };
 			Line.Values[0] = std::format("{:.2f}", Data.GetLastMs());
 			Line.Values[1] = std::format("{:.2f}", Data.GetRecentAverageMs());
 			Line.Values[2] = std::format("{:.2f}", Data.GetMaxMs());
@@ -361,7 +415,7 @@ void FViewportsPanel::DrawStatOverlay(ImDrawList* DrawList, const ImVec2& ViewMi
 	if (const FCycleStatData* PickingData = FStatRegistry::Find(EditorStats::STAT_PickingTime))
 	{
 		ProfileLines.Add({ "Picking", TitleColor });
-		FProfileStatLine Line{"  Time (ms)", ValueColor};
+		FProfileStatLine Line{ "  Time (ms)", ValueColor };
 		Line.Values[0] = std::format("Last: {:.2f}", PickingData->GetLastMs());
 		Line.Values[1] = std::format("Attempts: {}", PickingData->CallCount);
 		Line.Values[2] = std::format("Acc.: {:.2f}", PickingData->GetTotalMs());
@@ -375,7 +429,7 @@ void FViewportsPanel::DrawStatOverlay(ImDrawList* DrawList, const ImVec2& ViewMi
 	const float LineHeight = ImGui::GetTextLineHeight();
 	const ImVec2 Origin{
 		ViewMin.x + StatOverlayMargin,
-		ViewMin.y + StatOverlayMargin + ImGui::GetFrameHeight() + StatOverlayMargin};
+		ViewMin.y + StatOverlayMargin + ImGui::GetFrameHeight() + StatOverlayMargin };
 
 	// 최대 너비 계산
 	float MaxWidth = 0.0f;
@@ -408,10 +462,10 @@ void FViewportsPanel::DrawStatOverlay(ImDrawList* DrawList, const ImVec2& ViewMi
 		MaxWidth = std::max(MaxWidth, Width);
 	}
 
-	const ImVec2 BackgroundMin{Origin.x - StatOverlayPadding, Origin.y - StatOverlayPadding};
+	const ImVec2 BackgroundMin{ Origin.x - StatOverlayPadding, Origin.y - StatOverlayPadding };
 	const ImVec2 BackgroundMax{
 		Origin.x + MaxWidth + StatOverlayPadding,
-		Origin.y + LineHeight * static_cast<float>(Lines.Num() + ProfileLines.Num()) + StatOverlayPadding};
+		Origin.y + LineHeight * static_cast<float>(Lines.Num() + ProfileLines.Num()) + StatOverlayPadding };
 	DrawList->AddRectFilled(BackgroundMin, BackgroundMax, StatOverlayBackgroundColor, 4.0f);
 
 	// Lines 그리기
