@@ -496,7 +496,27 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
 	}
 
+	// TextRenderComponent 렌더링
+	for (TObjectIterator<UTextRenderComponent> TextComponent; TextComponent; ++TextComponent)
+	{
+		if (!TextComponent || !TextComponent->GetFont() || !TextComponent->IsVisible())
+		{
+			continue;
+		}
 
+		// Skip if this comopnent is not in current viewport world
+		// TODO: Modify TObjectIterator to support filtering by world type or find a better way
+		if (TextComponent->GetOwner()->GetWorld() != CurrentWorld)
+			continue;
+
+		TextRenderer->OnRender(
+			TextComponent->GetText(),
+			TextComponent->GetWorldMatrix(),
+			TextComponent->GetTextSize(),
+			*TextComponent->GetFont(),
+			ViewProjection
+		);
+	}
 
 	// Do not draw Gizmo and Outline if the world type of the current view is PIE
 	bool bIsPIEWorld = CurrentWorld->GetWorldType() == EWorldType::PIE;
@@ -519,6 +539,45 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 			ViewCameraLocation,
 			MultipleViewportsAdapter.IsOrthographic(ViewIndex));
 	}
+
+
+	if (SettingsPanel->GetSettings().bShowUUID)
+	{
+
+		for (AActor* Actor : CurrentWorld->GetPersistentLevel()->GetActors())
+		{
+			if (!Actor)
+				continue;
+
+			UPrimitiveComponent* Primitive =
+				Cast<UPrimitiveComponent>(Actor->GetRootComponent());
+
+			if (!Primitive)
+				continue;
+
+			FBox Box =
+				Primitive->CalcBounds();
+
+			FVector UUIDLocation;
+			UUIDLocation.X = (Box.Min.X + Box.Max.X) * 0.5f;
+			UUIDLocation.Y = (Box.Min.Y + Box.Max.Y) * 0.5f;
+			UUIDLocation.Z = Box.Max.Z + 0.5f;
+
+			FString Text =
+				"UUID : " + std::to_string(Actor->GetUUID());
+
+			TextRenderer->BuildTextMesh(
+				Text,
+				0.5f,
+				*SystemFont
+			);
+
+			const FMatrix BillboardWorld = MultipleViewportsAdapter.BuildEngineBillboardMatrix(ViewIndex, UUIDLocation, 1.0f, 1.0f);
+			TextRenderer->OnRender(Text, BillboardWorld, 0.5f, *SystemFont, ViewProjection);
+
+		}
+	}
+
 
 
 	RenderCommand::EndRenderPass(ViewRenderingInfo);
@@ -560,28 +619,6 @@ void UEditorEngine::RenderOverlay(int32 ViewIndex, const FRenderingInfo& ViewRen
 		}
 	} 
 
-	// TextRenderComponent 렌더링
-	for (TObjectIterator<UTextRenderComponent> TextComponent; TextComponent; ++TextComponent)
-	{
-		if (!TextComponent || !TextComponent->GetFont() || !TextComponent->IsVisible())
-		{
-			continue;
-		}
-
-		// Skip if this comopnent is not in current viewport world
-		// TODO: Modify TObjectIterator to support filtering by world type or find a better way
-		if (TextComponent->GetOwner()->GetWorld() != CurrentWorld)
-			continue;
-
-		TextRenderer->OnRender(
-			TextComponent->GetText(),
-			TextComponent->GetWorldMatrix(),
-			TextComponent->GetTextSize(),
-			*TextComponent->GetFont(),
-			ViewProjection
-		);
-	}
-
 	if (Outline->GetTarget() && !bIsPIEWorld)
 	{
 		OutlineRenderer->OnRender(*Outline, ViewProjection, ViewRenderingInfo.ViewportSetting);
@@ -598,25 +635,6 @@ void UEditorEngine::RenderOverlay(int32 ViewIndex, const FRenderingInfo& ViewRen
 			ViewProjection,
 			ViewCameraLocation,
 			MultipleViewportsAdapter.IsOrthographic(ViewIndex));
-	}
-
-	if (SettingsPanel->GetSettings().bShowUUID) {
-		for (AActor* Actor : CurrentWorld->GetPersistentLevel()->GetActors()) {
-			if (!Actor) {
-				continue;
-			}
-
-			UPrimitiveComponent* Primitive{ Cast<UPrimitiveComponent>(Actor->GetRootComponent()) };
-			if (!Primitive) {
-				continue;
-			}
-
-			const FBox Box{ Primitive->CalcBounds() };
-			const FVector UUIDLocation{ (Box.Min.X + Box.Max.X) * 0.5f, (Box.Min.Y + Box.Max.Y) * 0.5f, Box.Max.Z + 0.5f };
-			const FString Text{ "UUID : " + std::to_string(Actor->GetUUID()) };
-			const FMatrix BillboardWorld{ MultipleViewportsAdapter.BuildEngineBillboardMatrix(ViewIndex, UUIDLocation, 1.0f, 1.0f) };
-			TextRenderer->OnRender(Text, BillboardWorld, 0.5f, *SystemFont, ViewProjection);
-		}
 	}
 }
 
