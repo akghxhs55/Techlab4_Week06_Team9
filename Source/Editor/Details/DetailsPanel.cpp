@@ -1,4 +1,4 @@
-#include "EnginePCH.h"
+﻿#include "EnginePCH.h"
 #include "Editor/Details/DetailsPanel.h"
 
 #include "imgui_internal.h"
@@ -7,6 +7,8 @@
 #include "Component/StaticMeshComponent.h"
 #include "Component/TextRenderComponent.h"
 #include "Asset/AssetManager.h"
+#include "Component/SphereGlowComponent.h"
+#include "Component/SpotLightComponent.h"
 #include "Render/Material.h"
 #include "Render/Texture2D.h"
 #include "Text/Font.h"
@@ -441,7 +443,7 @@ namespace
 							Effective = Override;
 						}
 					}
-					
+
 					ImGui::TableNextRow();
 
 					// 4: UV Scroll Speed
@@ -604,10 +606,27 @@ namespace
 		{
 			FTransform* Value = static_cast<FTransform*>(ValuePtr);
 
+			FTransform EditedTransform = *Value;
+			bool bChanged = false;
+
 			ImGui::NewLine();
-			DrawVector3Controller("Location", Value->Location.V, 0.0f, 55.0f);
-			DrawRotatorAsXYZ("Rotation", Value->Rotation);
-			DrawVector3Controller("Scale", Value->Scale.V, 1.0f, 55.0f);
+			bChanged |= DrawVector3Controller("Location", EditedTransform.Location.V, 0.0f, 55.0f);
+			bChanged |= DrawRotatorAsXYZ("Rotation", EditedTransform.Rotation);
+			bChanged |= DrawVector3Controller("Scale", EditedTransform.Scale.V, 1.0f, 55.0f);
+
+			if (bChanged)
+			{
+				// USceneComponent should be updated via SetTransform to mark dirty and update world transform
+				if (USceneComponent* SceneComp = Cast<USceneComponent>(Object))
+				{
+					SceneComp->SetTransform(EditedTransform);
+				}
+				else
+				{
+					*Value = EditedTransform;
+				}
+			}
+
 			break;
 		}
 		case EPropertyType::Object:
@@ -699,32 +718,146 @@ void FDetailsPanel::OnRender()
 
 	if (Target)
 	{
+		// 선택된 컴포넌트의 소유 액터와 계층 구조를 표시
+		DrawComponentSection(Target->GetOwner());
+
 		// 액터 -> 컴포넌트 순으로, 클래스별 프로퍼티 표시
 		DrawProperties(Target->GetOwner(), CustomFont);
-
-		// 선택된 컴포넌트뿐 아니라 같은 액터의 다른 컴포넌트도 보여준다.
-		// (예: 라이트는 빌보드를 클릭해서 고르지만 수치는 SpotLight 쪽에 있다)
-		if (AActor* Owner = Target->GetOwner())
+		DrawProperties(Target, CustomFont);
+		if (UMeshComponent* MeshComponent = Cast<UMeshComponent>(Target))
 		{
-			for (UActorComponent* Component : Owner->GetComponents())
-			{
-				// 같은 클래스를 상속한 컴포넌트가 여럿이면 헤더 ID가 겹치므로 분리한다
-				ImGui::PushID(Component);
-				DrawProperties(Component, CustomFont);
-				if (UMeshComponent* MeshComponent = Cast<UMeshComponent>(Component))
-				{
-					DrawMaterialSlots(MeshComponent);
-				}
-				ImGui::PopID();
-			}
-		}
-		else
-		{
-			DrawProperties(Target, CustomFont);
+			DrawMaterialSlots(MeshComponent);
 		}
 	}
 
 	ImGui::End();
+}
+
+void FDetailsPanel::DrawComponentSection(AActor* Actor)
+{
+	if (!Actor)
+	{
+		return;
+	}
+
+	ImGui::TextUnformatted(Actor->GetName().c_str());
+	ImGui::SameLine();
+
+	ImGuiStyle& Style = ImGui::GetStyle();
+	const float ButtonSize = ImGui::CalcTextSize("+Add").x + Style.FramePadding.x * 2.0f;
+	const float AvailableRegion = ImGui::GetContentRegionAvail().x;
+	ImGui::SetCursorPosX(ImGui::GetCursorPosX() + AvailableRegion - ButtonSize);
+
+	if (ImGui::Button("+Add"))
+	{
+		ImGui::OpenPopup("AddComponentPopup");
+	}
+
+	if (ImGui::BeginPopup("AddComponentPopup"))
+	{
+		static UClass* AddableComponentTypes[] = {
+			UStaticMeshComponent::StaticClass(),
+			UTextRenderComponent::StaticClass(),
+			UBillboardComponent::StaticClass(),
+			USpotLightComponent::StaticClass(),
+			USphereGlowComponent::StaticClass()
+		};
+		for (UClass* Type : AddableComponentTypes)
+		{
+			const FString Label = Type->Name;
+			if (ImGui::MenuItem(Type->Name.c_str()))
+			{
+				UActorComponent* AddedComponent = Actor->AddComponentByClass(Type);
+				SetTarget(Cast<USceneComponent>(AddedComponent)); // TODO: ActorComponent도 선택 가능해야 함
+			}
+		}
+
+		ImGui::EndPopup();
+	}
+
+	// SceneComponent는 Root부터 시작하여 트리로 그림
+	DrawSceneComponentNode(Actor->GetRootComponent());
+
+	bool SeparatorDrew = false;
+
+	// SceneComponent가 아닌 컴포넌트 목록
+	for (UActorComponent* Component : Actor->GetComponents())
+	{
+		if (!Component->IsA<USceneComponent>())
+		{
+			if (!SeparatorDrew)
+			{
+				ImGui::Separator();
+				SeparatorDrew = true;
+			}
+
+			DrawActorComponent(Component);
+		}
+	}
+}
+
+void FDetailsPanel::DrawSceneComponentNode(USceneComponent* Component)
+{
+	if (!Component)
+	{
+		return;
+	}
+
+	const bool bHasChild = !Component->GetAttachChildren().IsEmpty();
+	const bool bIsRoot = (Component->GetAttachParent() == nullptr);
+
+	ImGuiTreeNodeFlags Flags =
+		ImGuiTreeNodeFlags_SpanAvailWidth |
+		ImGuiTreeNodeFlags_FramePadding;
+
+	if (bHasChild)
+	{
+		Flags |=
+			ImGuiTreeNodeFlags_OpenOnArrow |
+			ImGuiTreeNodeFlags_OpenOnDoubleClick |
+			ImGuiTreeNodeFlags_DefaultOpen;
+	}
+	else
+	{
+		Flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+	}
+
+	if (Component == Target)
+	{
+		Flags |= ImGuiTreeNodeFlags_Selected;
+	}
+
+	const FString DisplayName = Component->GetName() + (bIsRoot ? " (Root)" : "");
+
+	ImGui::PushID(Component);
+	bool bNodeOpen = ImGui::TreeNodeEx(DisplayName.c_str(), Flags);
+	ImGui::PopID();
+
+	if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
+	{
+		SetTarget(Component);
+	}
+
+	if (bHasChild && bNodeOpen)
+	{
+		for (USceneComponent* Child : Component->GetAttachChildren())
+		{
+			DrawSceneComponentNode(Child);
+		}
+
+		ImGui::TreePop();
+	}
+}
+
+void FDetailsPanel::DrawActorComponent(UActorComponent* Component)
+{
+	ImGui::PushID(Component);
+	if (ImGui::Selectable(Component->GetName().c_str(), Component == Target, ImGuiSelectableFlags_SpanAllColumns))
+	{
+		// TODO: ActorComponent도 선택 가능해야 함
+		// SetTarget(Component);
+	}
+	ImGui::PopID();
 }
 
 FDetailsPanel::~FDetailsPanel()
