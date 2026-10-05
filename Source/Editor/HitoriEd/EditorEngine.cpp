@@ -20,6 +20,7 @@
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/Actor/LightActor.h"
+#include "Component/PointLightComponent.h"
 
 #include "Asset/AssetManager.h"
 #include "Render/RenderResourceManager.h"
@@ -466,12 +467,22 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 			CurrentWorld->GetPathTracker().OnRender(LineBatcher.get());
 		}
 
-		// 선택된 액터가 라이트면 원뿔을 같이 쌓는다
+		// 선택된 액터가 라이트 컴포넌트를 가지고 있으면 디버그 와이어프레임을 같이 쌓는다
 		if (Gizmo->GetTarget())
 		{
-			if (ALightActor* LightActor = Cast<ALightActor>(Gizmo->GetTarget()->GetOwner()))
+			if (AActor* TargetOwner = Gizmo->GetTarget()->GetOwner())
 			{
-				LightActor->GetSpotLightComponent()->DrawDebug(LineBatcher.get());
+				for (UActorComponent* Comp : TargetOwner->GetComponents())
+				{
+					if (UPointLightComponent* PointLight = Cast<UPointLightComponent>(Comp))
+					{
+						PointLight->DrawDebug(LineBatcher.get());
+					}
+					else if (USpotLightComponent* SpotLight = Cast<USpotLightComponent>(Comp))
+					{
+						SpotLight->DrawDebug(LineBatcher.get());
+					}
+				}
 			}
 		}
 
@@ -498,6 +509,7 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		RenderCommand::SetDepthStencilState(EDepthStencilState::Default);
 
 		RenderCommand::SetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		Renderer->UpdatePointLights(CurrentWorld);
 		// 반투명은 Grid 뒤에 합성되어야 하므로 불투명만 먼저 그린다.
 		Renderer->RenderQueueSorting(RenderQueue, ViewProjection);
 		Renderer->RenderOpaque(ViewProjection);

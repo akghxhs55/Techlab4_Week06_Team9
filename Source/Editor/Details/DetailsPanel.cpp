@@ -1,4 +1,4 @@
-﻿#include "EnginePCH.h"
+#include "EnginePCH.h"
 #include "Editor/Details/DetailsPanel.h"
 
 #include "imgui_internal.h"
@@ -9,6 +9,7 @@
 #include "Asset/AssetManager.h"
 #include "Component/SphereGlowComponent.h"
 #include "Component/SpotLightComponent.h"
+#include "Component/PointLightComponent.h"
 #include "Render/Material.h"
 #include "Render/Texture2D.h"
 #include "Text/Font.h"
@@ -760,6 +761,7 @@ void FDetailsPanel::DrawComponentSection(AActor* Actor)
 			UTextRenderComponent::StaticClass(),
 			UBillboardComponent::StaticClass(),
 			USpotLightComponent::StaticClass(),
+			UPointLightComponent::StaticClass(),
 			USphereGlowComponent::StaticClass()
 		};
 		for (UClass* Type : AddableComponentTypes)
