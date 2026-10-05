@@ -216,6 +216,7 @@ void FTextRenderer::OnRender(const FString& Text, const FMatrix& WorldMatrix, fl
 
 	RenderCommand::BindPipelineState(PipelineState);
 	RenderCommand::BindShaderResource(0, Atlas.AtlasTexture, EShaderBindFlagBits::Pixel);
+	RenderCommand::BindSamplerState(0, ESamplerState::LinearClamp, EShaderBindFlagBits::Pixel);
 	RenderCommand::UpdateBufferData(MVP.get(), &TransData, sizeof(TextTransformData));
 	RenderCommand::UpdateBufferData(ScreenPx.get(), &MSDFData, sizeof(MSDFData));
 
