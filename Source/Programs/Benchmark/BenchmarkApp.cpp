@@ -2,6 +2,7 @@
 #include "BenchmarkApp.h"
 
 #include "Asset/AssetManager.h"
+#include "Camera/ViewInfo.h"
 #include "Core/Window.h"
 #include "Core/EngineLog.h"
 #include "Core/Stats/LightweightStats.h"
@@ -230,8 +231,41 @@ void UBenchmarkEngine::DrawSelectionBounds(const FMatrix& ViewProjection)
 	RenderCommand::SetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
+void UBenchmarkEngine::UpdateCameraInput(float DeltaTime)
+{
+	constexpr float MoveSpeed = 10.0f;
+	constexpr float Sensitivity = 0.05f;
+	constexpr float WheelSpeed = 0.1f;
+
+	const FQuat Q = CameraRotation.Quaternion();
+
+	const FVector Forward = Q.RotateVector({ 1.0f, 0.0f, 0.0f });
+	const FVector Right = Q.RotateVector({ 0.0f, 1.0f, 0.0f });
+	const FVector Up = Q.RotateVector({ 0.0f, 0.0f, 1.0f });
+	FVector& Location = ViewCamera.Transform.Location;
+
+	if (FInputSystem::IsKeyDown(EKeyCode::W)) Location += Forward * MoveSpeed * DeltaTime;
+	if (FInputSystem::IsKeyDown(EKeyCode::S)) Location -= Forward * MoveSpeed * DeltaTime;
+	if (FInputSystem::IsKeyDown(EKeyCode::D)) Location += Right * MoveSpeed * DeltaTime;
+	if (FInputSystem::IsKeyDown(EKeyCode::A)) Location -= Right * MoveSpeed * DeltaTime;
+	if (FInputSystem::IsKeyDown(EKeyCode::E)) Location += Up * MoveSpeed * DeltaTime;
+	if (FInputSystem::IsKeyDown(EKeyCode::Q)) Location -= Up * MoveSpeed * DeltaTime;
+
+	if (FInputSystem::IsMouseDown(EMouseButton::Right))
+	{
+		CameraRotation.Pitch += FInputSystem::GetMouseDeltaY() * Sensitivity;
+		CameraRotation.Yaw += FInputSystem::GetMouseDeltaX() * Sensitivity;
+	}
+	if (const int32 Wheel = FInputSystem::GetWheelDelta())
+	{
+		Location += Forward * WheelSpeed * Wheel * DeltaTime;
+	}
+
+	ViewCamera.Transform.Rotation = CameraRotation.Quaternion();
+}
+
 // 마우스 Ray로 Gizmo를 갱신하고, 축을 잡지 않은 클릭은 피킹으로 처리한다.
-void UBenchmarkEngine::UpdateGizmoAndPicking()
+void UBenchmarkEngine::UpdateGizmoAndPicking(const FRenderView& RenderView)
 {
 	// ImGui 패널 위에서의 클릭은 씬 조작으로 넘기지 않는다.
 	if (ImGui::GetIO().WantCaptureMouse)
@@ -242,24 +276,21 @@ void UBenchmarkEngine::UpdateGizmoAndPicking()
 	if (Width == 0 || Height == 0)
 		return;
 
-	UCameraComponent* Camera = World->GetMainCamera()->GetCameraComponent();
-
 	const FVector2 MousePosition(
 		static_cast<float>(FInputSystem::GetMouseX()),
 		static_cast<float>(FInputSystem::GetMouseY()));
 
-	const FRay Ray = Camera->DeProjection(
-		MousePosition, static_cast<float>(Width), static_cast<float>(Height));
+	const FRay Ray = RenderView.Deproject(MousePosition);
 
 	Gizmo->Update(
 		Ray,
 		MousePosition,
-		Camera->GetViewProjectionMatrix(),
+		RenderView.ViewProjection,
 		static_cast<int>(Width),
 		static_cast<int>(Height),
 		FInputSystem::IsMouseDown(EMouseButton::Left),
-		Camera->GetWorldLocation(),
-		Camera->GetIsOrthogonal());
+		RenderView.CameraLocation,
+		RenderView.bIsOrthogonal);
 
 	// 기즈모 축을 집고 있는 중이면 피킹으로 선택을 바꾸지 않는다.
 	if (FInputSystem::IsMousePressed(EMouseButton::Left) &&
@@ -267,7 +298,7 @@ void UBenchmarkEngine::UpdateGizmoAndPicking()
 	{
 
 		FHitResult Hit;
-		SelectPrimitive(World->LineTraceSingle(Ray, Hit) ? Hit.HitComponent : nullptr);
+		SelectPrimitive(World->LineTraceSingle(Ray, Hit, &RenderView) ? Hit.HitComponent : nullptr);
 	}
 }
 
@@ -280,38 +311,22 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 	if (Width == 0 || Height == 0)
 		return;
 
-	UCameraComponent* Camera = World->GetMainCamera()->GetCameraComponent();
-	Camera->SetAspectRatio(static_cast<float>(Width) / Height);
+	UpdateCameraInput(DeltaTime);
+	const FRenderView RenderView = FRenderView::Build(ViewCamera.ToViewInfo({ static_cast<float>(Width), static_cast<float>(Height) }));
 
 	// 기즈모 조작 결과가 같은 프레임의 UpdateAllTransforms에 반영되도록 World Tick보다 앞에 둔다.
-	UpdateGizmoAndPicking();
+	UpdateGizmoAndPicking(RenderView);
 
 	World->Tick(DeltaTime);
 
 	EditorControlsPanel->DeltaTime = DeltaTime;
 	EditorUI->Tick(DeltaTime);
 
-	const FMatrix ViewProjection = Camera->GetViewProjectionMatrix();
-	const FMatrix Projection = Camera->GetProjectionMatrix();
+	const FMatrix ViewProjection = RenderView.ViewProjection;
 	const FFrustumPlanes Frustum = ExtractFrustumPlanes(ViewProjection);
 
-
-	const float ScaleX = Projection.M[1][0];
-	const float ScaleY = Projection.M[2][1];
-
 	// LOD에 카메라 정보 저장
-	FLODViewContext LODView{ Width, Height };
-	LODView.ViewProjection = ViewProjection;
-	LODView.CameraPosition = Camera->GetWorldLocation();
-	LODView.CameraForward = Camera->GetWorldRotation()
-		.Quaternion()
-		.RotateVector(FVector(1.0f, 0.0f, 0.0f))
-		.Normalized();
-	LODView.ProjectionScaleSquared =
-		std::max(ScaleX * ScaleX, ScaleY * ScaleY);
-	LODView.NearZ = Camera->GetNearZ();
-	LODView.bOrthographic = Camera->GetIsOrthogonal();
-	LODView.Prepare();
+	FLODViewContext LODView{ RenderView };
 
 	// 멤버 큐를 재사용한다. Renderer와 swap으로 버퍼를 주고받으므로 두 버퍼 모두 용량이 유지된다.
 	FRenderer* Renderer = GetEngineLoop().GetRenderer();
@@ -325,8 +340,8 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 	GetEngineLoop().BeginBackbufferPass();
 
 	const FViewportSettings Viewport{ 0, 0, Width, Height, 0.0f, 1.0f };
-	const FVector CameraLocation = Camera->GetWorldLocation();
-	const FVector CameraForward = Camera->GetTransform().GetForward();
+	const FVector CameraLocation = RenderView.CameraLocation;
+	const FVector CameraForward = RenderView.CameraForward;
 
 	// 반투명이 Grid 위에 합성되도록 불투명 → Grid → 반투명 순서로 그린다.
 	{
@@ -367,7 +382,7 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 			// 에디터와 같이 깊이를 비워 기즈모가 사과에 가려지지 않고 항상 위에 보이게 한다.
 			// 아웃라인(스텐실)은 이미 그렸고 이후 장면 패스가 없으므로 지워도 된다.
 			RenderCommand::ClearDepthStencil(GetEngineLoop().GetDepthBuffer());
-			GizmoRenderer->OnRender(*Gizmo, ViewProjection, CameraLocation, Camera->GetIsOrthogonal());
+			GizmoRenderer->OnRender(*Gizmo, ViewProjection, CameraLocation, RenderView.bIsOrthogonal);
 		}
 	}
 

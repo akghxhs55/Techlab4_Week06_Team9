@@ -21,7 +21,7 @@ struct FSortEntry
 	uint32 PacketIndex;
 };
 
-class UCameraComponent;
+struct FRenderView;
 
 // 오클루전 컬링의 효과 상한을 재기 위한 측정 결과 (디버그 전용)
 struct FOcclusionMeasureResult
@@ -45,7 +45,7 @@ public:
 	bool Init();
 
 	// 기존 단일 카메라의 ViewProjection으로 렌더 큐 전체를 그린다.
-	void RenderAll(FRenderQueue& InQueue, UCameraComponent* CameraComponent);
+	void RenderAll(FRenderQueue& InQueue, const FRenderView& RenderView);
 
 	// Adapter가 계산한 ViewProjection을 직접 받아 View별 렌더 큐를 그린다.
 	void RenderAll(FRenderQueue& InQueue, const FMatrix& ViewProjection);

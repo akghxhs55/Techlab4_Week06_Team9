@@ -1,6 +1,8 @@
-﻿#pragma once
+#pragma once
 
 #include "PrimitiveComponent.h"
+
+struct FRenderView;
 
 class UBillboardComponent : public UPrimitiveComponent
 {
@@ -18,8 +20,6 @@ public:
 	virtual void TickComponent(float DeltaTime) override;
 
 	virtual bool LineTraceComponent(const FRay& WorldRay, FHitResult& OutHit) override;
-	// 클릭한 View의 실제 렌더 행렬로 Quad Mesh 교차를 판정한다.
-	bool LineTraceComponentForView(const FRay& WorldRay, FHitResult& OutHit, const FMatrix& BillboardWorldMatrix);
 
 	virtual int32 GetNumMaterials() const override { return 1; }
 	virtual UMaterial* GetMaterial(int32 SlotIndex) const override { return SlotIndex == 0 ? Material : nullptr; }
@@ -32,6 +32,7 @@ public:
 	virtual void SubmitToRenderQueue(FRenderQueue& RenderQueue) override;
 	// View별 Adapter가 계산한 Billboard 행렬을 사용해 같은 렌더 패킷 형식으로 제출한다.
 	void SubmitToRenderQueue(FRenderQueue& RenderQueue, const FMatrix& BillboardWorldMatrix);
+	FMatrix GetBillboardMatrix(const FRenderView& RenderView) const;
 
 	virtual void Serialize(json& Handle, bool bIsLoading) override;
 

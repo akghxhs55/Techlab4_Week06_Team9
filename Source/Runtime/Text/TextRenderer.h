@@ -1,11 +1,11 @@
-﻿#pragma once
+#pragma once
 
 #include "Render/Buffer.h"
 #include "Render/PipelineState.h"
 
+struct FRenderView;
 struct FTextVertex;
 class UFont;
-class UCameraComponent;
 
 struct TextTransformData
 {
@@ -29,14 +29,14 @@ public:
 
 	// 컴포넌트 트랜스폼을 그대로 사용 (TextRenderComponent)
 	void OnRender(const FString& Text, const FMatrix& WorldMatrix, float TextSize,
-		const UFont& Atlas, UCameraComponent* CameraComponent);
+		const UFont& Atlas, const FRenderView& RenderView);
 	// View별 ViewProjection을 직접 사용해 텍스트를 해당 View에 렌더한다.
 	void OnRender(const FString& Text, const FMatrix& WorldMatrix, float TextSize,
 		const UFont& Atlas, const FMatrix& ViewProjection);
 
 	// 항상 카메라를 향하게 그린다 (에디터 UUID 라벨 등)
 	void OnRenderBillboard(const FString& Text, const FVector& WorldPos, float TextSize,
-		const UFont& Atlas, UCameraComponent* CameraComponent);
+		const UFont& Atlas, const FRenderView& RenderView);
 
 	void BuildTextMesh(const FString& Text, float TextSize, const UFont& Atlas);
 

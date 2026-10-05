@@ -63,7 +63,7 @@ private:
 	bool EnsureTargets(uint32 Width, uint32 Height);
 	bool EnsureItemCapacity(uint32 Count);
 	bool EnsureOccluderCapacity(uint32 Count);
-	bool FillItems(const FPrimitiveSceneProxy* const* Proxies, uint32 Count, const FLODViewContext& View);
+	bool FillItems(const FPrimitiveSceneProxy* const* Proxies, uint32 Count, const FLODViewContext& Context);
 	void DrawOccluders(const FPrimitiveSceneProxy* const* Proxies, const FLODViewContext& View);
 	void BuildHiZ();
 	void Cull(const FMatrix& ViewProjection, uint32 Count);

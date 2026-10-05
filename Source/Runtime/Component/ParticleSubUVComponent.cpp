@@ -3,9 +3,6 @@
 #include "Asset/AssetManager.h"
 #include "Render/RenderCommand.h"
 
-#include "Camera/CameraActor.h"
-#include "Camera/CameraComponent.h"
-
 #include "BillboardComponent.h"
 
 #include "Engine/World.h"
@@ -123,7 +120,7 @@ void UParticleSubUVComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue)
 	Constants.Reset();
 	Constants.Reserve(Particles.Num());
 
-	const FVector CameraPos = GetOwner()->GetWorld()->GetMainCamera()->GetCameraComponent()->GetWorldLocation();
+	const FVector CameraPos;
 	for (FParticle& Particle : Particles)
 	{
 		if (Particle.bAlive == false)

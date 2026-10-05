@@ -1,11 +1,10 @@
-﻿#include "EnginePCH.h"
+#include "EnginePCH.h"
 #include "BillboardComponent.h"
 
 #include "ParticleSubUVComponent.h"
 #include "Asset/AssetManager.h"
-#include "Serialization/TypeSerializer.h"
-
 #include "GameFramework/Actor.h"
+#include "Component/CameraComponent.h"
 #include "Engine/World.h"
 
 // Billboard 컴포넌트의 초기 상태를 구성한다.
@@ -40,13 +39,6 @@ bool UBillboardComponent::LineTraceComponent(const FRay& WorldRay, FHitResult& O
 	FMatrix BillboardMatrix;
 	GetWorldTransformedMatrix(&BillboardMatrix);   // 카메라를 향하는, 실제로 그려지는 행 렬
 	return TraceMesh(WorldRay, QuadMesh->GetMeshData(), BillboardMatrix, OutHit);
-}
-
-// View별 렌더 행렬을 그대로 사용해 메인 카메라와 다른 방향에서도 같은 면을 선택한다.
-bool UBillboardComponent::LineTraceComponentForView(
-	const FRay& WorldRay, FHitResult& OutHit, const FMatrix& BillboardWorldMatrix)
-{
-	return QuadMesh && TraceMesh(WorldRay, QuadMesh->GetMeshData(), BillboardWorldMatrix, OutHit);
 }
 
 // 기본 카메라용 행렬을 구해 공통 렌더 패킷 제출 경로로 전달한다.
@@ -84,6 +76,12 @@ void UBillboardComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue, const F
 	RenderQueue.Add(Packet);
 }
 
+FMatrix UBillboardComponent::GetBillboardMatrix(const FRenderView& RenderView) const
+{
+	const FVector Scale = GetWorldScale3D();
+	return RenderView.BuildBillboardMatrix(GetWorldLocation(), Scale.Y, Scale.Z);
+}
+
 void UBillboardComponent::Serialize(json& Handle, bool bIsLoading)
 {
 	Super::Serialize(Handle, bIsLoading);
@@ -110,7 +108,7 @@ void UBillboardComponent::GetWorldTransformedMatrix(FMatrix* OutWorldMatrix) con
 {
 	OutWorldMatrix->SetIdentity();
 
-	const FTransform& Transform = GetOwner()->GetWorld()->GetMainCamera()->GetCameraComponent()->GetTransform();
+	const FTransform Transform; // TODO
 
 	FVector Right = Transform.GetRight().Normalized();
 	FVector Up = Transform.GetUp().Normalized();

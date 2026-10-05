@@ -2,8 +2,6 @@
 
 #include "Editor/LevelEditor/MultipleViewports/Adapter/MultipleViewportsAdapter.h"
 
-#include "Camera/CameraActor.h"
-#include "Camera/CameraComponent.h"
 #include "Component/PrimitiveComponent.h"
 #include "Component/StaticMeshComponent.h"
 #include "Component/BillboardComponent.h"
@@ -21,6 +19,8 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+
+#include "Camera/ViewInfo.h"
 
 namespace
 {
@@ -152,15 +152,7 @@ FQuat MakeCameraRotation(const float YawDegrees, const float PitchDegrees)
 // 메인 카메라 투영값을 공유하고 네 View의 기본 프리셋 상태를 만든다.
 void FMultipleViewportsAdapter::InitializeFromWorld(UWorld& World)
 {
-    UCameraComponent* MainCamera = World.GetMainCamera() ? World.GetMainCamera()->GetCameraComponent() : nullptr;
-    assert(MainCamera != nullptr);
-
-    const FCameraProjection Perspective{
-        EProjectionMode::Perspective,
-        MainCamera->GetFieldOfView(),
-        MainCamera->GetOrthoWidth(),
-        MainCamera->GetNearZ(),
-        MainCamera->GetFarZ()};
+    const FCameraProjection Perspective{};
     Views.Mode = ELayoutMode::QuadSplit;
     // 최신 trace의 구도를 사용해 화면 정면은 +X, 화면 오른쪽은 +Y가 되도록 시작한다.
     Views.Cameras[0] = {{{-11.665390f, 6.117728f, 9.921079f},
@@ -498,115 +490,6 @@ const FRect& FMultipleViewportsAdapter::GetViewRect(const int32 ViewIndex) const
     return ViewRects[ViewIndex];
 }
 
-// 직교 화면의 XY는 유지하면서 렌더·컬링·피킹용 카메라만 후퇴시켜 양방향 깊이를 확보한다.
-FViewCamera FMultipleViewportsAdapter::GetRenderCamera(const int32 ViewIndex) const
-{
-    assert(ViewIndex >= 0 && ViewIndex < 4);
-    FViewCamera Camera = Views.Cameras[ViewIndex];
-    if (Camera.Projection.Mode != EProjectionMode::Orthographic)
-        return Camera;
-
-    const FRect& Rect = ViewRects[ViewIndex];
-    const float AspectRatio = Rect.Width > 0.0f && Rect.Height > 0.0f
-        ? Rect.Width / Rect.Height : 1.0f;
-    const float HalfWidth = Camera.Projection.OrthoWidth * 0.5f;
-    const float HalfHeight = HalfWidth / AspectRatio;
-    const FVector Position = Camera.Transform.Location;
-    const float Distance = std::sqrt(
-        Position.X * Position.X + Position.Y * Position.Y + Position.Z * Position.Z);
-
-    // 현재 카메라 평면의 앞뒤를 모두 포함하고 기존 FarClip보다 깊이 범위를 줄이지 않는다.
-    const float Radius = std::max(Camera.Projection.FarClip,
-        2.0f * Distance + 4.0f * std::sqrt(HalfWidth * HalfWidth + HalfHeight * HalfHeight));
-    const FVector Forward = NormalizedOrZero(CameraForward(Camera.Transform.Rotation));
-    const float Retreat = Radius + Camera.Projection.NearClip;
-    Camera.Transform.Location = Position - Forward * Retreat;
-    Camera.Projection.FarClip = Camera.Projection.NearClip + 2.0f * Radius;
-    return Camera;
-}
-
-// 현재 카메라로 VP와 절두체를 매번 계산한다.
-const FMultipleViewportsAdapter::PreparedView& FMultipleViewportsAdapter::PrepareView(const int32 ViewIndex) const
-{
-    assert(IsViewActive(ViewIndex));
-    const FViewCamera Camera = GetRenderCamera(ViewIndex);
-    const auto& Rect = ViewRects[ViewIndex];
-    PreparedView& Prepared = PreparedViews[ViewIndex];
-	Prepared.View = BuildViewMatrix(Camera.Transform);
-	Prepared.Projection = BuildProjectionMatrix(Camera.Projection, Rect.Width / Rect.Height);
-	Prepared.EngineViewProjection = Prepared.View * Prepared.Projection;
-    Prepared.Frustum = ExtractFrustumPlanes(Prepared.EngineViewProjection);
-    return Prepared;
-}
-
-// Native와 엔진이 함께 쓰는 현재 row-vector VP를 반환한다.
-FMatrix FMultipleViewportsAdapter::GetEngineViewProjection(const int32 ViewIndex) const
-{
-    assert(IsViewActive(ViewIndex));
-    return PrepareView(ViewIndex).EngineViewProjection;
-}
-
-FMatrix FMultipleViewportsAdapter::GetEngineProjectionMatrix(int32 ViewIndex) const {
-	assert(IsViewActive(ViewIndex));
-    return PrepareView(ViewIndex).Projection;
-}
-
-// Native 카메라 위치를 엔진 FVector 그대로 반환한다.
-FVector FMultipleViewportsAdapter::GetEngineCameraLocation(const int32 ViewIndex) const
-{
-    assert(ViewIndex >= 0 && ViewIndex < 4);
-    return Views.Cameras[ViewIndex].Transform.Location;
-}
-
-// Native 회전에서 정규화한 Forward를 엔진 FVector로 반환한다.
-FVector FMultipleViewportsAdapter::GetEngineCameraForward(const int32 ViewIndex) const
-{
-    assert(ViewIndex >= 0 && ViewIndex < 4);
-    return NormalizedOrZero(CameraForward(Views.Cameras[ViewIndex].Transform.Rotation));
-}
-
-// 위치·크기·View 카메라로 엔진 규약의 Billboard 행렬을 계산한다.
-FMatrix FMultipleViewportsAdapter::BuildEngineBillboardMatrix(const int32 ViewIndex, const FVector& WorldPosition, const float Width, const float Height) const
-{
-    assert(ViewIndex >= 0 && ViewIndex < 4);
-    const FViewCamera& ViewCamera = Views.Cameras[ViewIndex];
-    if (ViewCamera.Projection.Mode == EProjectionMode::Orthographic)
-    {
-        // 직교 투영의 모든 시선은 평행하므로 카메라 위치가 아니라 고정된 화면 기저를 사용한다.
-        // 위치 기반 LookAt을 사용하면 평면 이동 시 오브젝트-카메라 벡터가 달라져 Billboard가 회전한다.
-        const FVector Facing = NormalizedOrZero(CameraForward(ViewCamera.Transform.Rotation)) * -1.0f;
-        const FVector Right = NormalizedOrZero(CameraRight(ViewCamera.Transform.Rotation));
-        const FVector Up = NormalizedOrZero(CameraUp(ViewCamera.Transform.Rotation));
-
-        FMatrix EngineMatrix;
-        EngineMatrix.SetIdentity();
-        EngineMatrix.M[0][0] = Facing.X; EngineMatrix.M[0][1] = Facing.Y; EngineMatrix.M[0][2] = Facing.Z;
-        EngineMatrix.M[1][0] = Right.X * Width; EngineMatrix.M[1][1] = Right.Y * Width; EngineMatrix.M[1][2] = Right.Z * Width;
-        EngineMatrix.M[2][0] = Up.X * Height; EngineMatrix.M[2][1] = Up.Y * Height; EngineMatrix.M[2][2] = Up.Z * Height;
-        EngineMatrix.M[3][0] = WorldPosition.X; EngineMatrix.M[3][1] = WorldPosition.Y; EngineMatrix.M[3][2] = WorldPosition.Z;
-        return EngineMatrix;
-    }
-
-    const FBillboardTransform Result = ComputeBillboardTransform(
-        {WorldPosition, {Width, Height}},
-        ViewCamera.Transform);
-    FMatrix EngineMatrix = Result.WorldMatrix;
-
-    // 팀 엔진의 ParticleQuad는 Core의 Billboard 오른쪽 축과 반대 와인딩을 사용한다.
-    // 오른쪽 축만 뒤집어 기존 렌더 경로와 같은 앞면이 카메라를 향하게 한다.
-    EngineMatrix.M[1][0] = -EngineMatrix.M[1][0];
-    EngineMatrix.M[1][1] = -EngineMatrix.M[1][1];
-    EngineMatrix.M[1][2] = -EngineMatrix.M[1][2];
-    return EngineMatrix;
-}
-
-// 지정 View 카메라의 투영 모드가 Orthographic인지 검사한다.
-bool FMultipleViewportsAdapter::IsOrthographic(const int32 ViewIndex) const
-{
-    assert(ViewIndex >= 0 && ViewIndex < 4);
-    return Views.Cameras[ViewIndex].Projection.Mode == EProjectionMode::Orthographic;
-}
-
 // 활성 View Rect 기준 로컬 좌표를 Core로 역투영하고 엔진 Ray로 변환한다.
 bool FMultipleViewportsAdapter::TryGetActiveViewRay(const FVector2 LocalMousePosition, FRay& OutRay) const
 {
@@ -617,7 +500,8 @@ bool FMultipleViewportsAdapter::TryGetActiveViewRay(const FVector2 LocalMousePos
         return false;
     const FRect& Rect = ViewRects[ActiveViewIndex];
     const FVector2 ViewLocal{LocalMousePosition.X - Rect.X, LocalMousePosition.Y - Rect.Y};
-    const FRay Ray = Deproject(GetRenderCamera(ActiveViewIndex), ViewLocal, {Rect.Width, Rect.Height});
+	const FRenderView RenderView = GetRenderView(ActiveViewIndex);
+    const FRay Ray = RenderView.Deproject(ViewLocal);
     OutRay = Ray;
     return true;
 }
@@ -635,28 +519,13 @@ void FMultipleViewportsAdapter::BuildRenderQueue(const int32 ViewIndex, FRenderQ
     OutQueue.Reset();
     PendingStaticMeshes.Reset();
     LODInputs.Reset();
-    if (!IsViewActive(ViewIndex)) return;
-    {
-        CullForView(RenderObjects[ViewIndex], PrepareView(ViewIndex).Frustum, VisibleIds[ViewIndex]);
-    }
-    const FRect& Rect = GetViewRect(ViewIndex);
-    const FViewCamera& ViewCamera = Views.Cameras[ViewIndex];
-    const FMatrix Projection = BuildProjectionMatrix(
-        ViewCamera.Projection, Rect.Width / Rect.Height);
-    const float ScaleX = Projection.M[1][0];
-    const float ScaleY = Projection.M[2][1];
 
-    FLODViewContext LODContext{
-        static_cast<uint32>(Rect.Width),
-        static_cast<uint32>(Rect.Height)
-    };
-    LODContext.CameraPosition = GetEngineCameraLocation(ViewIndex);
-    LODContext.ViewProjection = GetEngineViewProjection(ViewIndex);
-    LODContext.CameraForward = GetEngineCameraForward(ViewIndex);
-    LODContext.ProjectionScaleSquared = std::max(ScaleX * ScaleX, ScaleY * ScaleY);
-    LODContext.NearZ = ViewCamera.Projection.NearClip;
-    LODContext.bOrthographic = ViewCamera.Projection.Mode == EProjectionMode::Orthographic;
-    LODContext.Prepare();
+    if (!IsViewActive(ViewIndex)) return;
+
+    const FRenderView RenderView = GetRenderView(ViewIndex);
+    CullForView(RenderObjects[ViewIndex], RenderView.Frustum, VisibleIds[ViewIndex]);
+
+    FLODViewContext LODContext{ RenderView };
 
     for (const ObjectId Id : VisibleIds[ViewIndex])
     {
@@ -679,30 +548,27 @@ void FMultipleViewportsAdapter::BuildRenderQueue(const int32 ViewIndex, FRenderQ
                 Snapshot.bParticlesPrepared = true;
             }
             // 반투명은 모든 emitter를 합친 최종 Renderer만 정렬한다. 불투명은 Core 정렬을 유지하며 동률은 인덱스 순서다.
-            const FVector CameraLocation = GetEngineCameraLocation(ViewIndex);
+            const FVector CameraLocation = RenderView.CameraLocation;
             const bool bOpaque = ParticleComponent->UsesOpaqueMaterial();
             if (bOpaque)
             {
                 SortInputs.Reset();
                 for (const int32 Index : Snapshot.AliveParticleIndices)
                     SortInputs.Add({static_cast<ObjectId>(Index + 1), Particles[Index].Location});
-                SortParticlesByCameraDistance(SortInputs, Views.Cameras[ViewIndex].Transform.Location, SortedParticleIds);
+                SortParticlesByCameraDistance(SortInputs, RenderView.CameraLocation, SortedParticleIds);
             }
             for (int32 Order = 0; Order < Snapshot.AliveParticleIndices.Num(); ++Order)
             {
                 const int32 ParticleIndex = bOpaque ? static_cast<int32>(SortedParticleIds[Order] - 1) : Snapshot.AliveParticleIndices[Order];
                 const FParticle& Particle = Particles[ParticleIndex];
-                const FMatrix ParticleWorld = BuildEngineBillboardMatrix(ViewIndex, Particle.Location, Particle.Scale, Particle.Scale);
+                const FMatrix ParticleWorld = RenderView.BuildBillboardMatrix(Particle.Location, Particle.Scale, Particle.Scale);
                 const FVector Delta = Particle.Location - CameraLocation;
                 ParticleComponent->SubmitParticleToRenderQueue(OutQueue, ParticleIndex, ParticleWorld, Delta.Dot(Delta));
             }
         }
         else if (UBillboardComponent* Billboard = Cast<UBillboardComponent>(Primitive))
         {
-            const FVector Scale = Billboard->GetWorldScale3D();
-            Billboard->SubmitToRenderQueue(
-                OutQueue,
-                BuildEngineBillboardMatrix(ViewIndex, Billboard->GetWorldLocation(), Scale.Y, Scale.Z));
+            Billboard->SubmitToRenderQueue(OutQueue, Billboard->GetBillboardMatrix(RenderView));
         }
         else if (auto* StaticComponent = Cast<UStaticMeshComponent>(Primitive))
         {
@@ -737,18 +603,11 @@ FPickHit FMultipleViewportsAdapter::PickActiveView(const FVector2 LocalMousePosi
     FRay Ray{};
     if (!TryGetActiveViewRay(LocalMousePosition, Ray)) return LastPick;
 
-    // 렌더와 같은 함수로 각 Billboard의 위치·크기에 맞는 View 행렬을 만든다.
-    const auto ResolveBillboardTransform = [](const UBillboardComponent& Billboard, const void* Context) -> FMatrix
-    {
-        const auto& Adapter = *static_cast<const FMultipleViewportsAdapter*>(Context);
-        const FVector Scale = Billboard.GetWorldScale3D();
-        return Adapter.BuildEngineBillboardMatrix(Adapter.GetActiveViewIndex(),
-            Billboard.GetWorldLocation(), Scale.Y, Scale.Z);
-    };
+    const FRenderView RenderView = GetRenderView(ViewIndex);
 
 	UWorld& World = *ViewWorlds[ViewIndex];
     FHitResult Hit;
-    if (World.LineTraceSingle(Ray, Hit, ResolveBillboardTransform, this))
+    if (World.LineTraceSingle(Ray, Hit, &RenderView))
     {
         LastPick.bHit = true;
         LastPick.Id = Hit.HitComponent->GetUUID();
@@ -791,4 +650,14 @@ UWorld* FMultipleViewportsAdapter::GetViewWorld(int32 ViewIndex) const
 {
 	assert(ViewIndex >= 0 && ViewIndex < 4);
 	return ViewWorlds[ViewIndex];
+}
+
+FRenderView FMultipleViewportsAdapter::GetRenderView(int32 ViewIndex) const
+{
+    return FRenderView::Build(MakeViewInfo(ViewIndex));
+}
+
+FViewInfo FMultipleViewportsAdapter::MakeViewInfo(int32 ViewIndex) const
+{
+	return Views.Cameras[ViewIndex].ToViewInfo({ ViewRects[ViewIndex].Width, ViewRects[ViewIndex].Height });
 }

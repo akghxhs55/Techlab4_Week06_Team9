@@ -6,8 +6,6 @@
 #include "Core/EngineStatics.h"
 #include "GameFramework/Actor/StaticMeshActor.h"
 
-#include "Camera/CameraActor.h"
-#include "Camera/CameraComponent.h"
 #include "Input/InputSystem.h"
 
 #include "UObject/UObjectIterator.h"
@@ -17,6 +15,7 @@
 
 #include "Component/StaticMeshComponent.h"
 #include "Asset/LOD/StaticMeshLODSelector.h"
+#include "Camera/ViewInfo.h"
 
 #include "Math/Frustum.h"
 
@@ -42,7 +41,6 @@ UWorld::~UWorld()
 
 UWorld::UWorld(const UWorld& Other)
 	: UObject(Other)
-	, MainCamera(Other.MainCamera)
 	, PersistentLevel(Other.PersistentLevel)
 	, CurrentLevel(Other.CurrentLevel)
 	, Levels(Other.Levels)
@@ -65,9 +63,6 @@ bool  UWorld::Init()
 	PersistentLevel->SetWorld(this);
 	Levels.Add(PersistentLevel);
 	CurrentLevel = PersistentLevel;
-
-	//카메라 생성
-	CreateMainCamera();
 
 	return true;
 }
@@ -105,16 +100,6 @@ void UWorld::DuplicateSubObjects()
 
 		PersistentLevel = Levels[0];
 		CurrentLevel = PersistentLevel;
-	}
-
-	if (MainCamera)
-	{
-		MainCamera = MainCamera->Duplicate<ACameraActor>();
-
-	}
-	else
-	{
-		CreateMainCamera();
 	}
 }
 
@@ -513,45 +498,6 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FLODViewContex
 //	}
 //}
 
-// 메인 카메라 생성
-void UWorld::CreateMainCamera()
-{
-	if (MainCamera)
-		return;
-
-	MainCamera = FObjectFactory::ConstructObject<ACameraActor>();
-
-	if (!MainCamera)
-	{
-		HTR_LOG(Error, "Failed to create MainCamera");
-		return;
-	}
-
-	MainCamera->World = this;
-	MainCamera->Level = nullptr;
-	MainCamera->GetCameraComponent()->SetRelativeLocation(FVector(-5.0f, -5.0f, 5.0f));
-
-	// 메인 카메라는 Level에 속하지 않아 BeginPlay를 거치지 않으므로 여기서 등록한다.
-	MainCamera->RegisterAllActorTickFunctions(true);
-}
-
-void UWorld::SetMainCamera(ACameraActor* Camera)
-{
-	if (MainCamera == Camera)
-		return;
-
-	if (MainCamera)
-		MainCamera->RegisterAllActorTickFunctions(false);
-
-	MainCamera = Camera;
-
-	if (MainCamera)
-	{
-		MainCamera->World = this;
-		MainCamera->RegisterAllActorTickFunctions(true);
-	}
-}
-
 int32 UWorld::GetActorNum()
 {
 	return PersistentLevel->GetActorNum();
@@ -637,8 +583,7 @@ bool UWorld::DestroyActor(AActor* Actor)
 }
 
 // 다른 World의 객체를 제외하고 Component 교차 중 최근접 결과를 선택한다.
-bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
-	FBillboardTraceTransform ResolveBillboard, const void* ViewContext)
+bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit, const FRenderView* RenderView)
 {
 	SCOPE_CYCLE_COUNTER_ALWAYS(EditorStats::STAT_PickingTime_Name);
 	OutHit = FHitResult();
@@ -675,21 +620,12 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 
 			if (UBillboardComponent* Billboard = Cast<UBillboardComponent>(Component))
 			{
-				if (!ResolveBillboard)
+				if (!RenderView)
 				{
-					FHitResult Hit;
-					if (!Billboard->LineTraceComponent(WorldRay, Hit) ||
-						Hit.Distance >= InOutNearestT)
-					{
-						return false;
-					}
-
-					OutHit = Hit;
-					InOutNearestT = Hit.Distance;
-					return true;
+					return false;
 				}
 
-				const FMatrix BillboardToWorld = ResolveBillboard(*Billboard, ViewContext);
+				const FMatrix BillboardToWorld = Billboard->GetBillboardMatrix(*RenderView);
 
 				const FRay LocalRay = ToLocalRay(WorldRay, BillboardToWorld);
 

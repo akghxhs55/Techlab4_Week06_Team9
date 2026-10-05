@@ -1,8 +1,6 @@
 #include "EnginePCH.h"
 #include "Editor/Gizmo/GizmoRenderer.h"
 
-#include "Render/GeometryGenerator.h"
-#include "Camera/CameraComponent.h"
 #include "Render/RenderCommand.h"
 #include "Render/RenderResourceManager.h"
 #include "Asset/AssetManager.h"

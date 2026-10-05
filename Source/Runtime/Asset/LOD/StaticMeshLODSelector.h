@@ -1,37 +1,34 @@
 #pragma once
+
+#include "Camera/RenderView.h"
 #include "Core/Types.h"
 #include "Engine/PrimitiveSceneProxy.h"
 
 struct FLODViewContext
 {
-    uint32 Width = 0;
-    uint32 Height = 0;
-    FVector CameraPosition;
-    FVector CameraForward;
-    float ProjectionScaleSquared = 0.0f;
-    float NearZ = 0.0f;
-    bool bOrthographic = false;
+    const FRenderView& View;
+	float ProjectionScaleSquared = 0.0f;
     float CameraDepth = 0.0f;
-    FMatrix ViewProjection; // Current view used by the GPU occlusion pass.
 
-    void Prepare()
-    {
-        CameraDepth = CameraPosition.X * CameraForward.X
-            + CameraPosition.Y * CameraForward.Y + CameraPosition.Z * CameraForward.Z;
-    }
+	explicit FLODViewContext(const FRenderView& InView)
+		: View(InView)
+	{
+		CameraDepth = InView.CameraLocation.Dot(InView.CameraForward);
+		ProjectionScaleSquared = std::max(InView.Projection.M[1][0] * InView.Projection.M[1][0], InView.Projection.M[2][1] * InView.Projection.M[2][1]);
+	}
 };
 
 template<bool Orthographic>
-inline uint32 SelectSphereLOD(const FLODSelectionInput& Input, const FLODViewContext& View)
+inline uint32 SelectSphereLOD(const FLODSelectionInput& Input, const FLODViewContext& Context)
 {
     const FMeshRenderState* State = Input.State;
-    if (!State || State->LODCount <= 1 || View.Width == 0 || View.Height == 0) return 0;
+    if (!State || State->LODCount <= 1 || Context.View.ViewSize.X == 0 || Context.View.ViewSize.Y == 0) return 0;
     const FLODSphere& Sphere = Input.Sphere;
-    const float Depth = Sphere.Center.X * View.CameraForward.X
-        + Sphere.Center.Y * View.CameraForward.Y + Sphere.Center.Z * View.CameraForward.Z - View.CameraDepth;
-    const float NearDistance = Depth - View.NearZ;
+    const float Depth = Sphere.Center.X * Context.View.CameraForward.X
+        + Sphere.Center.Y * Context.View.CameraForward.Y + Sphere.Center.Z * Context.View.CameraForward.Z - Context.CameraDepth;
+    const float NearDistance = Depth - Context.View.NearZ;
     if (NearDistance <= 0.0f || NearDistance * NearDistance <= Sphere.RadiusSquared) return 0;
-    const float Numerator = Sphere.RadiusSquared * View.ProjectionScaleSquared;
+    const float Numerator = Sphere.RadiusSquared * Context.ProjectionScaleSquared;
     const float DistanceFactor = Orthographic ? 1.0f : Depth * Depth;
     uint32 DesiredLOD = 3;
     if (Numerator >= State->LODThresholdSq[0] * DistanceFactor) DesiredLOD = 0;
@@ -40,11 +37,11 @@ inline uint32 SelectSphereLOD(const FLODSelectionInput& Input, const FLODViewCon
     return DesiredLOD < State->LODCount ? DesiredLOD : State->LODCount - 1;
 }
 
-inline uint32 SelectLOD(const FPrimitiveSceneProxy& Proxy, const FLODViewContext& View)
+inline uint32 SelectLOD(const FPrimitiveSceneProxy& Proxy, const FLODViewContext& Context)
 {
     const FLODSelectionInput Input{Proxy.GetLODSphere(), Proxy.GetRenderState()};
-    return View.bOrthographic ? SelectSphereLOD<true>(Input, View) : SelectSphereLOD<false>(Input, View);
+    return Context.View.bIsOrthogonal ? SelectSphereLOD<true>(Input, Context) : SelectSphereLOD<false>(Input, Context);
 }
 
 // Recomputed for every current view; previous selections are never reused.
-void SelectLODs(const TArray<FLODSelectionInput>& Inputs, const FLODViewContext& View, TArray<uint8>& OutLODs);
+void SelectLODs(const TArray<FLODSelectionInput>& Inputs, const FLODViewContext& Context, TArray<uint8>& OutLODs);

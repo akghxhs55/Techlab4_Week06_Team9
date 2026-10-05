@@ -11,10 +11,9 @@
 #include "Math/Frustum.h"
 #include "Math/BVH.h"
 #include "Engine/Scene.h"
-#include "Camera/CameraActor.h"
 #include "Asset/LOD/StaticMeshLODSelector.h"
 
-//class ACameraActor;
+struct FViewInfo;
 class ULevel;
 class UBillboardComponent;
 
@@ -66,12 +65,6 @@ public:
 
 	void GatherRenderPackets(FRenderQueue& RenderArray, const FLODViewContext* LODView = nullptr, const FFrustumPlanes* Frustum = nullptr, FRenderer* Renderer = nullptr);
 
-	void CreateMainCamera();
-
-	// 카메라 Get/Set
-	void SetMainCamera(ACameraActor* Camera);
-	ACameraActor* GetMainCamera() const { return MainCamera; }
-
 	// Level
 	ULevel* GetPersistentLevel() const { return PersistentLevel; }
 	void SetPersistentLevel(ULevel* InLevel) { PersistentLevel = InLevel; }
@@ -85,17 +78,16 @@ public:
 
 	bool DestroyActor(AActor* Actor);
 
-	// View별 Billboard 행렬 공급자는 이 동기 호출 동안만 사용하며 저장하지 않는다.
-	using FBillboardTraceTransform = FMatrix(*)(const UBillboardComponent&, const void*);
 	// 현재 World의 Component에 Ray를 전달하고 가장 가까운 유효 교차를 반환한다.
-	bool LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
-		FBillboardTraceTransform ResolveBillboard = nullptr, const void* ViewContext = nullptr);
+	bool LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit, const FRenderView* RenderView = nullptr);
 
 	void BeginPlay();
 	void EndPlay();
 
 	FScene& GetScene() { return Scene; }
 	FTickTaskManager& GetTickTaskManager() { return TickTaskManager; }
+
+	bool GetActiveCameraViewInfo(FViewInfo& Out) const;
 
 	const FRenderStats& GetRenderStats() const { return RenderStats; }
 
@@ -123,9 +115,6 @@ private:
 	FTickTaskManager TickTaskManager;
 
 	TQueue<AActor*> BeginPlayList;
-
-	//메인 카메라 
-	ACameraActor* MainCamera = nullptr;
 
 	FPathTracker PathTracker;
 

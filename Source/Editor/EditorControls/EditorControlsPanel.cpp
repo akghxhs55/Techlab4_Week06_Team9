@@ -2,8 +2,6 @@
 
 #include "Editor/EditorControls/EditorControlsPanel.h"
 #include "Editor/LevelEditor/MultipleViewports/Adapter/MultipleViewportsAdapter.h"
-#include "Camera/CameraActor.h"
-#include "Camera/CameraComponent.h"
 
 #include "Engine/World.h"
 
@@ -189,7 +187,7 @@ void FEditorControlsPanel::DrawCameraProperties()
 	ImGui::Dummy(ImVec2(0.0f, SectionGap));
 	ImGui::SeparatorText("Viewport");
 
-	UCameraComponent* CamCom = World && World->GetMainCamera() ? World->GetMainCamera()->GetCameraComponent() : nullptr;
+	UCameraComponent* CamCom = nullptr; // TODO
 	if (!ViewportAdapter && !CamCom) return;
 
 	int32 CameraViewIndex = 0;
@@ -216,7 +214,7 @@ void FEditorControlsPanel::DrawCameraProperties()
 	}
 
 	bool bChanged = false;
-	bool bOrthogonal = ViewportAdapter ? Camera.Projection.Mode == EProjectionMode::Orthographic : CamCom->GetIsOrthogonal();
+	bool bOrthogonal = Camera.Projection.Mode == EProjectionMode::Orthographic;
 
 	ImGui::Dummy(ImVec2(0.0f, SubsectionGap));
 	ImGui::TextDisabled("Projection");
@@ -237,38 +235,24 @@ void FEditorControlsPanel::DrawCameraProperties()
 
 		if (bOrthogonal)
 		{
-			float OrthoWidth = ViewportAdapter ? Camera.Projection.OrthoWidth : CamCom->GetOrthoWidth();
+			float OrthoWidth = Camera.Projection.OrthoWidth;
 			if (ImGui::DragFloat("##OrthoWidth", &OrthoWidth, 0.1f) && std::isfinite(OrthoWidth))
 			{
 				OrthoWidth = FMath::Clamp(OrthoWidth, 0.01f, 1000000.0f);
 
-				if (ViewportAdapter)
-				{
-					Camera.Projection.OrthoWidth = OrthoWidth;
-					bChanged = true;
-				}
-				else
-				{
-					CamCom->SetOrthoWidth(OrthoWidth);
-				}
+				Camera.Projection.OrthoWidth = OrthoWidth;
+				bChanged = true;
 			}
 		}
 		else
 		{
-			float FOV = ViewportAdapter ? Camera.Projection.FovDegrees : CamCom->GetFieldOfView();
+			float FOV = Camera.Projection.FovDegrees;
 			if (ImGui::DragFloat("##FOV", &FOV, 0.1f) && std::isfinite(FOV))
 			{
 				FOV = FMath::Clamp(FOV, 1.0f, 179.0f);
 
-				if (ViewportAdapter)
-				{
-					Camera.Projection.FovDegrees = FOV;
-					bChanged = true;
-				}
-				else
-				{
-					CamCom->SetFieldOfView(FOV);
-				}
+				Camera.Projection.FovDegrees = FOV;
+				bChanged = true;
 			}
 		}
 
@@ -279,8 +263,7 @@ void FEditorControlsPanel::DrawCameraProperties()
 		ImGui::Text("Near");
 
 		ImGui::TableSetColumnIndex(1);
-		float Width = ImGui::GetContentRegionAvail().x;
-		float Near = ViewportAdapter ? Camera.Projection.NearClip : CamCom->GetNearZ();
+		float Near = Camera.Projection.NearClip;
 
 		ImGui::SetNextItemWidth(-1.0f);
 		bool Changed = ImGui::InputFloat("##Near", &Near);
@@ -291,23 +274,15 @@ void FEditorControlsPanel::DrawCameraProperties()
 		ImGui::Text("Far");
 
 		ImGui::TableSetColumnIndex(1);
-		float Far = ViewportAdapter ? Camera.Projection.FarClip : CamCom->GetFarZ();
+		float Far = Camera.Projection.FarClip;
 		ImGui::SetNextItemWidth(-1.0f);
 		Changed |= ImGui::InputFloat("##Far", &Far);
 
 		if (Changed && std::isfinite(Near) && std::isfinite(Far) && Near > 0 && Far > Near)
 		{
-			if (ViewportAdapter)
-			{
-				Camera.Projection.NearClip = Near;
-				Camera.Projection.FarClip = Far;
-				bChanged = true;
-			}
-			else
-			{
-				CamCom->SetNearZ(Near);
-				CamCom->SetFarZ(Far);
-			}
+			Camera.Projection.NearClip = Near;
+			Camera.Projection.FarClip = Far;
+			bChanged = true;
 		}
 		ImGui::EndTable();
 	}
@@ -334,9 +309,7 @@ void FEditorControlsPanel::DrawCameraProperties()
 		float Available = ImGui::GetContentRegionAvail().x;
 		float ItemWidth = (Available - ImGui::GetStyle().ItemSpacing.x * 2.0f) / 3.0f;
 
-		FVector Location = ViewportAdapter ?
-			FVector(Camera.Transform.Location.X, Camera.Transform.Location.Y, Camera.Transform.Location.Z) :
-			CamCom->GetRelativeLocation();
+		FVector Location = FVector(Camera.Transform.Location.X, Camera.Transform.Location.Y, Camera.Transform.Location.Z);
 
 		ImGui::SetNextItemWidth(ItemWidth);
 		bLocationChanged |= ImGui::DragFloat("##LocationX", &Location.X, 0.1f);
@@ -353,12 +326,8 @@ void FEditorControlsPanel::DrawCameraProperties()
 
 		if (bLocationChanged && std::isfinite(Location.X) && std::isfinite(Location.Y) && std::isfinite(Location.Z))
 		{
-			if (ViewportAdapter)
-			{
-				Camera.Transform.Location = { Location.X, Location.Y, Location.Z };
-				bChanged = true;
-			}
-			else CamCom->SetRelativeLocation(Location);
+			Camera.Transform.Location = { Location.X, Location.Y, Location.Z };
+			bChanged = true;
 		}
 
 		ImGui::TableNextRow();
@@ -368,9 +337,7 @@ void FEditorControlsPanel::DrawCameraProperties()
 		ImGui::Text("Rotation");
 
 		ImGui::TableSetColumnIndex(1);
-		FRotator Rotation = ViewportAdapter ?
-			FQuat(Camera.Transform.Rotation.X, Camera.Transform.Rotation.Y, Camera.Transform.Rotation.Z, Camera.Transform.Rotation.W).ToFRotator() :
-			CamCom->GetRelativeRotation();
+		FRotator Rotation = FQuat(Camera.Transform.Rotation.X, Camera.Transform.Rotation.Y, Camera.Transform.Rotation.Z, Camera.Transform.Rotation.W).ToFRotator();
 
 		ImGui::SetNextItemWidth(ItemWidth);
 		bRotationChanged |= ImGui::DragFloat("##Pitch", &Rotation.Pitch, 0.1f);
@@ -389,18 +356,14 @@ void FEditorControlsPanel::DrawCameraProperties()
 
 		if (bRotationChanged && std::isfinite(Rotation.Pitch) && std::isfinite(Rotation.Yaw) && std::isfinite(Rotation.Roll))
 		{
-			if (ViewportAdapter)
+			if (!bOrthogonal)
 			{
-				if (!bOrthogonal)
-				{
-					Rotation.Pitch = FMath::Clamp(Rotation.Pitch, -89.0f, 89.0f);
-					Rotation.Roll = 0.0f;
-				}
-				const FQuat Q = Rotation.Quaternion();
-				Camera.Transform.Rotation = { Q.X, Q.Y, Q.Z, Q.W };
-				bChanged = true;
+				Rotation.Pitch = FMath::Clamp(Rotation.Pitch, -89.0f, 89.0f);
+				Rotation.Roll = 0.0f;
 			}
-			else CamCom->SetRelativeRotation(Rotation);
+			const FQuat Q = Rotation.Quaternion();
+			Camera.Transform.Rotation = { Q.X, Q.Y, Q.Z, Q.W };
+			bChanged = true;
 		}
 		ImGui::EndTable();
 	}

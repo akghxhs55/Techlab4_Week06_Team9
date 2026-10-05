@@ -5,12 +5,11 @@
 
 #include "Core/EngineTimer.h"
 #include "Core/Stats/LightweightStats.h"
+#include "Camera/RenderView.h"
 
 #include "Engine/PrimitiveSceneProxy.h"
 
 #include "RenderCommand.h"
-
-#include "Camera/CameraComponent.h"
 
 #include <algorithm>
 #include <chrono>
@@ -125,9 +124,9 @@ void FRenderer::UploadPerObjectConstants()
 }
 
 // 카메라의 ViewProjection을 공통 렌더 경로로 전달한다.
-void FRenderer::RenderAll(FRenderQueue& InQueue, UCameraComponent* CameraComponent)
+void FRenderer::RenderAll(FRenderQueue& InQueue, const FRenderView& RenderView)
 {
-	RenderAll(InQueue, CameraComponent->GetViewProjectionMatrix());
+	RenderAll(InQueue, RenderView.ViewProjection);
 }
 
 // 불투명 우선·반투명 거리순으로 정렬해 View 행렬과 Section 범위로 그린다.

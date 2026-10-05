@@ -1,8 +1,7 @@
-﻿#include "EnginePCH.h"
+#include "EnginePCH.h"
 #include "TextRenderer.h"
 
-#include "Camera/CameraComponent.h"
-
+#include "Camera/RenderView.h"
 #include "Render/RenderCommand.h"
 #include "Render/RenderResourceManager.h"
 #include "Render/Vertex.h"
@@ -173,9 +172,9 @@ bool FTextRenderer::ComputeTextBounds(const FString& Text, float TextSize, const
 
 // 카메라 ViewProjection을 명시적 행렬 렌더 경로로 전달한다.
 void FTextRenderer::OnRender(const FString& Text, const FMatrix& WorldMatrix, float TextSize,
-	const UFont& Atlas, UCameraComponent* CameraComponent)
+	const UFont& Atlas, const FRenderView& RenderView)
 {
-	OnRender(Text, WorldMatrix, TextSize, Atlas, CameraComponent->GetViewProjectionMatrix());
+	OnRender(Text, WorldMatrix, TextSize, Atlas, RenderView.ViewProjection);
 }
 
 // ViewProjection과 MSDF 상수로 텍스트 Mesh를 그린다.
@@ -233,13 +232,11 @@ void FTextRenderer::OnRender(const FString& Text, const FMatrix& WorldMatrix, fl
 
 // 카메라를 향하는 Billboard 행렬을 구성해 텍스트를 그린다.
 void FTextRenderer::OnRenderBillboard(const FString& Text, const FVector& WorldPos, float TextSize,
-	const UFont& Atlas, UCameraComponent* CameraComponent)
+	const UFont& Atlas, const FRenderView& RenderView)
 {
-	const FTransform& Transform = CameraComponent->GetTransform();
-
-	const FVector Forward = Transform.GetForward().Normalized();
-	const FVector Right = Transform.GetRight().Normalized();
-	const FVector Up = Transform.GetUp().Normalized();
+	const FVector Forward = RenderView.CameraForward;
+	const FVector Right = RenderView.CameraRight;
+	const FVector Up = RenderView.CameraUp;
 
 	// 텍스트 로컬축: X = , Y = 글자 가로, Z = 글자 세로
 	FMatrix World;
@@ -249,5 +246,5 @@ void FTextRenderer::OnRenderBillboard(const FString& Text, const FVector& WorldP
 	World.M[2][0] = Up.X;       World.M[2][1] = Up.Y;       World.M[2][2] = Up.Z;       World.M[2][3] = 0;
 	World.M[3][0] = WorldPos.X; World.M[3][1] = WorldPos.Y; World.M[3][2] = WorldPos.Z; World.M[3][3] = 1;
 
-	OnRender(Text, World, TextSize, Atlas, CameraComponent);
+	OnRender(Text, World, TextSize, Atlas, RenderView);
 }

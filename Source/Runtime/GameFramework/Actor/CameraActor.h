@@ -1,11 +1,9 @@
 #pragma once
 
-#include "../GameFramework/Actor.h"
+#include "GameFramework/Actor.h"
 #include "ObjectSystem/Class.h"
 
-#include "CameraComponent.h"
-
-//class UCameraComponent;
+class UCameraComponent;
 
 class ACameraActor : public AActor
 {
