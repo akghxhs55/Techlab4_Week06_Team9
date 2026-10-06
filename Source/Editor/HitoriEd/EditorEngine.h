@@ -81,7 +81,7 @@ private:
 	TUniquePtr<FOutline> Outline;
 	TUniquePtr<FOutlineRenderer> OutlineRenderer;
 	TUniquePtr<FSkyboxRenderer> SkyboxRenderer;
-	TUniquePtr<FScreenQuadRenderer> ScreenQuadRenderer;
+	TUniquePtr<FPostProcessor> ScreenQuadRenderer;
 
 	UFont* SystemFont;
 

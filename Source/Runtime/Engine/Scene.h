@@ -3,6 +3,7 @@
 #include "PrimitiveSceneProxy.h"
 #include "Component/BillboardComponent.h"
 #include "Component/PrimitiveComponent.h"
+#include "Component/UExpHeightFogComponent.h"
 #include "Math/Frustum.h"
 #include "Math/BVH.h"
 
@@ -21,10 +22,14 @@ public:
 	void MarkDirty(FPrimitiveSceneProxy* Proxy);
 	void MarkRenderStateDirty(FPrimitiveSceneProxy* Proxy);
 
+	void AddFog(UExpHeightFogComponent* Fog);
 
 	TArray<FPrimitiveSceneProxy*> Proxies;
 	TArray<FPrimitiveSceneProxy*> DirtyProxies;
 	TArray<FPrimitiveSceneProxy*> RenderStateDirtyProxies;
+
+	TArray<UExpHeightFogComponent*> ExpHeightFogs;
+
 	TArray<FAABB> PrimitiveBounds;
 	TArray<uint8> PrimitiveFlags;
 

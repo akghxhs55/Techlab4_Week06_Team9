@@ -4,6 +4,7 @@
 #include "Engine/Level.h"
 #include "ObjectSystem/ObjectFactory.h"
 #include "Component/SceneComponent.h"
+#include "../Component/UExpHeightFogComponent.h"
 
 AActor::AActor()
 {
@@ -109,6 +110,14 @@ UActorComponent* AActor::AddComponentByClass(UClass* Class, bool bManualAttachme
 		if (World)
 		{
 			World->GetScene().AddPrimitive(Primitive);
+		}
+	}
+
+	if (UExpHeightFogComponent* FogComponent = Cast<UExpHeightFogComponent>(Component))
+	{
+		if (World)
+		{
+			World->GetScene().AddFog(FogComponent);
 		}
 	}
 

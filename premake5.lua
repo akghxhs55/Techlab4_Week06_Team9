@@ -100,7 +100,6 @@ project "ImGui"
 	}
 
 
--- 런타임. 에디터를 모른다. include 경로에 Source/Editor가 없는 것이 그 방벽이다.
 -- location이 소스 루트와 같아야 "모든 파일 표시"에서 폴더가 보인다.
 project "HitoriEngine"
 	location "Source/Runtime"
@@ -120,6 +119,8 @@ project "HitoriEngine"
 	includedirs
 	{
 		"Source/Runtime",
+		"Source",
+		"%{IncludeDir.ImGui}",
 		"%{IncludeDir.stb}",
 		"%{IncludeDir.json}",
 	}

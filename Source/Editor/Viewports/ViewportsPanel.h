@@ -1,7 +1,8 @@
 #pragma once
-
-#include "Editor/EditorUI/EditorPanel.h"
-#include "Editor/LevelEditor/MultipleViewports/Adapter/MultipleViewportsAdapterTypes.h"
+#include "../EditorUI/EditorPanel.h"
+#include "../LevelEditor/MultipleViewports/Adapter/MultipleViewportsAdapter.h"
+//#include "Editor/EditorUI/EditorPanel.h"
+//#include "Editor/LevelEditor/MultipleViewports/Adapter/MultipleViewportsAdapterTypes.h"
 #include "Render/RenderingInfo.h"
 
 enum class EPIECommand : uint8 { None, Start, Pause, Stop };
@@ -43,7 +44,11 @@ public:
 	// UI에서 발생한 PIE 요청을 한 번 소비하도록 반환한다.
 	bool ConsumePIERequest(int32& OutViewIndex, EPIECommand& OutCommand);
 
-	FTexture2D* GetViewRenderTarget(int32 ViewIndex) const;
+	FTexture2D* GetViewRenderTarget1(int32 ViewIndex) const;
+	FTexture2D* GetViewRenderTarget2(int32 ViewIndex) const;
+
+	FTexture2D* GetFinalRenderTarget(int32 ViewIndex) const;
+
 private:
 	FMultipleViewportsAdapter* ViewportAdapter = nullptr;
 	struct FViewSlot
@@ -56,7 +61,11 @@ private:
 
 		// Screen Quad를 그리고, 후처리를 적용시킬 렌더 타깃 버퍼. AddImage 의 대상이 이제 이 이미지가 되어야 한다. 
 		// 이 이미지는 RTV, SRV, UAV 모두 지원해야 한다. ( 뷰가 모두 있어야 한다 ) 
-		TUniquePtr<FTexture2D> RenderTarget; 
+		// Ping-Pong Render Target 
+		TUniquePtr<FTexture2D> RenderTarget1;
+		TUniquePtr<FTexture2D> RenderTarget2;
+
+		TUniquePtr<FTexture2D> FinalRenderTarget;
 
 		TUniquePtr<FTexture2D> ColorTarget;
 		TUniquePtr<FTexture2D> DepthTarget;
