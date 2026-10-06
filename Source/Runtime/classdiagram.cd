@@ -24,14 +24,14 @@
   <Class Name="USceneComponent" Collapsed="true">
     <Position X="10.25" Y="4.75" Width="1.5" />
     <TypeIdentifier>
-      <HashCode>gAAAAAIgEokCACCQAQFAABagAAAAAAAAAAAAAAaAEAQ=</HashCode>
+      <HashCode>gAAAAAIgEokCACCQAQFAABagAiAAAAAAAAAAAAaAEAQ=</HashCode>
       <FileName>Component\SceneComponent.h</FileName>
     </TypeIdentifier>
   </Class>
   <Class Name="UPrimitiveComponent" Collapsed="true">
     <Position X="8" Y="6.25" Width="1.5" />
     <TypeIdentifier>
-      <HashCode>AgAAEEAAQAEIMAACEAAIEAAAwAAAAAAEEAAAAACgEAA=</HashCode>
+      <HashCode>AgAAEEAAQAEIMAACEAAIEAAAwAAAAAAEEAAAAASgEAA=</HashCode>
       <FileName>Component\PrimitiveComponent.h</FileName>
     </TypeIdentifier>
   </Class>
@@ -50,9 +50,9 @@
     </TypeIdentifier>
   </Class>
   <Class Name="ULightComponent" Collapsed="true">
-    <Position X="12.25" Y="6.25" Width="1.5" />
+    <Position X="14" Y="6.25" Width="1.5" />
     <TypeIdentifier>
-      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <HashCode>AAAAAAAAAAAIAAAAAAAIAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
       <FileName>Component\LightComponent.h</FileName>
     </TypeIdentifier>
   </Class>
@@ -66,22 +66,36 @@
   <Class Name="UActorComponent" Collapsed="true">
     <Position X="10.25" Y="3.25" Width="1.5" />
     <TypeIdentifier>
-      <HashCode>AAAAAACIAoAAAAAAAAAAAAAAAAAAAAAAAAIBAAAgAAA=</HashCode>
+      <HashCode>AAAAAACIAoAAAAAAAAAAAAAAACAAAAAAAAIBAAAoAAA=</HashCode>
       <FileName>Component\ActorComponent.h</FileName>
     </TypeIdentifier>
   </Class>
   <Class Name="UObject" Collapsed="true">
     <Position X="10.25" Y="2" Width="1.5" />
     <TypeIdentifier>
-      <HashCode>BACIBBIAIQABAAAAAQQAAQUACCBAAAgAgACgQmBABAA=</HashCode>
+      <HashCode>BACIBBIAIQABAAAAAQQAAQUACCBAIAgAgACgQmBABAA=</HashCode>
       <FileName>ObjectSystem\Object.h</FileName>
     </TypeIdentifier>
   </Class>
   <Class Name="USphereGlowComponent" Collapsed="true">
     <Position X="12.25" Y="7.5" Width="1.5" />
     <TypeIdentifier>
-      <HashCode>AAAAAQAAAAAAIEAAAAAAAACAQAAAAAAAAAAAAAAEEAA=</HashCode>
-      <FileName>SphereGlowComponent.h</FileName>
+      <HashCode>AAAIAQAACAAAIEAAAAAAAACIQAAAAAAIAAAAgAAEEAA=</HashCode>
+      <FileName>Component\SphereGlowComponent.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="UProjectileMovementComponent" Collapsed="true">
+    <Position X="12" Y="4.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>ACAAAAIEAgAAAAAAIAAkgAAAAGAAAEAAAAggAAAmIEA=</HashCode>
+      <FileName>Component\ProjectileMovementComponent.h</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="UPointLightComponent" Collapsed="true">
+    <Position X="14" Y="7.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AQAAAAEAAAAQAIUAAQAAAAAIEAAAAAAIAIgAAAAAIQA=</HashCode>
+      <FileName>Component\PointLightComponent.h</FileName>
     </TypeIdentifier>
   </Class>
   <Font Name="맑은 고딕" Size="9" />

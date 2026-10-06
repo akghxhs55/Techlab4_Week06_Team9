@@ -20,7 +20,7 @@ class USphereGlowComponent : public UPrimitiveComponent
         PROPERTY(Radius)
         PROPERTY(RadiusFallOff)
         PROPERTY_TYPE(Color, Color)
-        REFLECT_END()
+    REFLECT_END()
 
 public:
     USphereGlowComponent();

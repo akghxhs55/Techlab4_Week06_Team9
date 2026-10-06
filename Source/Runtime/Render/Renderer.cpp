@@ -11,6 +11,12 @@
 
 #include "RenderCommand.h"
 
+#include "Component/CameraComponent.h"
+#include "Component/PointLightComponent.h"
+#include "UObject/UObjectIterator.h"
+#include "Engine/World.h"
+#include "GameFramework/Actor.h"
+
 #include <algorithm>
 #include <chrono>
 #include <unordered_map>
@@ -61,6 +67,11 @@ bool FRenderer::Init()
 	bUsePerObjectSlots = RenderCommand::SupportsConstantBufferOffsets();
 	PerObjectCB = RenderCommand::CreateConstantBuffer(sizeof(FPerObjectConstants));
 	ViewCB = RenderCommand::CreateConstantBuffer(sizeof(FMatrix));
+	PointLightCB = RenderCommand::CreateConstantBuffer(sizeof(FPointLightBuffer));
+
+	FPointLightBuffer InitialLightBuffer{};
+	InitialLightBuffer.NumPointLights = 0;
+	RenderCommand::UpdateBufferData(PointLightCB.get(), &InitialLightBuffer);
 
 	GPUOcclusion.Init();   // 실패해도 오클루전만 못 쓸 뿐 렌더링은 된다
 
@@ -199,6 +210,10 @@ void FRenderer::DrawPackets(uint32 Begin, uint32 End, const FMatrix& ViewProject
 	uint8 LastLODIndex = 0;
 
 	RenderCommand::BindConstantBuffer(0, ViewCB.get(), EShaderBindFlagBits::Vertex | EShaderBindFlagBits::Pixel);
+	if (PointLightCB)
+	{
+		RenderCommand::BindConstantBuffer(3, PointLightCB.get(), EShaderBindFlagBits::Pixel);
+	}
 
 
 	for (uint32 k = Begin; k < End; ++k)          // k = 정렬된 위치
@@ -488,4 +503,48 @@ void FRenderer::UpdatePerObjectConstants(const FMatrix& World)
 	Constants.World = World;
 
 	RenderCommand::UpdateBufferData(PerObjectCB.get(), &Constants);
+}
+
+void FRenderer::UpdatePointLights(UWorld* World)
+{
+	if (!PointLightCB)
+	{
+		return;
+	}
+
+	FPointLightBuffer BufferData{};
+	BufferData.NumPointLights = 0;
+
+	for (TObjectIterator<UPointLightComponent> It; It; ++It)
+	{
+		if (BufferData.NumPointLights >= static_cast<int32>(MAX_POINT_LIGHTS))
+		{
+			break;
+		}
+
+		UPointLightComponent* Comp = *It;
+		if (!Comp || !Comp->IsVisible())
+		{
+			continue;
+		}
+
+		AActor* Owner = Comp->GetOwner();
+		if (World && Owner && Owner->GetWorld() && Owner->GetWorld() != World)
+		{
+			continue;
+		}
+
+		FPointLightShaderData& L = BufferData.PointLights[BufferData.NumPointLights];
+		L.Position = Comp->GetWorldLocation();
+		L.AttenuationRadius = Comp->GetAttenuationRadius();
+		L.Color = Comp->GetLightColor();
+		L.Intensity = Comp->GetIntensity();
+		L.Falloff = Comp->GetFalloff();
+		L.bEnabled = 1.0f;
+		L.Padding = 0.0f;
+
+		++BufferData.NumPointLights;
+	}
+
+	RenderCommand::UpdateBufferData(PointLightCB.get(), &BufferData);
 }

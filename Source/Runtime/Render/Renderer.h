@@ -9,6 +9,25 @@
 #include "Occlusion/GPUOcclusion.h"
 
 constexpr uint32 ObjectSlotBytes = 256;
+constexpr uint32 MAX_POINT_LIGHTS = 4;
+
+struct alignas(16) FPointLightShaderData
+{
+	FVector Position = FVector(0.0f, 0.0f, 0.0f);
+	float AttenuationRadius = 10.0f;
+	FVector4 Color = FVector4(1.0f, 1.0f, 1.0f, 1.0f);
+	float Intensity = 1.0f;
+	float Falloff = 2.0f;
+	float bEnabled = 0.0f;
+	float Padding = 0.0f;
+};
+
+struct alignas(16) FPointLightBuffer
+{
+	FPointLightShaderData PointLights[MAX_POINT_LIGHTS];
+	int32 NumPointLights = 0;
+	float Padding[3] = { 0.0f, 0.0f, 0.0f };
+};
 
 struct FPerObjectConstants
 {
@@ -21,6 +40,8 @@ struct FSortEntry
 	uint32 PacketIndex;
 };
 
+class UCameraComponent;
+class UWorld;
 struct FRenderView;
 
 // 오클루전 컬링의 효과 상한을 재기 위한 측정 결과 (디버그 전용)
@@ -70,6 +91,9 @@ public:
 	uint8* BeginObjectConstants(uint32 MaxSlots);
 	void EndObjectConstants();
 
+	// 씬의 UPointLightComponent를 수집하여 상수 버퍼(b3)를 갱신한다
+	void UpdatePointLights(UWorld* World = nullptr);
+
 private:
 	// FIFO 소비용 배열의 용량만 재사용하며 매 View의 패킷 값은 새로 채운다.
 	FRenderQueue RenderPackets;
@@ -78,6 +102,7 @@ private:
 	uint32 FirstMaterialIndex = 0;
 	TUniquePtr<FConstantBuffer> PerObjectCB;
 	TUniquePtr<FConstantBuffer> ViewCB;
+	TUniquePtr<FConstantBuffer> PointLightCB;
 
 	// 모든 패킷의 World 행렬을 256바이트 칸에 한 번에 올린 버퍼. D3D11.1 오프셋 바인딩을 못 쓰면 PerObjectCB로 돌아간다.
 	TUniquePtr<FConstantBuffer> PerObjectSlotCB;

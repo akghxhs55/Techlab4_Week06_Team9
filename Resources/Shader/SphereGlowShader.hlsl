@@ -100,7 +100,6 @@ float4 mainPS(PS_INPUT input) : SV_TARGET
         float len = length(toPixel);
         float3 rayDir = (len > 0.0001f) ? (toPixel / len) : float3(0.0f, 0.0f, 1.0f);
         
-        
         float3 toCenter = Center - camPos;
         // 시선 레이를 따라 구체 중심을 투영 (카메라 뒤쪽으로 투영되지 않도록 t >= 0 제한)
         float t = max(dot(toCenter, rayDir), 0.0f);
