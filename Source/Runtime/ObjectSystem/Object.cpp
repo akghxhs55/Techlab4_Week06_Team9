@@ -42,6 +42,17 @@ UObject::~UObject()
 	}
 }
 
+UObject::UObject(const UObject& Other)
+	: ObjectUUID(FEngineStatics::GetUUID())
+	, InternalIndex(GUObjectArray.Num())
+	, Name(Other.Name)
+	, Outer(Other.Outer)
+	, ClassPrivate(Other.ClassPrivate)
+	, Flags(Other.Flags)
+{
+	InternalIndex = GUObjectArray.Add(this);
+}
+
 UClass* UObject::StaticClass()
 {
 	static UClass c;
@@ -54,9 +65,20 @@ UClass* UObject::StaticClass()
 			{
 				return new UObject();
 			};
+		c.CopyConstructor = [](const UObject& Other) -> UObject*
+			{
+				return new UObject(Other);
+			};
+		RegisterProperties(&c);
+		RegisterClass(&c);
 		bIsInit = true;
 	}
 	return &c;
+}
+
+void UObject::RegisterProperties(UClass* InClass)
+{
+	InClass->AddProperty<uint32>("ObjectUUID", offsetof(UObject, ObjectUUID));
 }
 
 bool UObject::IsA(const UClass* Class)
