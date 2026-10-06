@@ -1,4 +1,27 @@
 #pragma pack_matrix(row_major)
+
+float3 ACESFitted(float3 color)
+{
+    const float3x3 ACESInputMat =
+    {
+        { 0.59719, 0.35458, 0.04823 },
+        { 0.07600, 0.90834, 0.01566 },
+        { 0.02840, 0.13383, 0.83777 }
+    };
+    const float3x3 ACESOutputMat =
+    {
+        { 1.60475, -0.53108, -0.07367 },
+        { -0.10208, 1.10813, -0.00605 },
+        { -0.00327, -0.07276, 1.07602 }
+    };
+    float3 v = mul(ACESInputMat, color);
+    
+    float3 a = v * (v + 0.0245786f) - 0.000090537f;
+    float3 b = v * (0.983729f * v + 0.4329510f) + 0.238081f;
+    float3 c = a / b;
+    return saturate(mul(ACESOutputMat, c));
+}
+
 cbuffer Viewconstants : register(b0)
 {
     matrix VP;
@@ -119,6 +142,12 @@ float4 mainPS(PS_INPUT input) : SV_TARGET
     
     // 감쇠 계산: 중심(distance = 0)에서 최대, 가장자리(distance = Radius) 부근에서 RadiusFallOff 두께로 부드럽게 감쇠
     float attenuation = saturate((Radius - distance) / max(RadiusFallOff, 0.001f));
-    float4 finalColor = Color * Intensity * attenuation;
-    return finalColor;
+    // 지수 감쇠: 중심 코어는 단단하고 쨍하게 유지하고, 외곽은 가파르게 옅어지도록 처리
+    attenuation = pow(attenuation, 2.5f);
+
+    // 1. 순수 고광도(HDR) 색상 계산
+    float3 hdrColor = Color.rgb * Intensity * attenuation;
+    // 2. 필름 톤매핑 통과 -> 강한 중심부는 자동으로 눈부신 백색으로, 외곽은 원색으로!
+    float3 tonemappedColor = ACESFitted(hdrColor);
+    return float4(tonemappedColor, Color.a * attenuation);
 }

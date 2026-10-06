@@ -156,6 +156,13 @@ void UObject::Serialize(json& Handle, bool bIsLoading)
 				else Handle[Property.Name] = Value;
 				break;
 			}
+			case EPropertyType::Rotator:
+			{
+				FRotator& Value = *static_cast<FRotator*>(Ptr);
+				if (bIsLoading) Value = Handle[Property.Name].get<FRotator>();
+				else Handle[Property.Name] = Value;
+				break;
+			}
 			case EPropertyType::Object:
 			{
 				UObject*& Value = *static_cast<UObject**>(Ptr);
