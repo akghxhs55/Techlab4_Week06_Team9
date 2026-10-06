@@ -3,6 +3,7 @@
 
 #include "ParticleSubUVComponent.h"
 #include "Asset/AssetManager.h"
+#include "Camera/RenderView.h"
 #include "GameFramework/Actor.h"
 #include "Component/CameraComponent.h"
 #include "Engine/World.h"
@@ -30,29 +31,6 @@ void UBillboardComponent::BeginPlay()
 void UBillboardComponent::TickComponent(float DeltaTime)
 {
 	Super::TickComponent(DeltaTime);
-}
-
-bool UBillboardComponent::LineTraceComponent(const FRay& WorldRay, FHitResult& OutHit)
-{
-	if (!QuadMesh) return false;
-
-	FMatrix BillboardMatrix;
-	GetWorldTransformedMatrix(&BillboardMatrix);   // 카메라를 향하는, 실제로 그려지는 행 렬
-	return TraceMesh(WorldRay, QuadMesh->GetMeshData(), BillboardMatrix, OutHit);
-}
-
-// 기본 카메라용 행렬을 구해 공통 렌더 패킷 제출 경로로 전달한다.
-void UBillboardComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue)
-{
-	// 렌더러가 역참조하므로 둘 중 하나라도 없으면 보내지 않는다
-	if (QuadMesh == nullptr || Material == nullptr)
-	{
-		return;
-	}
-
-	FMatrix BillboardWorldMatrix;
-	GetWorldTransformedMatrix(&BillboardWorldMatrix);
-	SubmitToRenderQueue(RenderQueue, BillboardWorldMatrix);
 }
 
 // View별 Billboard 행렬과 Material을 렌더 패킷에 담는다.
@@ -101,53 +79,4 @@ void UBillboardComponent::Serialize(json& Handle, bool bIsLoading)
 	{
 		Handle["Material"] = Material ? UMaterial::SaveMaterial(Material) : json(nullptr);
 	}
-}
-
-// 카메라를 향하는 기저와 위치·크기로 Billboard 행렬을 구성한다.
-void UBillboardComponent::GetWorldTransformedMatrix(FMatrix* OutWorldMatrix) const
-{
-	OutWorldMatrix->SetIdentity();
-
-	const FTransform Transform; // TODO
-
-	FVector Right = Transform.GetRight().Normalized();
-	FVector Up = Transform.GetUp().Normalized();
-	FVector Forward = Transform.GetForward().Normalized();
-
-	FVector BbUp = Transform.GetUp().Normalized();
-	FVector BbRight = FVector::Cross(BbUp, Forward).Normalized();
-	FVector BbFwd = FVector::Cross(BbUp, BbRight);
-
-	if (BbRight.Length() <= 1e-6f)
-	{
-		BbRight = Right;
-		BbFwd = FVector::Cross(BbUp, BbRight);
-	}
-
-	const FVector WorldPos = GetWorldLocation();
-	const FVector WorldScale = GetWorldScale3D();
-
-	// Y -> Billboard Right
-	OutWorldMatrix->M[0][0] = BbFwd.X;
-	OutWorldMatrix->M[0][1] = BbFwd.Y;
-	OutWorldMatrix->M[0][2] = BbFwd.Z;
-	OutWorldMatrix->M[0][3] = 0.0f;
-
-	// Z -> Billboard Up
-	OutWorldMatrix->M[1][0] = BbRight.X;
-	OutWorldMatrix->M[1][1] = BbRight.Y;
-	OutWorldMatrix->M[1][2] = BbRight.Z;
-	OutWorldMatrix->M[1][3] = 0.0f;
-
-	// X -> Billboard Forward
-	OutWorldMatrix->M[2][0] = BbUp.X;
-	OutWorldMatrix->M[2][1] = BbUp.Y;
-	OutWorldMatrix->M[2][2] = BbUp.Z;
-	OutWorldMatrix->M[2][3] = 0.0f;
-
-	// Position
-	OutWorldMatrix->M[3][0] = WorldPos.X;
-	OutWorldMatrix->M[3][1] = WorldPos.Y;
-	OutWorldMatrix->M[3][2] = WorldPos.Z;
-	OutWorldMatrix->M[3][3] = 1.0f;
 }

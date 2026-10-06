@@ -11,25 +11,10 @@
 #include "Math/Frustum.h"
 #include "Math/BVH.h"
 #include "Engine/Scene.h"
-#include "Asset/LOD/StaticMeshLODSelector.h"
 
 struct FViewInfo;
 class ULevel;
 class UBillboardComponent;
-
-struct FLODViewContext;
-
-struct FRenderStats
-{
-	uint32 TotalPrimitives = 0;
-	uint32 VisiblePrimitives = 0;
-	uint32 DrawCalls = 0;
-	uint64 Triangles = 0;
-	uint32 LODCounts[4] = {};
-	uint64 LODTriangles[4] = {};
-
-	void Reset() { *this = FRenderStats(); }
-};
 
 enum class EWorldType : uint8
 {
@@ -63,8 +48,6 @@ public:
 
 	void ClearWorld();
 
-	void GatherRenderPackets(FRenderQueue& RenderArray, const FLODViewContext* LODView = nullptr, const FFrustumPlanes* Frustum = nullptr, FRenderer* Renderer = nullptr);
-
 	// Level
 	ULevel* GetPersistentLevel() const { return PersistentLevel; }
 	void SetPersistentLevel(ULevel* InLevel) { PersistentLevel = InLevel; }
@@ -89,8 +72,6 @@ public:
 
 	bool GetActiveCameraViewInfo(FViewInfo& Out, const FVector2& ViewSize) const;
 
-	const FRenderStats& GetRenderStats() const { return RenderStats; }
-
 	inline EWorldType GetWorldType() const { return WorldType; }
 	inline void SetWorldType(EWorldType InWorldType) { WorldType = InWorldType; }
 
@@ -98,19 +79,6 @@ public:
 
 protected:
 private:
-	struct alignas(64) FGatherChunk
-	{
-		TArray<FRenderPacket> Packets;              // 스태틱 묶음에 못 들어가는 것 (반투명 섹션, Renderer 없는 호출)
-		TArray<uint32> SlowPathIndices;
-		std::vector<FStaticDrawGroup> Groups;       // 불투명 스태틱 메시: (머티리얼, 메시, LOD)별 묶음. 항목만 매 프레임 비운다
-		uint32 LastGroup = 0;                       // 바로 전 물체가 들어간 묶음 (연속한 물체는 대개 같은 묶음)
-		uint32 StaticDrawCount = 0;
-		uint32 LODCounts[4] = {};
-		uint64 LODTriangles[4] = {};
-	};
-
-	TArray<FGatherChunk> GatherChunks;
-
 	// 등록된 Tick 함수만 실행한다. Actor보다 먼저 사라져도 남은 함수와의 연결을 스스로 끊는다.
 	FTickTaskManager TickTaskManager;
 
@@ -123,13 +91,6 @@ private:
 	TArray<ULevel*> Levels;
 
 	FScene Scene;
-
-	// GatherRenderPackets가 매 프레임 채우는 컬링 결과. 용량을 재사용한다.
-	TArray<FPrimitiveSceneProxy*> VisibleProxies;
-    TArray<FLODSelectionInput> LODInputs;
-    TArray<uint8> SelectedLODs;
-
-	FRenderStats RenderStats;
 
 	EWorldType WorldType = EWorldType::Editor;
 };

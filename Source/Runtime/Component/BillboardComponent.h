@@ -19,17 +19,12 @@ public:
 	virtual void BeginPlay() override;
 	virtual void TickComponent(float DeltaTime) override;
 
-	virtual bool LineTraceComponent(const FRay& WorldRay, FHitResult& OutHit) override;
-
 	virtual int32 GetNumMaterials() const override { return 1; }
 	virtual UMaterial* GetMaterial(int32 SlotIndex) const override { return SlotIndex == 0 ? Material : nullptr; }
 	virtual void SetMaterial(int32 SlotIndex, UMaterial* InMaterial) override { if (SlotIndex == 0) Material = InMaterial; }
 
 	virtual const FStaticMeshData* GetMeshData() const override { return QuadMesh ? &QuadMesh->GetMeshData() : nullptr; }
 
-	void GetWorldTransformedMatrix(FMatrix* OutWorldMatrix) const;
-	// 기본 카메라 기준 월드 행렬로 Billboard 렌더 패킷을 제출한다.
-	virtual void SubmitToRenderQueue(FRenderQueue& RenderQueue) override;
 	// View별 Adapter가 계산한 Billboard 행렬을 사용해 같은 렌더 패킷 형식으로 제출한다.
 	void SubmitToRenderQueue(FRenderQueue& RenderQueue, const FMatrix& BillboardWorldMatrix);
 	FMatrix GetBillboardMatrix(const FRenderView& RenderView) const;
