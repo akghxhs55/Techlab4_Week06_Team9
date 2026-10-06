@@ -11,7 +11,7 @@
 
 #include "RenderCommand.h"
 
-#include "Camera/CameraComponent.h"
+#include "Component/CameraComponent.h"
 #include "Component/PointLightComponent.h"
 #include "UObject/UObjectIterator.h"
 #include "Engine/World.h"
@@ -164,53 +164,6 @@ void FRenderer::RenderTranslucent(const FMatrix& ViewProjection)
 	DrawPackets(FirstTranslucentIndex, SortEntries.Num(), ViewProjection);
 	RenderPackets.Reset();
 	FirstTranslucentIndex = 0;
-	StaticGroups.clear();   // 묶음 메모리는 World 것이므로 이번 프레임이 끝나면 놓는다
-}
-
-// 스태틱 메시 묶음을 정렬 키 순서로 그린다. 바인딩은 묶음마다 한 번, 항목마다는 칸 바인딩과 드로우만 한다.
-void FRenderer::DrawStaticGroups()
-{
-	if (StaticGroups.empty())
-		return;
-
-	SCOPE_CYCLE_COUNTER(STAT_DrawRenderPackets);
-	RenderCommand::BindConstantBuffer(0, ViewCB.get(), EShaderBindFlagBits::Vertex);
-	if (PointLightCB)
-	{
-		RenderCommand::BindConstantBuffer(3, PointLightCB.get(), EShaderBindFlagBits::Pixel);
-	}
-
-	UMaterial* BoundMaterial = nullptr;
-	for (const FStaticDrawGroup* Group : StaticGroups)
-	{
-		RenderCommand::BindMesh(Group->Mesh, Group->LODIndex);
-		if (Group->Material != BoundMaterial)
-		{
-			BoundMaterial = Group->Material;
-			BindMaterial(BoundMaterial);
-			FRenderPacket MaterialOnly;           // 머티리얼 파라미터 갱신은 패킷을 받으므로 머티리얼만 채워 넘긴다
-			MaterialOnly.Material = BoundMaterial;
-			UpdateMaterialParams(MaterialOnly);
-		}
-
-		for (const FStaticDrawItem& Item : Group->Items)
-		{
-			if (bUsePerObjectSlots && Item.Slot != InvalidObjectSlot)
-			{
-				RenderCommand::BindConstantBufferRange(2, PerObjectSlotCB.get(), Item.Slot * PerObjectSlotConstants, PerObjectSlotConstants, EShaderBindFlagBits::Vertex);
-			}
-			else
-			{
-				RenderCommand::BindConstantBuffer(2, PerObjectCB.get(), EShaderBindFlagBits::Vertex);
-				UpdatePerObjectConstants(Item.Proxy->GetLocalToWorld());
-			}
-			RenderCommand::DrawIndexed(Item.IndexCount, Item.StartIndex);
-		}
-	}
-
-	// 뒤따르는 DrawPackets가 처음부터 다시 바인딩하도록 기록을 비운다.
-	LastMesh = nullptr;
-	LastMaterial = nullptr;
 }
 
 void FRenderer::RenderQueueSorting(FRenderQueue& InQueue, const FMatrix& ViewProjection)
