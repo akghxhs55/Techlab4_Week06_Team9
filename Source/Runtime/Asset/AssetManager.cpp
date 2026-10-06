@@ -353,7 +353,7 @@ void UAssetManager::CreateIconMaterials()
 
 	UMaterial* FogIconMat = FObjectFactory::ConstructObject<UMaterial>();
 	FogIconMat->Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/DefaultShader.hlsl");
-	FogIconMat->Textures.Add(GetAssetByPath<UTexture2D>("Assets/Icons/FogIcon.png"));
+	FogIconMat->Textures.Add(GetAssetByPath<UTexture2D>("Assets/Icons/S_ExpoHeightFog.png"));
 	FogIconMat->SamplerState = ESamplerState::NearestClamp;
 	RegisterAsset("FogIcon", FogIconMat);
 

@@ -92,6 +92,9 @@ void UWorld::DuplicateSubObjects()
 
 					for (UActorComponent* Component : Actor->GetComponents())
 					{
+						if (Component->IsEditorOnly())
+							continue;
+
 						if (UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Component))
 							Scene.AddPrimitive(Primitive);
 
