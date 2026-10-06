@@ -1,0 +1,165 @@
+{
+    "Actors": [
+        {
+            "Class": "AStaticMeshActor",
+            "Components": [
+                {
+                    "Class": "UStaticMeshComponent",
+                    "Name": "UStaticMeshComponent_0",
+                    "Properties": {
+                        "OverrideMaterials": [],
+                        "StaticMesh": "Cube",
+                        "Transform": {
+                            "Location": [
+                                9.735981941223145,
+                                -10.534355163574219,
+                                4.441062927246094
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                1.0,
+                                12.459693908691406,
+                                25.841997146606445
+                            ]
+                        },
+                        "bVisible": true
+                    }
+                }
+            ],
+            "Properties": null
+        },
+        {
+            "Class": "AStaticMeshActor",
+            "Components": [
+                {
+                    "Class": "UStaticMeshComponent",
+                    "Name": "UStaticMeshComponent_0",
+                    "Properties": {
+                        "OverrideMaterials": [],
+                        "StaticMesh": "Cube",
+                        "Transform": {
+                            "Location": [
+                                26.58694076538086,
+                                0.8230996131896973,
+                                4.182173728942871
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                1.9749999046325684,
+                                14.581703186035156,
+                                18.779083251953125
+                            ]
+                        },
+                        "bVisible": true
+                    }
+                }
+            ],
+            "Properties": null
+        },
+        {
+            "Class": "AStaticMeshActor",
+            "Components": [
+                {
+                    "Class": "UStaticMeshComponent",
+                    "Name": "UStaticMeshComponent_0",
+                    "Properties": {
+                        "OverrideMaterials": [],
+                        "StaticMesh": "Cube",
+                        "Transform": {
+                            "Location": [
+                                0.0,
+                                -19.7869873046875,
+                                0.0
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                206.65916442871094,
+                                5.812183380126953,
+                                37.49690246582031
+                            ]
+                        },
+                        "bVisible": true
+                    }
+                }
+            ],
+            "Properties": null
+        },
+        {
+            "Class": "AStaticMeshActor",
+            "Components": [
+                {
+                    "Class": "UStaticMeshComponent",
+                    "Name": "UStaticMeshComponent_0",
+                    "Properties": {
+                        "OverrideMaterials": [],
+                        "StaticMesh": "Cube",
+                        "Transform": {
+                            "Location": [
+                                -0.00067138671875,
+                                -9.548065185546875,
+                                -3.1842637062072754
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                358.5809631347656,
+                                34.77527618408203,
+                                11.789712905883789
+                            ]
+                        },
+                        "bVisible": true
+                    }
+                }
+            ],
+            "Properties": null
+        },
+        {
+            "Class": "AStaticMeshActor",
+            "Components": [
+                {
+                    "Class": "UStaticMeshComponent",
+                    "Name": "UStaticMeshComponent_0",
+                    "Properties": {
+                        "OverrideMaterials": [],
+                        "StaticMesh": "Cube",
+                        "Transform": {
+                            "Location": [
+                                0.0,
+                                8.650778770446777,
+                                0.0
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                102.40510559082031,
+                                1.0,
+                                24.152273178100586
+                            ]
+                        },
+                        "bVisible": true
+                    }
+                }
+            ],
+            "Properties": null
+        }
+    ],
+    "Version": 2
+}

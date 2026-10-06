@@ -1,4 +1,4 @@
-﻿#include "EnginePCH.h"
+#include "EnginePCH.h"
 #include "GPUOcclusion.h"
 
 #include "Render/Renderer.h"
@@ -378,15 +378,15 @@ namespace
 
 // 물체마다 판정 입력(AABB)을 채우고, 가림막 후보 점수(화면 크기)를 매긴다.
 // 점수 칸별로 개수와 화면 넓이 합을 조각마다 따로 모아 두면, 가림막 커트라인을 정렬 없이 잡을 수 있다.
-bool FGPUOcclusion::FillItems(const FPrimitiveSceneProxy* const* Proxies, uint32 Count, const FLODViewContext& View)
+bool FGPUOcclusion::FillItems(const FPrimitiveSceneProxy* const* Proxies, uint32 Count, const FLODViewContext& Context)
 {
 	ScoreBuckets.resize(Count);
 	OccluderLODs.resize(Count);
 
 	// 점수 → 화면에서 차지하는 비율. 타원 넓이 π·rx·ry를 NDC 화면 넓이 4로 나눈 것 (r² ≈ Extent²/3, 구에 가까운 물체 기준).
 	// ScaleX·ScaleY = (둘 중 큰 쪽)² × 짧은 변/긴 변
-	const float Aspect = static_cast<float>(std::min(View.Width, View.Height)) / static_cast<float>(std::max(View.Width, View.Height));
-	CoverageScale = 3.14159265f / 12.0f * View.ProjectionScaleSquared * Aspect;
+	const float Aspect = static_cast<float>(std::min(Context.View.ViewSize.X, Context.View.ViewSize.Y)) / static_cast<float>(std::max(Context.View.ViewSize.X, Context.View.ViewSize.Y));
+	CoverageScale = 3.14159265f / 12.0f * Context.ProjectionScaleSquared * Aspect;
 
 	FTaskPool& Pool = FTaskPool::Get();
 	const uint32 ChunkCount = std::clamp(Count / 1024u, 1u, Pool.GetNumThreads() * 4);
@@ -421,12 +421,12 @@ bool FGPUOcclusion::FillItems(const FPrimitiveSceneProxy* const* Proxies, uint32
 				uint8 Bucket = 0;
 				if (Proxy->IsVisible() && Proxy->GetMesh())
 				{
-					const FVector ToCenter = Bounds.Center - View.CameraPosition;
+					const FVector ToCenter = Bounds.Center - Context.View.CameraLocation;
 					const float Score = Bounds.Extent.Dot(Bounds.Extent) / std::max(ToCenter.Dot(ToCenter), 1e-4f);
 					Bucket = ToScoreBucket(Score);
 					++Counts[Bucket];
 					ScoreSums[Bucket] += Score;
-					OccluderLODs[i] = static_cast<uint8>(SelectLOD(*Proxy, View));   // 가림막이 되면 본 패스와 같은 LOD로 그린다
+					OccluderLODs[i] = static_cast<uint8>(SelectLOD(*Proxy, Context));   // 가림막이 되면 본 패스와 같은 LOD로 그린다
 				}
 				ScoreBuckets[i] = Bucket;
 			}
@@ -535,7 +535,7 @@ void FGPUOcclusion::DrawOccluders(const FPrimitiveSceneProxy* const* Proxies, co
 
 	SCOPE_CYCLE_COUNTER(STAT_GPUOcclusionDraw);
 
-	Context->UpdateSubresource(ViewCB.Get(), 0, nullptr, &View.ViewProjection, 0, 0);
+	Context->UpdateSubresource(ViewCB.Get(), 0, nullptr, &View.View.ViewProjection, 0, 0);
 
 	Context->OMSetRenderTargets(0, nullptr, OccluderDSV.Get());   // 색 없이 깊이만
 	const D3D11_VIEWPORT Viewport{ 0.0f, 0.0f, static_cast<float>(TargetWidth), static_cast<float>(TargetHeight), 0.0f, 1.0f };
@@ -659,9 +659,9 @@ bool FGPUOcclusion::Run(const FPrimitiveSceneProxy* const* Proxies, uint32 Count
 
 	Stats.Tested = Count;
 	Stats.Occluded = 0;
-	if (!Settings.bEnabled || Count == 0 || View.Width == 0 || View.Height == 0 || !CullCS || !BuildHiZCS)
+	if (!Settings.bEnabled || Count == 0 || View.View.ViewSize.X == 0.0f || View.View.ViewSize.Y == 0.0f || !CullCS || !BuildHiZCS)
 		return false;
-	if (!EnsureTargets(View.Width, View.Height) || !EnsureItemCapacity(Count))
+	if (!EnsureTargets(static_cast<uint32>(View.View.ViewSize.X), static_cast<uint32>(View.View.ViewSize.Y)) || !EnsureItemCapacity(Count))
 		return false;
 
 	ID3D11DeviceContext* Context = RenderCommand::GetContext();
@@ -682,7 +682,7 @@ bool FGPUOcclusion::Run(const FPrimitiveSceneProxy* const* Proxies, uint32 Count
 		{
 			DrawOccluders(Proxies, View);
 			BuildHiZ();
-			Cull(View.ViewProjection, Count);
+			Cull(View.View.ViewProjection, Count);
 		}
 	}
 

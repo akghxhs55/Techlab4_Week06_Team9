@@ -148,3 +148,9 @@ void FScene::MarkRenderStateDirty(FPrimitiveSceneProxy* Proxy)
 	Proxy->bRenderStateQueued = true;
 	RenderStateDirtyProxies.Add(Proxy);
 }
+
+void FScene::AddFog(UExpHeightFogComponent* Fog) {
+	if (not Fog) return;
+
+	ExpHeightFogs.Add(Fog);
+}

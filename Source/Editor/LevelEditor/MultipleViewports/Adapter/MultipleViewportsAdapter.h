@@ -72,18 +72,6 @@ public:
     const FPickHit& GetLastPick() const { return LastPick; }
     // 지정 View의 로컬 화면 Rect를 반환한다.
     const FRect& GetViewRect(int32 ViewIndex) const;
-    // Native View·Projection을 row-vector 순서로 합성한 엔진 행렬을 반환한다.
-    FMatrix GetEngineViewProjection(int32 ViewIndex) const;
-	// 지정 View의 엔진 Projection 행렬을 반환한다.
-	FMatrix GetEngineProjectionMatrix(int32 ViewIndex) const;
-    // 지정 View 카메라 위치를 엔진 FVector 그대로 반환한다.
-    FVector GetEngineCameraLocation(int32 ViewIndex) const;
-    // 지정 View의 카메라 Forward를 엔진 FVector로 계산해 반환한다.
-    FVector GetEngineCameraForward(int32 ViewIndex) const;
-    // Core Billboard 계산 결과를 엔진 월드 행렬로 변환한다.
-    FMatrix BuildEngineBillboardMatrix(int32 ViewIndex, const FVector& WorldPosition, float Width, float Height) const;
-    // 지정 View가 직교 투영인지 반환한다.
-    bool IsOrthographic(int32 ViewIndex) const;
     // 활성 View의 로컬 마우스 좌표를 Core로 역투영해 엔진 Ray로 반환한다.
     bool TryGetActiveViewRay(FVector2 LocalMousePosition, FRay& OutRay) const;
     // 지정 View의 절두체를 통과한 오브젝트 수를 반환한다.
@@ -108,20 +96,11 @@ public:
     void SetViewWorld(int32 ViewIndex, UWorld& World);
 	UWorld* GetViewWorld(int32 ViewIndex) const;
 
+    FRenderView GetRenderView(int32 ViewIndex) const;
+
 private:
-    // 직교 View의 논리 위치는 유지하고 렌더·컬링·피킹용 깊이 범위만 확장한다.
-    FViewCamera GetRenderCamera(int32 ViewIndex) const;
-    // 현재 호출에서 계산한 행렬·절두체를 보관한다.
-    struct PreparedView
-    {
-        FFrustumPlanes Frustum{};
-		FMatrix Projection{};
-		FMatrix View{};
-        FMatrix EngineViewProjection{};
-    };
-    // 호출할 때마다 현재 카메라로 VP와 절두체를 계산한다.
-    const PreparedView& PrepareView(int32 ViewIndex) const;
-    mutable PreparedView PreparedViews[4]{};
+    FViewInfo MakeViewInfo(int32 ViewIndex) const;
+
     static constexpr float MinimumSplitRatio = 0.1f;
 
     FViewSet Views{};

@@ -7,8 +7,6 @@ workspace "Hitori"
 		"Debug",
 		"Release",
 		"ObjViewer",
-		"Benchmark",
-		"Benchmark_Debug",
 	}
 
 	multiprocessorcompile "On"
@@ -68,24 +66,6 @@ function CommonSettings()
 		optimize "on"
 		symbols  "on"
 
-	filter "configurations:Benchmark_Debug"
-		defines  { "ENGINE_DEBUG", "_DEBUG", "BENCHMARK" }
-		runtime  "Debug"
-		symbols  "on"
-
-	filter "configurations:Benchmark"
-		defines  { "ENGINE_RELEASE", "NDEBUG", "BENCHMARK" }
-		runtime  "Release"
-		optimize "speed"
-		linktimeoptimization "on"    -- /GL + /LTCG (배포 시 백신 오탐이 문제되면 끌 것)
-		vectorextensions "AVX2"
-		buffersecuritycheck "Off"    -- /GS-
-		buildoptions { "/Gw" }
-		-- /fp:fast는 피킹 결과가 달라질 수 있어 쓰지 않는다
-		symbols  "on"
-
-
-
 	filter {}
 end
 
@@ -120,7 +100,6 @@ project "ImGui"
 	}
 
 
--- 런타임. 에디터를 모른다. include 경로에 Source/Editor가 없는 것이 그 방벽이다.
 -- location이 소스 루트와 같아야 "모든 파일 표시"에서 폴더가 보인다.
 project "HitoriEngine"
 	location "Source/Runtime"
@@ -140,6 +119,8 @@ project "HitoriEngine"
 	includedirs
 	{
 		"Source/Runtime",
+		"Source",
+		"%{IncludeDir.ImGui}",
 		"%{IncludeDir.stb}",
 		"%{IncludeDir.json}",
 	}
@@ -194,11 +175,5 @@ project "HitoriEditor"
 
 	filter "configurations:ObjViewer"
 		targetname "ObjViewer"
-
-	filter "configurations:Benchmark"
-		targetname "Benchmark"
-
-	filter "configurations:Benchmark_Debug"
-		targetname "Benchmark_Debug"
 
 	filter {}

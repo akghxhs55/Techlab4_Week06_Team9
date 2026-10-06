@@ -1,9 +1,7 @@
 #include "EnginePCH.h"
 #include "Editor/Settings/SettingsPanel.h"
-#include "Editor/LevelEditor/MultipleViewports/Adapter/MultipleViewportsAdapter.h"
-#include "Camera/CameraActor.h"
-#include "Camera/CameraComponent.h"
 
+#include "Editor/LevelEditor/MultipleViewports/Adapter/MultipleViewportsAdapter.h"
 #include "Engine/World.h"
 
 // 종료 시 렌더·에디터·뷰포트 설정을 함께 저장한다.
@@ -60,15 +58,11 @@ void FSettingsPanel::OnRender()
 	ImGui::Dummy(ImVec2(0.0f, SectionGap));
 	ImGui::SeparatorText("Editor Settings");
 
-	UCameraComponent* CamCom = World->GetMainCamera()->GetCameraComponent();
-
 	ImGui::SetNextItemWidth(200.0f);
 	ImGui::SliderFloat("Camera Rotate Sensitivity", &Settings.MouseSensitivity, 0.01f, 1.0f, "%.2f");
-	CamCom->SetMouseSensitivity(Settings.MouseSensitivity);
 
 	ImGui::SetNextItemWidth(200.0f);
 	ImGui::SliderFloat("Camera Speed", &Settings.CameraSpeed, 0.1f, 10.0f, "%.2f");
-	CamCom->SetMoveSpeed(Settings.CameraSpeed);
 
 	//////////////////////////////////////////////////////////
 

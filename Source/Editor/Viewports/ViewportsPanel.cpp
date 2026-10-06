@@ -158,9 +158,18 @@ bool FViewportsPanel::ConsumePIERequest(int32& OutViewIndex, EPIECommand& OutCom
 	return true;
 }
 
-FTexture2D* FViewportsPanel::GetViewRenderTarget(int32 ViewIndex) const {
-	return Slots[ViewIndex].RenderTarget.get();
+FTexture2D* FViewportsPanel::GetViewRenderTarget1(int32 ViewIndex) const {
+	return Slots[ViewIndex].RenderTarget1.get();
 }
+
+FTexture2D* FViewportsPanel::GetViewRenderTarget2(int32 ViewIndex) const {
+	return Slots[ViewIndex].RenderTarget2.get();
+}
+
+FTexture2D* FViewportsPanel::GetFinalRenderTarget(int32 ViewIndex) const {
+	return Slots[ViewIndex].FinalRenderTarget.get();
+}
+
 
 // View Texture와 Splitter·Layout·Preset UI를 그리고 요청을 기록한다.
 void FViewportsPanel::OnRender()
@@ -236,7 +245,7 @@ void FViewportsPanel::OnRender()
 
 		const ImVec2 ViewMin{ ContentOrigin.x + Slot.Rect.X, ContentOrigin.y + Slot.Rect.Y };
 		const ImVec2 ViewMax{ ViewMin.x + Slot.Rect.Width, ViewMin.y + Slot.Rect.Height };
-		DrawList->AddImage(Slot.RenderTarget->GetSRV(), ViewMin, ViewMax);
+		DrawList->AddImage(Slot.FinalRenderTarget->GetSRV(), ViewMin, ViewMax);
 	}
 	DrawList->PopClipRect();
 
@@ -520,7 +529,9 @@ void FViewportsPanel::ResizeSlot(FViewSlot& Slot, const uint32 Width, const uint
 	Desc.Usage = D3D11_USAGE_DEFAULT;
 	Desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS;
 	Slot.ColorTarget = RenderCommand::CreateTexture2D(Desc);
-	Slot.RenderTarget = RenderCommand::CreateTexture2D(Desc);
+	Slot.RenderTarget1 = RenderCommand::CreateTexture2D(Desc);
+	Slot.RenderTarget2 = RenderCommand::CreateTexture2D(Desc);
+	Slot.FinalRenderTarget = RenderCommand::CreateTexture2D(Desc);
 
 	Desc.Format = DXGI_FORMAT_R24G8_TYPELESS;
 	Desc.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;

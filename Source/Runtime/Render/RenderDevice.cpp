@@ -1,4 +1,4 @@
-#include "EnginePCH.h"
+﻿#include "EnginePCH.h"
 #include "RenderDevice.h"
 
 #include "Buffer.h"
@@ -324,5 +324,11 @@ void FRenderDevice::CreateStates()
 		Desc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
 		Desc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
 		Device->CreateSamplerState(&Desc, SamplerStates[(uint8)ESamplerState::LinearWrap].GetAddressOf());
+
+		Desc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
+		Desc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+		Desc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+		Desc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+		Device->CreateSamplerState(&Desc, SamplerStates[(uint8)ESamplerState::NearestClamp].GetAddressOf());
 	}
 }

@@ -1,6 +1,7 @@
 // 다중 뷰포트의 레이아웃·카메라·가시성 계산을 제공한다.
 #pragma once
 
+#include "Camera/ViewCamera.h"
 #include "Core/Types.h"
 #include "Container/Array.h"
 #include "Container/Map.h"
@@ -28,32 +29,7 @@ inline constexpr int32 InvalidViewIndex = -1;
 // 화면상의 좌상단 위치와 너비·높이를 담는다.
 struct FRect { float X, Y, Width, Height; };
 
-enum class EProjectionMode { Perspective, Orthographic };
 enum class ELayoutMode { Single, QuadSplit };
-
-// 카메라의 월드 위치와 회전을 담는다.
-struct FCameraTransform
-{
-    FVector Location;
-    FQuat Rotation{0.0f, 0.0f, 0.0f, 0.0f};
-};
-
-// 원근·직교 투영에 필요한 모드와 절두체 값을 담는다.
-struct FCameraProjection
-{
-    EProjectionMode Mode;
-    float FovDegrees;
-    float OrthoWidth;
-    float NearClip;
-    float FarClip;
-};
-
-// 한 View에서 사용하는 카메라 Transform과 투영 설정을 담는다.
-struct FViewCamera
-{
-    FCameraTransform Transform;
-    FCameraProjection Projection;
-};
 
 // 레이아웃 모드와 최대 네 View의 카메라 상태를 담는다.
 struct FViewSet
@@ -64,23 +40,6 @@ struct FViewSet
 
 // 월드 공간 광선의 시작점과 정규화 방향을 담는다.
 // 위 엔진 헤더의 동일 값 타입을 직접 사용한다(중복 정의 없음).
-
-// 한 프레임의 카메라 회전·이동·줌 입력을 담는다.
-struct FCameraMoveInput
-{
-    FVector2 MouseDelta;
-    FVector MoveAxis;
-    float ZoomDelta;
-};
-
-// 카메라의 월드 축을 직교기저로 변환해 View 행렬을 만든다.
-FMatrix BuildViewMatrix(const FCameraTransform& Transform);
-// 투영 모드에 따라 원근 또는 직교 Projection 행렬을 만든다.
-FMatrix BuildProjectionMatrix(const FCameraProjection& Projection, float AspectRatio);
-// 화면 좌표를 카메라 기저와 투영값으로 역투영해 월드 Ray를 만든다.
-FRay Deproject(const FViewCamera& Camera, FVector2 ScreenPos, FVector2 ViewportSize);
-// 로컬 이동과 Yaw·Pitch 입력을 현재 카메라에 적분한다.
-FViewCamera ApplyCameraMovement(const FViewCamera& Current, const FCameraMoveInput& Input, float DeltaTime);
 
 // Rect의 너비와 높이가 모두 양수인지 검사한다.
 bool IsViewRectValid(const FRect& Rect);
@@ -159,19 +118,6 @@ FPickHit PickNarrowPhase(const FRay& WorldRay, const TArray<ObjectId>& Candidate
 // AABB Broad Phase 뒤 삼각형 Narrow Phase를 수행해 가장 가까운 대상을 고른다.
 FPickHit Pick(const FRay& WorldRay, const TArray<FPickableObject>& Objects, const TMap<ObjectId, TArray<FTriangle>>& TrianglesById);
 
-// Billboard의 월드 위치와 화면에 보일 너비·높이를 담는다.
-struct FBillboardComputeInput
-{
-    FVector WorldPosition;
-    FVector2 Size;
-};
-
-// 카메라를 향하도록 계산된 Billboard 월드 행렬을 담는다.
-struct FBillboardTransform
-{
-    FMatrix WorldMatrix{0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};
-};
-
 // 파티클 식별자와 정렬 기준이 되는 월드 위치를 담는다.
 struct FParticleSortInput
 {
@@ -179,7 +125,5 @@ struct FParticleSortInput
     FVector WorldPosition;
 };
 
-// 카메라 기저로 Billboard의 Right·Up·Forward 축을 만들어 월드 행렬을 계산한다.
-FBillboardTransform ComputeBillboardTransform(const FBillboardComputeInput& Input, const FCameraTransform& ViewCamera);
 // 카메라와의 거리 제곱을 기준으로 파티클 ID를 먼 순서부터 안정 정렬한다.
 void SortParticlesByCameraDistance(const TArray<FParticleSortInput>& Particles, const FVector& CameraLocation, TArray<ObjectId>& OutSortedBackToFront);

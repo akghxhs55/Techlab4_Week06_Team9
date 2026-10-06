@@ -9,6 +9,7 @@
 #include "Asset/AssetManager.h"
 #include "Component/SphereGlowComponent.h"
 #include "Component/SpotLightComponent.h"
+#include "Component/UExpHeightFogComponent.h"
 #include "Component/PointLightComponent.h"
 #include "Render/Material.h"
 #include "Render/Texture2D.h"
@@ -474,7 +475,8 @@ namespace
 					ImGui::TableSetColumnIndex(1);
 					ImGui::SetNextItemWidth(-1.0f);
 
-					const char* SamplerItems[] = { "Linear Clamp", "Linear Wrap" };
+
+					const char* SamplerItems[] = { "Linear Clamp", "Linear Wrap", "Nearest Clamp" };
 					int SamplerIndex = Effective ? static_cast<int>(Effective->SamplerState) : static_cast<int>(ESamplerState::LinearClamp);
 					if (ImGui::BeginCombo("##SamplerState", SamplerItems[SamplerIndex]))
 					{
@@ -676,6 +678,10 @@ namespace
 			{
 				continue;
 			}
+			if (Class == UObject::StaticClass())
+			{
+				continue; // UObject의 프로퍼티는 표시하지 않음
+			}
 
 			ImGui::PushID(Class->Name.c_str());
 			if (ImGui::CollapsingHeader(Class->Name.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
@@ -762,15 +768,24 @@ void FDetailsPanel::DrawComponentSection(AActor* Actor)
 			UBillboardComponent::StaticClass(),
 			USpotLightComponent::StaticClass(),
 			UPointLightComponent::StaticClass(),
-			USphereGlowComponent::StaticClass()
+			USphereGlowComponent::StaticClass(),
+			UExpHeightFogComponent::StaticClass(),
 		};
 		for (UClass* Type : AddableComponentTypes)
 		{
 			const FString Label = Type->Name;
 			if (ImGui::MenuItem(Type->Name.c_str()))
 			{
-				UActorComponent* AddedComponent = Actor->AddComponentByClass(Type);
-				SetTarget(Cast<USceneComponent>(AddedComponent)); // TODO: ActorComponent도 선택 가능해야 함
+				if (Type->IsChildOf(USceneComponent::StaticClass()))
+				{
+					USceneComponent* AddedComponent = CastChecked<USceneComponent>(Actor->AddComponentByClass(Type, false));
+					AddedComponent->SetupAttachment(Target);
+					SetTarget(AddedComponent);
+				}
+				else
+				{
+					Actor->AddComponentByClass(Type);
+				}
 			}
 		}
 

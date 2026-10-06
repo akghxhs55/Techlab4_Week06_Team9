@@ -3,9 +3,6 @@
 #include "Asset/AssetManager.h"
 #include "Render/RenderCommand.h"
 
-#include "Camera/CameraActor.h"
-#include "Camera/CameraComponent.h"
-
 #include "BillboardComponent.h"
 
 #include "Engine/World.h"
@@ -111,83 +108,6 @@ void UParticleSubUVComponent::TickComponent(float DeltaTime)
 			++Particle.SubUVFrame;
 			Particle.SubUVFrame %= TotalFrames;
 		}
-	}
-}
-
-// 기본 카메라 기준으로 파티클 상수와 렌더 패킷을 구성한다.
-void UParticleSubUVComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue)
-{
-	assert(QuadMesh != nullptr);
-	assert(Material != nullptr);
-	
-	Constants.Reset();
-	Constants.Reserve(Particles.Num());
-
-	const FVector CameraPos = GetOwner()->GetWorld()->GetMainCamera()->GetCameraComponent()->GetWorldLocation();
-	for (FParticle& Particle : Particles)
-	{
-		if (Particle.bAlive == false)
-		{
-			continue;
-		}
-
-
-		FMatrix WorldMatrix = FMatrix::Identity; 
-		Super::GetWorldTransformedMatrix(&WorldMatrix);
-
-		// Scale, Move
-		WorldMatrix.M[0][0] *= Particle.Scale;
-		WorldMatrix.M[0][1] *= Particle.Scale;
-		WorldMatrix.M[0][2] *= Particle.Scale;
-		WorldMatrix.M[0][3] *= Particle.Scale;
-
-		WorldMatrix.M[1][0] *= Particle.Scale;
-		WorldMatrix.M[1][1] *= Particle.Scale;
-		WorldMatrix.M[1][2] *= Particle.Scale;
-		WorldMatrix.M[1][3] *= Particle.Scale;
-
-		WorldMatrix.M[2][0] *= Particle.Scale;
-		WorldMatrix.M[2][1] *= Particle.Scale;
-		WorldMatrix.M[2][2] *= Particle.Scale;
-		WorldMatrix.M[2][3] *= Particle.Scale;
-
-		WorldMatrix.M[3][0] = Particle.Location.X;
-		WorldMatrix.M[3][1] = Particle.Location.Y;
-		WorldMatrix.M[3][2] = Particle.Location.Z;
-		WorldMatrix.M[3][3] = 1.0f;
-
-		const FVector ParticlePos = Particle.Location;
-		const FVector CameraToParticleVec = ParticlePos - CameraPos;
-
-		const float CameraToParticleDistance = 
-			CameraToParticleVec.X *
-			CameraToParticleVec.X +
-
-			CameraToParticleVec.Y *
-			CameraToParticleVec.Y +
-
-			CameraToParticleVec.Z *
-			CameraToParticleVec.Z;
-
-		FRenderPacket Packet;
-		Packet.Model = RenderQueue.StoreWorldMatrix(WorldMatrix);
-		Packet.Mesh = QuadMesh;
-		Packet.Material = Material;
-
-		FSubUVConstants C;
-		C.CurrentFrame =  Particle.SubUVFrame;
-		C.AtlasColSize = ColSize;
-		C.AtlasRowSize = RowSize;
-		C.Alpha = Particle.Alpha;
-
-		Constants.Add(C);
-
-		Packet.MaterialParamData = &Constants.Last();
-		Packet.MaterialParamDataSize = sizeof(FSubUVConstants);
-
-		Packet.CameraToParticleDistance = CameraToParticleDistance;
-
-		RenderQueue.Add(Packet);
 	}
 }
 

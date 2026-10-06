@@ -17,8 +17,8 @@
 
 #include "Render/Renderer.h"
 
-#include "Camera/CameraActor.h"
-#include "Camera/CameraComponent.h"
+#include "GameFramework/Actor/CameraActor.h"
+#include "Component/CameraComponent.h"
 #include "GameFramework/Actor/LightActor.h"
 #include "Component/PointLightComponent.h"
 
@@ -136,7 +136,7 @@ bool UEditorEngine::Init()
 	TextRenderer = MakeUnique<FTextRenderer>();
 	TextRenderer->Init();
 
-	ScreenQuadRenderer = MakeUnique<FScreenQuadRenderer>();
+	ScreenQuadRenderer = MakeUnique<FPostProcessor>();
 	ScreenQuadRenderer->Init();
 
 	// TODO: Iterate WorldContext to set each world
@@ -156,7 +156,6 @@ bool UEditorEngine::Init()
 		SettingsPanel->GetSettings().bMultipleViewportsSingle
 		? ELayoutMode::Single
 		: ELayoutMode::QuadSplit);
-	World->GetMainCamera()->GetCameraComponent()->SetExternalInputManaged(true);
 
 	/// 삭제 예정
 	//SceneManager = EditorUI->AddEditorPanel<FSceneManager>();
@@ -345,30 +344,27 @@ void UEditorEngine::RenderMultipleViewports()
 			MultipleViewportsAdapter.BuildRenderQueue(ViewIndex, RenderQueue);
 		}
 
+		const FRenderView RenderView = MultipleViewportsAdapter.GetRenderView(ViewIndex);
+
 		RenderFrame(
 			ViewIndex,
 			ViewportsPanel->GetRenderingInfo(ViewIndex),
-			MultipleViewportsAdapter.GetEngineViewProjection(ViewIndex),
-			MultipleViewportsAdapter.GetEngineCameraLocation(ViewIndex),
-			MultipleViewportsAdapter.GetEngineCameraForward(ViewIndex),
+			RenderView,
 			RenderQueue);
-
-
-		// 지금까지 그린 결과를 Screen Quad 로 그리는 과정 추가... 
-		// 1. 현재 RT 는 어디에 -> Renderer 에 있다. 
-		// 1-1. Renderer 에 Screen Quad 를 그려야 하나?	
-		// RT 를 BackBuffer 에 그리는 것이 아니라, 화면 크기와 동일한 Texture 에 그리고, 모든 렌더링이 끝난 이후에 Screen Quad 를 그려서 BackBuffer 에 그린다.
-
-
+		
+		// 원근일 때에, FScene 에 안개가 있다면 그린다.
+		// 그런데 어느 월드에 있는 FScene 에서 가져오지? 
+		// -> ViewIndex == PIEViewIndex 라면 PIE World에서, 아니라면, Editor World 에서 가져온다. 
+		
 		auto& info = ViewportsPanel->GetRenderingInfo(ViewIndex);
-		ScreenQuadRenderer->Render(ViewportsPanel->GetViewRenderTarget(ViewIndex), info, MultipleViewportsAdapter.GetEngineProjectionMatrix(ViewIndex));
-
+		FWorldContext* WorldContext = PIEViewIndex == ViewIndex ? PIEWorldContextRef : EditorWorldContextRef;
+		ScreenQuadRenderer->Render(ViewIndex, ViewportsPanel, &MultipleViewportsAdapter, WorldContext);
+		
+	
 		RenderOverlay(
 			ViewIndex,
 			ViewportsPanel->GetRenderingInfo(ViewIndex),
-			MultipleViewportsAdapter.GetEngineViewProjection(ViewIndex),
-			MultipleViewportsAdapter.GetEngineCameraLocation(ViewIndex),
-			MultipleViewportsAdapter.GetEngineCameraForward(ViewIndex),
+			RenderView,
 			RenderQueue);
 	}
 
@@ -420,11 +416,13 @@ void UEditorEngine::UpdateGizmoAndPicking()
 	if (!MultipleViewportsAdapter.TryGetActiveViewRay(LocalMousePosition, Ray))
 		return;
 
+	const FRenderView RenderView = MultipleViewportsAdapter.GetRenderView(ViewIndex);
+
 	const FRect& Rect = MultipleViewportsAdapter.GetViewRect(ViewIndex);
 	const FVector2 ViewLocalMouse(
 		LocalMousePosition.X - Rect.X,
 		LocalMousePosition.Y - Rect.Y);
-	const FMatrix ViewProjection = MultipleViewportsAdapter.GetEngineViewProjection(ViewIndex);
+	const FMatrix ViewProjection = RenderView.ViewProjection;
 	bool bMouseDown = FInputSystem::IsMouseDown(EMouseButton::Left);
 
 	Gizmo->Update(
@@ -434,8 +432,8 @@ void UEditorEngine::UpdateGizmoAndPicking()
 		static_cast<int>(Rect.Width),
 		static_cast<int>(Rect.Height),
 		bMouseDown,
-		MultipleViewportsAdapter.GetEngineCameraLocation(ViewIndex),
-		MultipleViewportsAdapter.IsOrthographic(ViewIndex));
+		RenderView.CameraLocation,
+		RenderView.bIsOrthogonal);
 
 	if (FInputSystem::IsMousePressed(EMouseButton::Left) && !Gizmo->IsUsing() && Gizmo->GetHoveredAxis() < 0)
 	{
@@ -446,7 +444,7 @@ void UEditorEngine::UpdateGizmoAndPicking()
 }
 
 // View 행렬로 Scene·Grid·Gizmo·텍스트·Outline을 렌더한다.
-void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& ViewRenderingInfo, const FMatrix& ViewProjection, const FVector& ViewCameraLocation, const FVector& ViewCameraForward, FRenderQueue& RenderQueue)
+void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& ViewRenderingInfo, const FRenderView& RenderView, FRenderQueue& RenderQueue)
 {
 	RenderCommand::BeginRenderPass(ViewRenderingInfo);
 
@@ -486,7 +484,7 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 			}
 		}
 
-		LineBatcher->OnRender(ViewProjection);
+		LineBatcher->OnRender(RenderView.ViewProjection);
 
 	}
 
@@ -496,9 +494,9 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		? ERasterizerState::Wireframe : ERasterizerState::SolidBack;
 
 	// 렌더 루프 — 반드시 RenderAll보다 먼저
-	if (!MultipleViewportsAdapter.IsOrthographic(ViewIndex))
+	if (!RenderView.bIsOrthogonal)
 	{
-		SkyboxRenderer->OnRender(ViewProjection, ViewCameraLocation);
+		SkyboxRenderer->OnRender(RenderView.ViewProjection, RenderView.CameraLocation);
 	}
 
 
@@ -511,8 +509,8 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		RenderCommand::SetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		Renderer->UpdatePointLights(CurrentWorld);
 		// 반투명은 Grid 뒤에 합성되어야 하므로 불투명만 먼저 그린다.
-		Renderer->RenderQueueSorting(RenderQueue, ViewProjection);
-		Renderer->RenderOpaque(ViewProjection);
+		Renderer->RenderQueueSorting(RenderQueue, RenderView.ViewProjection);
+		Renderer->RenderOpaque(RenderView.ViewProjection);
 		// 장면 Wireframe이 Grid·Gizmo·UI로 전파되지 않도록 복원한다.
 		RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
 	}
@@ -522,7 +520,7 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		// Grid 파이프라인이 바꾼 상태를 장면 기준으로 되돌린 뒤 반투명을 먼 것부터 그린다.
 		RenderCommand::SetRasterizerState(SceneRasterizerState);
 		RenderCommand::SetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		Renderer->RenderTranslucent(ViewProjection);
+		Renderer->RenderTranslucent(RenderView.ViewProjection);
 		RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
 	}
 
@@ -544,11 +542,54 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 			TextComponent->GetWorldMatrix(),
 			TextComponent->GetTextSize(),
 			*TextComponent->GetFont(),
-			ViewProjection
+			RenderView.ViewProjection
 		);
 	}
 
-	if (SettingsPanel->GetSettings().bShowUUID)
+	
+
+
+	RenderCommand::EndRenderPass(ViewRenderingInfo);
+}
+
+void UEditorEngine::RenderOverlay(int32 ViewIndex, const FRenderingInfo& ViewRenderingInfo, const FRenderView& RenderView, FRenderQueue& RenderQueue)
+{
+	UWorld* CurrentWorld = MultipleViewportsAdapter.GetViewWorld(ViewIndex);
+	assert(CurrentWorld);
+	bool bIsPIEWorld = CurrentWorld->GetWorldType() == EWorldType::PIE;
+
+	// 직교일 때애는 무조건 그리고, 직교가 아니라면, 깊이 렌더링이 아닐 때 그린다. 
+	if (RenderView.bIsOrthogonal or ViewRenderingInfo.RenderBufferType != ERenderBuffer::Depth) {
+
+
+		if (SettingsPanel->GetSettings().bDrawBatchLine)
+		{
+			const EGridPlane GridPlane = MultipleViewportsAdapter.GetGridPlane(ViewIndex);
+
+			if (SettingsPanel->GetSettings().bDrawPSGrid && !RenderView.bIsOrthogonal)
+			{
+				GridRenderer->OnRenderPSGrid(
+					RenderView.ViewProjection, RenderView.CameraLocation, SettingsPanel->GetSettings(), ViewRenderingInfo.ViewportSetting
+				);
+			}
+			else
+			{
+				GridRenderer->OnRenderBatchGrid(
+					RenderView.ViewProjection,
+					RenderView.CameraLocation,
+					RenderView.CameraForward,
+					GridPlane,
+					static_cast<float>(SettingsPanel->GetSettings().GridSpacing),
+					!RenderView.bIsOrthogonal ||
+					MultipleViewportsAdapter.GetCameraPreset(ViewIndex) == EMultipleViewportsCameraPreset::OrthographicView,
+					ViewRenderingInfo.ViewportSetting
+				);
+			}
+		}
+	}
+
+
+	if (SettingsPanel->GetSettings().bShowUUID and not bIsPIEWorld)
 	{
 
 		for (AActor* Actor : CurrentWorld->GetPersistentLevel()->GetActors())
@@ -579,71 +620,28 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 				*SystemFont
 			);
 
-			const FMatrix BillboardWorld = MultipleViewportsAdapter.BuildEngineBillboardMatrix(ViewIndex, UUIDLocation, 1.0f, 1.0f);
-			TextRenderer->OnRender(Text, BillboardWorld, 0.5f, *SystemFont, ViewProjection);
+			auto view = MultipleViewportsAdapter.GetRenderView(ViewIndex);
+			const FMatrix BillboardWorld = view.BuildBillboardMatrix(UUIDLocation, 1.0f, 1.0f);
+			TextRenderer->OnRender(Text, BillboardWorld, 0.5f, *SystemFont, view.ViewProjection);
 
 		}
 	}
 
-
-
-	RenderCommand::EndRenderPass(ViewRenderingInfo);
-}
-
-void UEditorEngine::RenderOverlay(int32 ViewIndex, const FRenderingInfo& ViewRenderingInfo, const FMatrix& ViewProjection, const FVector& ViewCameraLocation, const FVector& ViewCameraForward, FRenderQueue& RenderQueue) {
-
-	UWorld* CurrentWorld = MultipleViewportsAdapter.GetViewWorld(ViewIndex);
-	assert(CurrentWorld);
-	bool bIsPIEWorld = CurrentWorld->GetWorldType() == EWorldType::PIE;
-
-	// 직교일 때애는 무조건 그리고, 직교가 아니라면, 깊이 렌더링이 아닐 때 그린다. 
-	if (MultipleViewportsAdapter.IsOrthographic(ViewIndex) or ViewRenderingInfo.RenderBufferType != ERenderBuffer::Depth) {
-
-
-		if (SettingsPanel->GetSettings().bDrawBatchLine)
-		{
-			const EGridPlane GridPlane = MultipleViewportsAdapter.GetGridPlane(ViewIndex);
-
-			if (SettingsPanel->GetSettings().bDrawPSGrid && !MultipleViewportsAdapter.IsOrthographic(ViewIndex))
-			{
-				GridRenderer->OnRenderPSGrid(
-					ViewProjection, ViewCameraLocation, SettingsPanel->GetSettings(), ViewRenderingInfo.ViewportSetting
-				);
-			}
-			else
-			{
-				GridRenderer->OnRenderBatchGrid(
-					ViewProjection,
-					ViewCameraLocation,
-					ViewCameraForward,
-					GridPlane,
-					static_cast<float>(SettingsPanel->GetSettings().GridSpacing),
-					!MultipleViewportsAdapter.IsOrthographic(ViewIndex) ||
-					MultipleViewportsAdapter.GetCameraPreset(ViewIndex) == EMultipleViewportsCameraPreset::OrthographicView,
-					ViewRenderingInfo.ViewportSetting
-				);
-			}
-		}
-	}
 
 	if (Outline->GetTarget() && !bIsPIEWorld 
 		&& Outline->GetTarget()->GetOwner()->GetWorld() == CurrentWorld)
 	{
-		OutlineRenderer->OnRender(*Outline, ViewProjection, ViewRenderingInfo.ViewportSetting);
+		OutlineRenderer->OnRender(*Outline, RenderView.ViewProjection, ViewRenderingInfo.ViewportSetting);
 	}
 
 	if (Gizmo->GetTarget() && !bIsPIEWorld 
 		&& Gizmo->GetTarget()->GetOwner()->GetWorld() == CurrentWorld)
 	{
-		auto Target = Cast<UPrimitiveComponent>(Gizmo->GetTarget());
-
-		FBox box = Target->CalcBounds();
-
 		GizmoRenderer->OnRender(
 			*Gizmo,
-			ViewProjection,
-			ViewCameraLocation,
-			MultipleViewportsAdapter.IsOrthographic(ViewIndex));
+			RenderView.ViewProjection,
+			RenderView.CameraLocation,
+			RenderView.bIsOrthogonal);
 	}
 }
 

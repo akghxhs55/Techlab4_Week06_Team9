@@ -46,9 +46,9 @@ public:
 	// Active View의 입력과 Picking 결과만 Gizmo 및 선택 상태에 반영한다.
 	void UpdateGizmoAndPicking();
 	// View 하나의 Scene·Grid·Gizmo·텍스트를 해당 ViewProjection으로 렌더한다.
-	void RenderFrame(int32 ViewIndex, const FRenderingInfo& ViewRenderingInfo, const FMatrix& ViewProjection, const FVector& ViewCameraLocation, const FVector& ViewCameraForward, FRenderQueue& RenderQueue);
+	void RenderFrame(int32 ViewIndex, const FRenderingInfo& ViewRenderingInfo, const FRenderView& RenderView, FRenderQueue& RenderQueue);
 	
-	void RenderOverlay(int32 ViewIndex, const FRenderingInfo& ViewRenderingInfo, const FMatrix& ViewProjection, const FVector& ViewCameraLocation, const FVector& ViewCameraForward, FRenderQueue& RenderQueue);
+	void RenderOverlay(int32 ViewIndex, const FRenderingInfo& ViewRenderingInfo, const FRenderView& RenderView, FRenderQueue& RenderQueue);
 	// 네 View 결과와 ImGui를 메인 Swapchain 백버퍼에 합성한다. Present는 FEngineLoop가 한다.
 	void PresentFrame();
 	void DeleteActor(AActor* Actor);
@@ -81,7 +81,7 @@ private:
 	TUniquePtr<FOutline> Outline;
 	TUniquePtr<FOutlineRenderer> OutlineRenderer;
 	TUniquePtr<FSkyboxRenderer> SkyboxRenderer;
-	TUniquePtr<FScreenQuadRenderer> ScreenQuadRenderer;
+	TUniquePtr<FPostProcessor> ScreenQuadRenderer;
 
 	UFont* SystemFont;
 

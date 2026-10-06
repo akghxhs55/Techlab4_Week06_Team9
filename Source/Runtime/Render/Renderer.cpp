@@ -5,6 +5,7 @@
 
 #include "Core/EngineTimer.h"
 #include "Core/Stats/LightweightStats.h"
+#include "Camera/RenderView.h"
 
 #include "Engine/PrimitiveSceneProxy.h"
 
@@ -134,9 +135,9 @@ void FRenderer::UploadPerObjectConstants()
 }
 
 // 카메라의 ViewProjection을 공통 렌더 경로로 전달한다.
-void FRenderer::RenderAll(FRenderQueue& InQueue, UCameraComponent* CameraComponent)
+void FRenderer::RenderAll(FRenderQueue& InQueue, const FRenderView& RenderView)
 {
-	RenderAll(InQueue, CameraComponent->GetViewProjectionMatrix());
+	RenderAll(InQueue, RenderView.ViewProjection);
 }
 
 // 불투명 우선·반투명 거리순으로 정렬해 View 행렬과 Section 범위로 그린다.
@@ -149,7 +150,6 @@ void FRenderer::RenderAll(FRenderQueue& InQueue, const FMatrix& ViewProjection)
 
 void FRenderer::RenderOpaque(const FMatrix& ViewProjection)
 {
-	DrawStaticGroups();
 	DrawPackets(0, FirstTranslucentIndex, ViewProjection);
 
 	if (RenderCommand::GetRasterizerState() != ERasterizerState::Wireframe)
@@ -240,11 +240,6 @@ void FRenderer::RenderQueueSorting(FRenderQueue& InQueue, const FMatrix& ViewPro
 		FirstTranslucentIndex = 0;
 		while (FirstTranslucentIndex < SortEntries.Num() && !(SortEntries[FirstTranslucentIndex].Key >> 63))
 			++FirstTranslucentIndex;
-
-		// ④ 스태틱 메시 묶음: 빈 묶음을 빼고 키 순으로 정렬한다. 조각마다 같은 키 묶음이 있으므로 정렬하면 서로 붙는다.
-		std::erase_if(StaticGroups, [](const FStaticDrawGroup* Group) { return Group->Items.empty(); });
-		std::sort(StaticGroups.begin(), StaticGroups.end(),
-			[](const FStaticDrawGroup* A, const FStaticDrawGroup* B) { return MakeGroupKey(*A) < MakeGroupKey(*B); });
 	}
 	// Gather uploads group and packet slots together. Other queues need an upload here.
 	if (!bObjectConstantsPrepared)
@@ -320,10 +315,10 @@ FOcclusionMeasureResult FRenderer::MeasureOpaqueOcclusion(const FMatrix& ViewPro
 		const FRenderPacket* Packet;
 	};
 	std::vector<FMeasureDraw> Draws;
-	for (const FStaticDrawGroup* Group : StaticGroups)
-		for (const FStaticDrawItem& Item : Group->Items)
-			Draws.push_back({ Group->Mesh, Group->Material, Group->LODIndex, Item.Slot, Item.StartIndex, Item.IndexCount,
-				&Item.Proxy->GetLocalToWorld(), Item.Proxy, Item.bOccludedByGpu != 0, nullptr });
+	//for (const FStaticDrawGroup* Group : StaticGroups)
+	//	for (const FStaticDrawItem& Item : Group->Items)
+	//		Draws.push_back({ Group->Mesh, Group->Material, Group->LODIndex, Item.Slot, Item.StartIndex, Item.IndexCount,
+	//			&Item.Proxy->GetLocalToWorld(), Item.Proxy, Item.bOccludedByGpu != 0, nullptr });
 	for (uint32 k = 0; k < FirstTranslucentIndex; ++k)
 	{
 		const FRenderPacket& Packet = RenderPackets[SortEntries[k].PacketIndex];

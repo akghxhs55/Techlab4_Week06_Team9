@@ -1,16 +1,17 @@
-﻿#include "EnginePCH.h"
+#include "EnginePCH.h"
 #include "JsonArchive.h"
 
 #include "Engine/World.h"
 #include "Engine/Level.h"
 #include "Component/PrimitiveComponent.h"
+#include "Component/SceneComponent.h"
 #include "GameFramework/Actor.h"
 #include "UObject/UObjectHash.h"
 #include "GameFramework/Actor/StaticMeshActor.h"
 #include "TypeSerializer.h"
 #include "Asset/AssetManager.h"
-#include "Camera/CameraActor.h"
-#include "Camera/CameraComponent.h"
+#include "GameFramework/Actor/CameraActor.h"
+#include "Component/CameraComponent.h"
 
 namespace
 {
@@ -28,8 +29,9 @@ namespace
 	// Rotation은 [Roll, Pitch, Yaw] 라디안이고, 엔진 FRotator는 도 단위다 (Pitch 양수 = 아래를 봄, 씬과 같은 방향).
 	void LoadPerspectiveCamera(UWorld* World, const json& CameraJson)
 	{
-		ACameraActor* CameraActor = World->GetMainCamera();
-		UCameraComponent* Camera = CameraActor ? CameraActor->GetCameraComponent() : nullptr;
+		return; // TODO
+
+		UCameraComponent* Camera = nullptr;
 		if (!Camera || !CameraJson.is_object())
 			return;
 
@@ -78,6 +80,9 @@ bool FJsonArchive::SaveWorld(UWorld* World, const FString& Path)
 		ActorJson["Class"] = Actor->GetClass()->Name;
 		Actor->Serialize(ActorJson["Properties"], false);
 
+		USceneComponent* Root = Actor->GetRootComponent();
+		ActorJson["RootComponentUUID"] = Root ? json(Root->GetUUID()) : json(nullptr);
+
 		for (UActorComponent* Component : Actor->GetComponents())
 		{
 			if (!Component) continue;
@@ -85,6 +90,12 @@ bool FJsonArchive::SaveWorld(UWorld* World, const FString& Path)
 			ComponentJson["Name"] = Component->GetName();
 			ComponentJson["Class"] = Component->GetClass()->Name;
 			Component->Serialize(ComponentJson["Properties"], false);
+
+			if (auto* SceneComponent = Cast<USceneComponent>(Component))
+			{
+				USceneComponent* Parent = SceneComponent->GetAttachParent();
+				ComponentJson["ParentUUID"] = Parent ? json(Parent->GetUUID()) : json(nullptr);
+			}
 
 			ActorJson["Components"].push_back(ComponentJson);
 		}
@@ -199,6 +210,16 @@ bool FJsonArchive::LoadWorld(UWorld* World, const FString& Path)
 		}
 		Actor->Serialize(ActorJson["Properties"], true);
 
+		TMap<uint32, USceneComponent*> ComponentMap; // UUID → Component
+
+		struct FPendingAttachment
+		{
+			USceneComponent* Child = nullptr;
+			bool bHasParent = false;
+			uint32 ParentUUID = 0;
+		};
+		TArray<FPendingAttachment> PendingAttachments;
+
 		for (json& ComponentJson : ActorJson["Components"])       // json → json&
 		{
 			const FName Name(ComponentJson["Name"].get<FString>());
@@ -216,8 +237,27 @@ bool FJsonArchive::LoadWorld(UWorld* World, const FString& Path)
 
 			if (!Component)
 			{
-				HTR_LOG(Warning, "Load: {} has no component {}", Class->Name, Name.ToString());
-				continue;
+				//HTR_LOG(Warning, "Load: {} has no component {}", Class->Name, Name.ToString());
+				//continue;
+				UClass* ComponentClass =
+					FindClass(ComponentJson["Class"].get<FString>());
+
+				if (!ComponentClass ||
+					!ComponentClass->IsChildOf(UActorComponent::StaticClass()) ||
+					!ComponentClass->Constructor)
+				{
+					HTR_LOG(Warning, "Load: invalid component class {}",
+						ComponentJson["Class"].get<FString>());
+					continue;
+				}
+
+				// 부모 연결은 아래 계층 복원 단계에서 처리한다.
+				Component = Actor->AddComponentByClass(ComponentClass, true);
+
+				if (!Component)
+					continue;
+
+				Component->SetName(Name);
 			}
 
 			if (Component->GetClass()->Name != ComponentJson["Class"].get<FString>())
@@ -227,6 +267,71 @@ bool FJsonArchive::LoadWorld(UWorld* World, const FString& Path)
 			}
 
 			Component->Serialize(ComponentJson["Properties"], true);
+
+			// Enqueue attachment for later processing, since the parent may not have been created yet
+			if (auto* SceneComponent = Cast<USceneComponent>(Component))
+			{
+				ComponentMap.Add(SceneComponent->GetUUID(), SceneComponent);
+
+				if (ComponentJson.contains("ParentUUID"))
+				{
+					const json& ParentUUID = ComponentJson["ParentUUID"];
+					const bool bHasParent = !ParentUUID.is_null();
+
+					PendingAttachments.Add({
+						SceneComponent,
+						bHasParent,
+						bHasParent ? ParentUUID.get<uint32>() : 0
+						});
+				}
+			}
+		}
+
+		for (const FPendingAttachment& Pending : PendingAttachments)
+		{
+			Pending.Child->DetachFromParent(); // Detach first to avoid issues
+		}
+
+		// Now attach the components to their parents
+		for (const FPendingAttachment& Pending : PendingAttachments)
+		{
+			if (!Pending.bHasParent)
+				continue;
+
+			USceneComponent** Parent = ComponentMap.Find(Pending.ParentUUID);
+
+			if (Parent && *Parent)
+			{
+				Pending.Child->SetupAttachment(*Parent);
+			}
+			else
+			{
+				HTR_LOG(Warning, "Load: component {} parent UUID {} not found",
+					Pending.Child->GetName(), Pending.ParentUUID);
+			}
+
+		}
+
+		if (ActorJson.contains("RootComponentUUID"))
+		{
+			const json& RootUUID = ActorJson["RootComponentUUID"];
+
+			if (RootUUID.is_null())
+			{
+				Actor->SetRootComponent(nullptr);
+			}
+			else
+			{
+				USceneComponent** Root = ComponentMap.FindOrNull(RootUUID.get<uint32>());
+
+				if (Root && *Root)
+					Actor->SetRootComponent(*Root);
+			}
+		}
+
+		for (const auto& Entry : ComponentMap)
+		{
+			Entry.second->MarkTransformDirty();
 		}
 	}
 
