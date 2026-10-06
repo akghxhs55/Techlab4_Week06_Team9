@@ -12,6 +12,8 @@ public:
 
 	virtual void BeginPlay() override;
 
+	virtual void DuplicateSubObjects() override;
+
 	UStaticMeshComponent* GetStaticMeshComponent() const { return StaticMeshComponent; }
 	void SetPrimitiveType(EPrimitiveType Type);
 

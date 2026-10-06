@@ -822,7 +822,7 @@ void FDetailsPanel::DrawComponentSection(AActor* Actor)
 
 void FDetailsPanel::DrawSceneComponentNode(USceneComponent* Component)
 {
-	if (!Component)
+	if (!Component || Component->IsHideInDetails())
 	{
 		return;
 	}

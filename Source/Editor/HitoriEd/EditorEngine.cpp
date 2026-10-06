@@ -164,11 +164,14 @@ bool UEditorEngine::Init()
 	OutlinerPanel = EditorUI->AddEditorPanel<FOutlinerPanel>();
 	OutlinerPanel->SetWorld(World);
 	OutlinerPanel->SetSelectionCallback(
-		[this](UPrimitiveComponent* Primitive)
+		[this](USceneComponent* Component)
 		{
-			Gizmo->SetTarget(Primitive);
-			Outline->SetTarget(Primitive);
-			DetailsPanel->SetTarget(Primitive);
+			Gizmo->SetTarget(Component);
+			if (UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Component))
+				Outline->SetTarget(Primitive);
+			else
+				Outline->SetTarget(nullptr);
+			DetailsPanel->SetTarget(Component);
 		}
 	);
 

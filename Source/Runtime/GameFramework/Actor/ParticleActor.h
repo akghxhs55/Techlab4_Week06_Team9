@@ -14,9 +14,13 @@ class AParticleActor : public AActor
 public:
 	AParticleActor();
 	AParticleActor(const AParticleActor& Other);
+
+	UParticleSubUVComponent* GetParticleComponent() const { return ParticleComponent; }
+	UBillboardComponent* GetBillboardComponent() const { return BillboardComponent; }
+
 	virtual void DuplicateSubObjects() override;
-	UParticleSubUVComponent* GetParticleComponent() const;
 
 private:
 	UParticleSubUVComponent* ParticleComponent;
+	UBillboardComponent* BillboardComponent;
 };
