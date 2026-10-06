@@ -12,6 +12,7 @@
 #include "Component/UExpHeightFogComponent.h"
 #include "Component/PointLightComponent.h"
 #include "Component/ProjectileMovementComponent.h"
+#include "Component/RotatingMovementComponent.h"
 #include "Render/Material.h"
 #include "Render/Texture2D.h"
 #include "Text/Font.h"
@@ -772,6 +773,7 @@ void FDetailsPanel::DrawComponentSection(AActor* Actor)
 			USphereGlowComponent::StaticClass(),
 			UExpHeightFogComponent::StaticClass(),
 			UProjectileMovementComponent::StaticClass(),
+			URotatingMovementComponent::StaticClass(),
 		};
 		for (UClass* Type : AddableComponentTypes)
 		{
