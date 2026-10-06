@@ -79,14 +79,18 @@ void FPostProcessor::Render(int32 ViewIndex, FViewportsPanel* viewPorts, FMultip
 		RenderCommand::Draw(3, 0);
 	}
 
-	Context.ColorBuffer = Buffers[1];
-	RenderCommand::GetContext()->OMSetRenderTargets(1, &rts[2], nullptr);
-	FXAAPass->Set(Context);
-	RenderCommand::Draw(3, 0);
+	if (AAEnabled) {
+		Context.ColorBuffer = Buffers[1];
+		RenderCommand::GetContext()->OMSetRenderTargets(1, &rts[2], nullptr);
+		FXAAPass->Set(Context);
+		RenderCommand::Draw(3, 0);
+	}
+	else {
+		RenderCommand::GetContext()->CopyResource(Buffers[2]->GetRawPtr(), Buffers[1]->GetRawPtr());
+	}
 
-
-	ID3D11ShaderResourceView* NullSRV{ nullptr };
-	RenderCommand::GetContext()->PSSetShaderResources(0, 1, &NullSRV);
+	ID3D11ShaderResourceView* NullSRV[8]{ nullptr };
+	RenderCommand::GetContext()->PSSetShaderResources(0, 8, NullSRV);
 	
 	RenderCommand::GetContext()->OMSetRenderTargets(1, &rts[2], info.DepthStencil.Texture->GetDSV());
 }

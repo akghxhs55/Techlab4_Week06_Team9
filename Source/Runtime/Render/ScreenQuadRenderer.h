@@ -41,9 +41,12 @@ public:
 	// 현재 World 에 맞는 WorldContext 를 넣어 줄 것
 	void Render(int32 ViewIndex, FViewportsPanel* viewPorts, FMultipleViewportsAdapter* adapter, FWorldContext* WorldContext);
 
+	void SetAAEnabled(bool bEnabled) { AAEnabled = bEnabled; }
 private:
 	TUniquePtr<IPostProcessPass> ColorPass;
 	TUniquePtr<IPostProcessPass> DepthPass;
 	TUniquePtr<IPostProcessPass> FogPass;
 	TUniquePtr<IPostProcessPass> FXAAPass;
+
+	bool AAEnabled = true;
 };

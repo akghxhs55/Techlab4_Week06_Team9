@@ -25,7 +25,7 @@ void FFXAAPass::Set(PostProcessContext& Context) {
 	auto  view = Context.ViewportAdapter->GetRenderView(Context.ViewIndex);
 
 	FXAACB data{
-		.InverseScreenSize = {1.f / view.ViewSize.X, 1.f / view.ViewSize.Y},
+		.InverseScreenSize = {1.f / Context.ColorBuffer->GetWidth(), 1.f / Context.ColorBuffer->GetHeight()},
 		.FXAAThreshold = 0.125f,
 		.FXAAThresholdMin = 0.0625f,
 	};

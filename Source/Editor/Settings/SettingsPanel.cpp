@@ -49,6 +49,8 @@ void FSettingsPanel::OnRender()
 	ImGui::Checkbox("Draw Batch Line / Grid", &Settings.bDrawBatchLine);
 	ImGui::Checkbox("Draw PS Grid", &Settings.bDrawPSGrid);
 
+	ImGui::Checkbox("Anti-Aliasing (FXAA)", &Settings.bAA);
+
 	ImGui::SetNextItemWidth(200.0f);
 	ImGui::SliderInt("Grid Spacing", &Settings.GridSpacing, 1, 100);
 
