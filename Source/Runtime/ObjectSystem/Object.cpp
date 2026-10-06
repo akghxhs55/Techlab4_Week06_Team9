@@ -200,6 +200,11 @@ void UObject::DuplicateSubObjects()
 	ObjectUUID = FEngineStatics::GetUUID();
 	InternalIndex = GUObjectArray.Num();
 	GUObjectArray.Add(this);
+
+	if (ClassPrivate)
+	{
+		HashObject(this, ClassPrivate);
+	}
 }
 
 UObject* UObject::Duplicate(const UClass* Class) const
@@ -211,6 +216,7 @@ UObject* UObject::Duplicate(const UClass* Class) const
 	if (!NewObject)
 		return nullptr;
 
+	NewObject->ClassPrivate = const_cast<UClass*>(Class);
 	NewObject->DuplicateSubObjects();
 	return NewObject;
 }

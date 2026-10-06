@@ -1,4 +1,4 @@
-﻿#include "EnginePCH.h"
+#include "EnginePCH.h"
 #include "AssetManager.h"
 #include "Render/Buffer.h"
 #include "Render/Material.h"
@@ -326,6 +326,12 @@ void UAssetManager::CreateIconMaterials()
 	SpotlightIconMat->Textures.Add(GetAssetByPath<UTexture2D>("Assets/Icons/SpotLight_64x.png"));
 	SpotlightIconMat->BlendState = EBlendState::AlphaBlend;
 	RegisterAsset("SpotlightIcon", SpotlightIconMat);
+
+	UMaterial* PointlightIconMat = FObjectFactory::ConstructObject<UMaterial>();
+	PointlightIconMat->Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/DefaultShader.hlsl");
+	PointlightIconMat->Textures.Add(GetAssetByPath<UTexture2D>("Assets/Icons/PointLight_64x.png"));
+	PointlightIconMat->BlendState = EBlendState::AlphaBlend;
+	RegisterAsset("PointlightIcon", PointlightIconMat);
 }
 
 void UAssetManager::Shutdown()

@@ -157,6 +157,7 @@ template<typename TObject>
 TObject* UObject::Duplicate() const
 {
 	TObject* NewObject = new TObject(static_cast<const TObject&>(*this));
+	NewObject->ClassPrivate = TObject::StaticClass();
 
 	NewObject->DuplicateSubObjects();
 
