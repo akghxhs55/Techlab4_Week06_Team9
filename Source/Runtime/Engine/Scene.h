@@ -23,12 +23,13 @@ public:
 	void MarkRenderStateDirty(FPrimitiveSceneProxy* Proxy);
 
 	void AddFog(UExpHeightFogComponent* Fog);
+	void RemoveFog(UExpHeightFogComponent* Fog);
 
 	TArray<FPrimitiveSceneProxy*> Proxies;
 	TArray<FPrimitiveSceneProxy*> DirtyProxies;
 	TArray<FPrimitiveSceneProxy*> RenderStateDirtyProxies;
 
-	TArray<UExpHeightFogComponent*> ExpHeightFogs;
+	std::vector<UExpHeightFogComponent*> ExpHeightFogs;
 
 	TArray<FAABB> PrimitiveBounds;
 	TArray<uint8> PrimitiveFlags;

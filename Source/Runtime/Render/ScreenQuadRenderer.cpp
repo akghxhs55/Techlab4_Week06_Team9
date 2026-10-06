@@ -41,7 +41,7 @@ void FPostProcessor::Render(int32 ViewIndex, FViewportsPanel* viewPorts, FMultip
 
 
 	if (info.RenderBufferType == ERenderBuffer::Color) {
-		if (not Context.WorldContext->World->GetScene().ExpHeightFogs.IsEmpty()) {
+		if (not Context.WorldContext->World->GetScene().ExpHeightFogs.empty()) {
 			RenderCommand::GetContext()->OMSetRenderTargets(1, &rts[0], nullptr);
 			ColorPass->Set(Context);
 
