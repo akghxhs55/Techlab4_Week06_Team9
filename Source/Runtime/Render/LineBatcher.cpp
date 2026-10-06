@@ -44,7 +44,8 @@ void FLineBatcher::BuildVertexBuffer(const UWorld& World)
 		// Skip drawing bounding box if the world is not an editor world
 		// TODO: Replacing TObjectIterator with a more efficient method to get world specific components
 		bool bIsEditorWorld = World.GetWorldType() == EWorldType::Editor;
-		if (!bIsEditorWorld)
+		if (!bIsEditorWorld ||
+			Itr->GetOwner()->GetWorld() != &World)
 		{
 			continue;
 		}

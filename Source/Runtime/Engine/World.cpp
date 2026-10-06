@@ -211,6 +211,7 @@ void UWorld::ClearWorld()
 			if (Actor)
 				Actor->RegisterAllActorTickFunctions(false);
 		Level->ClearActors();
+		delete Level;
 	}
 	HTR_LOG(Info, "{} : ", PersistentLevel->GetActorNum());
 }
