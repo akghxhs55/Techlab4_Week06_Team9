@@ -2,6 +2,8 @@
 cbuffer Viewconstants : register(b0)
 {
     matrix VP;
+    float3 CameraPosition;
+    float ViewPadding;
 };
 
 cbuffer Worldconstants : register(b2)
@@ -14,10 +16,10 @@ cbuffer MaterialParams : register(b1)
     float4 BaseColor;
     float2 UVOffset;
     float bOpaque;
-    float Padding;
+    float Shininess;
 };
 
-#define MAX_POINT_LIGHTS 4
+#define MAX_POINT_LIGHTS 10
 
 struct FPointLightShaderData
 {
@@ -80,14 +82,31 @@ float4 mainPS(PS_INPUT input) : SV_TARGET
     float4 texColor = g_txColor.Sample(g_Sample, input.uv + UVOffset);
     float4 albedo = texColor * BaseColor;
 
-    // 보간되면 길이가 틀어지므로 다시 정규화한다
+    // 보간되면 길이가 틀어지므로 다시 정규화
     float3 N = normalize(input.normal);
 
-    // 기본 환경광 + 방향성 광원 (씬 기본 시인성)
-    float dirNdotL = saturate(dot(N, -LightDir));
-    float3 totalLighting = AmbientColor + LightColor * dirNdotL;
+    // 카메라 시선 단위 벡터 (물체 표면 -> 카메라)
+    float3 V = normalize(CameraPosition - input.worldPos);
+    float specPower = max(Shininess, 1.0f);
 
-    // 포인트 라이트 누적 계산
+    // Ambient
+    float3 totalDiffuse = AmbientColor;
+    float3 totalSpecular = float3(0.0f, 0.0f, 0.0f);
+
+    // Directional Light
+    float3 dirL = -LightDir;
+    float dirNdotL = saturate(dot(N, dirL));
+    if (dirNdotL > 0.0f)
+    {
+        float3 dirH = normalize(dirL + V);
+        float dirNdotH = saturate(dot(N, dirH));
+        float dirSpec = pow(dirNdotH, specPower);
+
+        totalDiffuse += LightColor * dirNdotL;
+        totalSpecular += LightColor * dirSpec;
+    }
+
+    // 포인트 라이트
     for (int i = 0; i < NumPointLights; ++i)
     {
         if (PointLights[i].bEnabled < 0.5f)
@@ -104,16 +123,30 @@ float4 mainPS(PS_INPUT input) : SV_TARGET
             float3 L = toLight / dist;
             float NdotL = saturate(dot(N, L));
 
-            // 부드러운 거리 감쇄 (Falloff)
             float att = saturate(1.0f - (dist / radius));
             att = pow(att, max(PointLights[i].Falloff, 0.01f));
 
-            float3 lightContrib = PointLights[i].Color.rgb * PointLights[i].Intensity * NdotL * att;
-            totalLighting += lightContrib;
+            float3 lightColor = PointLights[i].Color.rgb * PointLights[i].Intensity;
+
+            // Diffuse
+            float3 diffuse = lightColor * NdotL;
+
+            // Specular
+            float3 specular = float3(0.0f, 0.0f, 0.0f);
+            if (NdotL > 0.0f)
+            {
+                float3 H = normalize(L + V);
+                float NdotH = saturate(dot(N, H));
+                specular = lightColor * pow(NdotH, specPower);
+            }
+
+            totalDiffuse += diffuse * att;
+            totalSpecular += specular * att;
         }
     }
 
     // Opaque는 알파를 1로 고정한다. 뷰포트 RT를 ImGui가 알파 블렌딩으로 그리므로 알파가 남으면 비쳐 보인다
     float alpha = bOpaque > 0.5f ? 1.0f : albedo.a;
-    return float4(albedo.rgb * totalLighting, alpha);
+    float3 finalRgb = albedo.rgb * totalDiffuse + totalSpecular;
+    return float4(finalRgb, alpha);
 }

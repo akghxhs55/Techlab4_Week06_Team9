@@ -1,4 +1,4 @@
-﻿#include "EnginePCH.h"
+#include "EnginePCH.h"
 
 #include "RenderCommand.h"
 
@@ -38,6 +38,7 @@ UMaterial* UMaterial::CreateInstance(const UMaterial* Source)
 	Instance->SamplerState = Source->SamplerState;
 	Instance->BaseColor = Source->BaseColor;
 	Instance->UVScrollSpeed = Source->UVScrollSpeed;
+	Instance->Shininess = Source->Shininess;
 	Instance->bTwoSided = Source->bTwoSided;
 
 	// ParamBuffer는 TUniquePtr라 복사할 수 없다.
@@ -81,6 +82,7 @@ json UMaterial::SaveMaterial(const UMaterial* Material)
 	const UMaterial* Base = Material->GetBaseAsset();
 	Out["Base"] = Base ? Base->GetPath() : FString("DefaultMaterial");
 	Out["BaseColor"] = Material->BaseColor;
+	Out["Shininess"] = Material->Shininess;
 	Out["UVScrollSpeed"] = {
 		Material->UVScrollSpeed.X,
 		Material->UVScrollSpeed.Y
@@ -142,6 +144,10 @@ UMaterial* UMaterial::LoadMaterial(const json& In)
 	if (In.contains("BaseColor"))
 	{
 		In["BaseColor"].get_to(Instance->BaseColor);
+	}
+	if (In.contains("Shininess"))
+	{
+		In["Shininess"].get_to(Instance->Shininess);
 	}
 
 	if (In.contains("Textures"))

@@ -450,6 +450,26 @@ namespace
 
 					ImGui::TableNextRow();
 
+					// Shininess (Blinn-Phong Specular)
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("Shininess");
+
+					ImGui::TableSetColumnIndex(1);
+					ImGui::SetNextItemWidth(-1.0f);
+
+					float TempShininess = Effective ? Effective->Shininess : 32.0f;
+					if (ImGui::DragFloat("##Shininess", &TempShininess, 1.0f, 1.0f, 256.0f, "%.1f"))
+					{
+						Override = EnsureMaterialOverride(MeshComponent, Slot, Effective, Override);
+						if (Override)
+						{
+							Override->Shininess = TempShininess;
+							Effective = Override;
+						}
+					}
+
+					ImGui::TableNextRow();
+
 					// 4: UV Scroll Speed
 					ImGui::TableSetColumnIndex(0);
 					ImGui::Text("UV Scroll");
