@@ -11,6 +11,7 @@
 #include "Component/SpotLightComponent.h"
 #include "Component/UExpHeightFogComponent.h"
 #include "Component/PointLightComponent.h"
+#include "Component/ProjectileMovementComponent.h"
 #include "Render/Material.h"
 #include "Render/Texture2D.h"
 #include "Text/Font.h"
@@ -770,6 +771,7 @@ void FDetailsPanel::DrawComponentSection(AActor* Actor)
 			UPointLightComponent::StaticClass(),
 			USphereGlowComponent::StaticClass(),
 			UExpHeightFogComponent::StaticClass(),
+			UProjectileMovementComponent::StaticClass(),
 		};
 		for (UClass* Type : AddableComponentTypes)
 		{
@@ -779,12 +781,15 @@ void FDetailsPanel::DrawComponentSection(AActor* Actor)
 				if (Type->IsChildOf(USceneComponent::StaticClass()))
 				{
 					USceneComponent* AddedComponent = CastChecked<USceneComponent>(Actor->AddComponentByClass(Type, false));
-					AddedComponent->SetupAttachment(Target);
+					USceneComponent* ParentToAttach = Cast<USceneComponent>(Target);
+					ParentToAttach = Actor->GetRootComponent();
+					AddedComponent->SetupAttachment(ParentToAttach);
 					SetTarget(AddedComponent);
 				}
 				else
 				{
-					Actor->AddComponentByClass(Type);
+					UActorComponent* AddedComponent = Actor->AddComponentByClass(Type);
+					SetTarget(AddedComponent);
 				}
 			}
 		}
@@ -871,8 +876,7 @@ void FDetailsPanel::DrawActorComponent(UActorComponent* Component)
 	ImGui::PushID(Component);
 	if (ImGui::Selectable(Component->GetName().c_str(), Component == Target, ImGuiSelectableFlags_SpanAllColumns))
 	{
-		// TODO: ActorComponent도 선택 가능해야 함
-		// SetTarget(Component);
+		SetTarget(Component);
 	}
 	ImGui::PopID();
 }

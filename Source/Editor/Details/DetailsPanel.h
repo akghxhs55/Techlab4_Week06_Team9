@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <format>
 #include "Editor/EditorUI/EditorPanel.h"
@@ -6,6 +6,9 @@
 #include "Engine/World.h"
 
 struct FTransform;
+
+class UActorComponent;
+class USceneComponent;
 
 class FDetailsPanel : public IEditorPanel
 {
@@ -18,7 +21,7 @@ public:
 	void OnRender() override;
 	const char* GetPanelName() const override { return "Details"; }
 
-	void SetTarget(USceneComponent* InTargetOrNull) { Target = InTargetOrNull; }
+	void SetTarget(UActorComponent* InTargetOrNull) { Target = InTargetOrNull; }
 
 	void SetWorld(UWorld* InWorld) { World = InWorld; }
 
@@ -30,7 +33,7 @@ private:
 	void DrawActorComponent(UActorComponent* Component);
 
 	UWorld* World = nullptr;
-	USceneComponent* Target = nullptr;
+	UActorComponent* Target = nullptr;
 	ImFont* CustomFont = nullptr;
 };
 
