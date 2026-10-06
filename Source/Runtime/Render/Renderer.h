@@ -21,7 +21,7 @@ struct FSortEntry
 	uint32 PacketIndex;
 };
 
-class UCameraComponent;
+struct FRenderView;
 
 // 오클루전 컬링의 효과 상한을 재기 위한 측정 결과 (디버그 전용)
 struct FOcclusionMeasureResult
@@ -45,7 +45,7 @@ public:
 	bool Init();
 
 	// 기존 단일 카메라의 ViewProjection으로 렌더 큐 전체를 그린다.
-	void RenderAll(FRenderQueue& InQueue, UCameraComponent* CameraComponent);
+	void RenderAll(FRenderQueue& InQueue, const FRenderView& RenderView);
 
 	// Adapter가 계산한 ViewProjection을 직접 받아 View별 렌더 큐를 그린다.
 	void RenderAll(FRenderQueue& InQueue, const FMatrix& ViewProjection);
@@ -55,11 +55,6 @@ public:
 
 	// Gather 전에 World가 불러 가려진 물체를 거른다.
 	FGPUOcclusion& GetGPUOcclusion() { return GPUOcclusion; }
-
-	// 캐시된 스태틱 메시 경로: World::Gather가 조각별로 채운 묶음을 이번 프레임 불투명 패스에 넘긴다.
-	// 묶음 메모리는 World 소유이며 다음 Gather 전까지 유효하다. RenderQueueSorting이 묶음을 정렬하고 RenderOpaque가 그린다.
-	void ResetStaticDrawGroups() { StaticGroups.clear(); }
-	void AddStaticDrawGroup(const FStaticDrawGroup* Group) { StaticGroups.push_back(Group); }
 
 	// RenderOpaque가 보관한 반투명 패킷을 먼 것부터 그린다.
 	void RenderTranslucent(const FMatrix& ViewProjection);
@@ -99,11 +94,8 @@ private:
 	FGPUOcclusion GPUOcclusion;
 
 	void DrawPackets(uint32 Begin, uint32 End, const FMatrix& ViewProjection);
-	void DrawStaticGroups();
 	void UpdatePerObjectConstants(const FMatrix& World);
 
-	// 이번 프레임 스태틱 메시 묶음 (정렬 키 순). 비어 있지 않은 것만 담는다.
-	std::vector<const FStaticDrawGroup*> StaticGroups;
 	void BindMaterial(UMaterial* material);
 	void UpdateMaterialParams(const FRenderPacket& RenderPacket);
 	void UpdatePerObjectConstants(const FRenderPacket& RenderPacket, const FMatrix& ViewProjection);

@@ -1,4 +1,4 @@
-﻿#include "EnginePCH.h"
+#include "EnginePCH.h"
 #include "JsonArchive.h"
 
 #include "Engine/World.h"
@@ -10,8 +10,8 @@
 #include "GameFramework/Actor/StaticMeshActor.h"
 #include "TypeSerializer.h"
 #include "Asset/AssetManager.h"
-#include "Camera/CameraActor.h"
-#include "Camera/CameraComponent.h"
+#include "GameFramework/Actor/CameraActor.h"
+#include "Component/CameraComponent.h"
 
 namespace
 {
@@ -29,8 +29,9 @@ namespace
 	// Rotation은 [Roll, Pitch, Yaw] 라디안이고, 엔진 FRotator는 도 단위다 (Pitch 양수 = 아래를 봄, 씬과 같은 방향).
 	void LoadPerspectiveCamera(UWorld* World, const json& CameraJson)
 	{
-		ACameraActor* CameraActor = World->GetMainCamera();
-		UCameraComponent* Camera = CameraActor ? CameraActor->GetCameraComponent() : nullptr;
+		return; // TODO
+
+		UCameraComponent* Camera = nullptr;
 		if (!Camera || !CameraJson.is_object())
 			return;
 

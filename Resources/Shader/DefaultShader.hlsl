@@ -13,7 +13,7 @@ struct VS_INPUT
 {
 	float3 position : POSITION;
     float2 uv : TEXCOORD0;
-	float4 color : COLOR; 
+	float4 color : COLOR;
 
 };
 
@@ -30,7 +30,7 @@ SamplerState Sampler : register(s0);
 PS_INPUT mainVS(VS_INPUT input)
 {
 	PS_INPUT output;
-    
+
     output.position = mul(mul(float4(input.position, 1.0f), World), VP);
     output.color = float4(input.position, 1.0f);
     output.uv = input.uv;
@@ -40,6 +40,10 @@ PS_INPUT mainVS(VS_INPUT input)
 float4 mainPS(PS_INPUT input) : SV_TARGET
 {
     float4 color = Texture.Sample(Sampler, input.uv);
-    
+    if (color.a < 0.000001)
+    {
+        discard;
+    }
+
     return color;
 }

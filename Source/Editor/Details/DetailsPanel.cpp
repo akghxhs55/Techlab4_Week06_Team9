@@ -473,7 +473,8 @@ namespace
 					ImGui::TableSetColumnIndex(1);
 					ImGui::SetNextItemWidth(-1.0f);
 
-					const char* SamplerItems[] = { "Linear Clamp", "Linear Wrap" };
+
+					const char* SamplerItems[] = { "Linear Clamp", "Linear Wrap", "Nearest Clamp" };
 					int SamplerIndex = Effective ? static_cast<int>(Effective->SamplerState) : static_cast<int>(ESamplerState::LinearClamp);
 					if (ImGui::BeginCombo("##SamplerState", SamplerItems[SamplerIndex]))
 					{
@@ -771,8 +772,16 @@ void FDetailsPanel::DrawComponentSection(AActor* Actor)
 			const FString Label = Type->Name;
 			if (ImGui::MenuItem(Type->Name.c_str()))
 			{
-				UActorComponent* AddedComponent = Actor->AddComponentByClass(Type);
-				SetTarget(Cast<USceneComponent>(AddedComponent)); // TODO: ActorComponent도 선택 가능해야 함
+				if (Type->IsChildOf(USceneComponent::StaticClass()))
+				{
+					USceneComponent* AddedComponent = CastChecked<USceneComponent>(Actor->AddComponentByClass(Type, false));
+					AddedComponent->SetupAttachment(Target);
+					SetTarget(AddedComponent);
+				}
+				else
+				{
+					Actor->AddComponentByClass(Type);
+				}
 			}
 		}
 

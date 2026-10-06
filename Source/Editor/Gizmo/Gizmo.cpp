@@ -1,6 +1,5 @@
 #include "EnginePCH.h"
 #include "Editor/Gizmo/Gizmo.h"
-#include "Camera/CameraComponent.h"
 
 static const FVector AxisDirs[3] = {
 	FVector(1, 0, 0),

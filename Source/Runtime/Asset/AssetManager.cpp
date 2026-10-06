@@ -1,4 +1,4 @@
-﻿#include "EnginePCH.h"
+#include "EnginePCH.h"
 #include "AssetManager.h"
 #include "Render/Buffer.h"
 #include "Render/Material.h"
@@ -318,14 +318,20 @@ void UAssetManager::CreateIconMaterials()
 	UMaterial* BillboardIconMat = FObjectFactory::ConstructObject<UMaterial>();
 	BillboardIconMat->Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/DefaultShader.hlsl");
 	BillboardIconMat->Textures.Add(GetAssetByPath<UTexture2D>("Assets/Icons/S_Actor.png"));
-	BillboardIconMat->BlendState = EBlendState::AlphaBlend;
+	BillboardIconMat->SamplerState = ESamplerState::NearestClamp;
 	RegisterAsset("BillboardIcon", BillboardIconMat);
 
 	UMaterial* SpotlightIconMat = FObjectFactory::ConstructObject<UMaterial>();
 	SpotlightIconMat->Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/DefaultShader.hlsl");
 	SpotlightIconMat->Textures.Add(GetAssetByPath<UTexture2D>("Assets/Icons/SpotLight_64x.png"));
-	SpotlightIconMat->BlendState = EBlendState::AlphaBlend;
+	SpotlightIconMat->SamplerState = ESamplerState::NearestClamp;
 	RegisterAsset("SpotlightIcon", SpotlightIconMat);
+
+	UMaterial* CameraIconMat = FObjectFactory::ConstructObject<UMaterial>();
+	CameraIconMat->Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/DefaultShader.hlsl");
+	CameraIconMat->Textures.Add(GetAssetByPath<UTexture2D>("Assets/Icons/CameraActor_64x.png"));
+	CameraIconMat->SamplerState = ESamplerState::NearestClamp;
+	RegisterAsset("CameraIcon", CameraIconMat);
 }
 
 void UAssetManager::Shutdown()

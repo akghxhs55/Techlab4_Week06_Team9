@@ -1,4 +1,4 @@
-#include "EnginePCH.h"
+﻿#include "EnginePCH.h"
 
 #include "RenderCommand.h"
 
@@ -85,7 +85,21 @@ json UMaterial::SaveMaterial(const UMaterial* Material)
 		Material->UVScrollSpeed.X,
 		Material->UVScrollSpeed.Y
 	};
-	Out["SamplerState"] = Material->SamplerState == ESamplerState::LinearWrap ? "LinearWrap" : "LinearClamp";
+	switch (Material->SamplerState)
+	{
+	case ESamplerState::LinearClamp:
+		Out["SamplerState"] = "LinearClamp";
+		break;
+	case ESamplerState::LinearWrap:
+		Out["SamplerState"] = "LinearWrap";
+		break;
+	case ESamplerState::NearestClamp:
+		Out["SamplerState"] = "NearestClamp";
+		break;
+	default:
+		Out["SamplerState"] = "LinearClamp";
+		break;
+	}
 	Out["BlendState"] = Material->BlendState == EBlendState::AlphaBlend ? "AlphaBlend" : "Opaque";
 	Out["bTwoSided"] = Material->bTwoSided;
 
@@ -146,7 +160,22 @@ UMaterial* UMaterial::LoadMaterial(const json& In)
 	if (In.contains("SamplerState"))
 	{
 		const FString State = In["SamplerState"].get<FString>();
-		Instance->SamplerState = State == "LinearWrap" ? ESamplerState::LinearWrap : ESamplerState::LinearClamp;
+		if (State == "LinearWrap")
+		{
+			Instance->SamplerState = ESamplerState::LinearWrap;
+		}
+		else if (State == "LinearClamp")
+		{
+			Instance->SamplerState = ESamplerState::LinearClamp;
+		}
+		else if (State == "NearestClamp")
+		{
+			Instance->SamplerState = ESamplerState::NearestClamp;
+		}
+		else
+		{
+			Instance->SamplerState = ESamplerState::LinearClamp;
+		}
 	}
 	if (In.contains("BlendState"))
 	{

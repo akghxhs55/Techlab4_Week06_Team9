@@ -9,14 +9,14 @@ static_assert(offsetof(FLODSphere, RadiusSquared) == 12 && sizeof(FLODSphere) ==
 namespace
 {
     template<bool Orthographic>
-    void SelectBatch(const TArray<FLODSelectionInput>& Inputs, const FLODViewContext& View, TArray<uint8>& OutLODs)
+    void SelectBatch(const TArray<FLODSelectionInput>& Inputs, const FLODViewContext& Context, TArray<uint8>& OutLODs)
     {
-        const __m128 FX = _mm_set1_ps(View.CameraForward.X);
-        const __m128 FY = _mm_set1_ps(View.CameraForward.Y);
-        const __m128 FZ = _mm_set1_ps(View.CameraForward.Z);
-        const __m128 CameraDepth = _mm_set1_ps(View.CameraDepth);
-        const __m128 NearZ = _mm_set1_ps(View.NearZ);
-        const __m128 ProjectionScale = _mm_set1_ps(View.ProjectionScaleSquared);
+        const __m128 FX = _mm_set1_ps(Context.View.CameraForward.X);
+        const __m128 FY = _mm_set1_ps(Context.View.CameraForward.Y);
+        const __m128 FZ = _mm_set1_ps(Context.View.CameraForward.Z);
+        const __m128 CameraDepth = _mm_set1_ps(Context.CameraDepth);
+        const __m128 NearZ = _mm_set1_ps(Context.View.NearZ);
+        const __m128 ProjectionScale = _mm_set1_ps(Context.ProjectionScaleSquared);
         uint32 I = 0;
         for (; I + 4 <= static_cast<uint32>(Inputs.Num()); I += 4)
         {
@@ -26,7 +26,7 @@ namespace
             if (bScalar)
             {
                 for (uint32 Lane = 0; Lane < 4; ++Lane)
-                    OutLODs[I + Lane] = static_cast<uint8>(SelectSphereLOD<Orthographic>(Inputs[I + Lane], View));
+                    OutLODs[I + Lane] = static_cast<uint8>(SelectSphereLOD<Orthographic>(Inputs[I + Lane], Context));
                 continue;
             }
             __m128 X = _mm_loadu_ps(&Inputs[I].Sphere.Center.X);
@@ -57,18 +57,18 @@ namespace
             }
         }
         for (; I < static_cast<uint32>(Inputs.Num()); ++I)
-            OutLODs[I] = static_cast<uint8>(SelectSphereLOD<Orthographic>(Inputs[I], View));
+            OutLODs[I] = static_cast<uint8>(SelectSphereLOD<Orthographic>(Inputs[I], Context));
     }
 }
 
-void SelectLODs(const TArray<FLODSelectionInput>& Inputs, const FLODViewContext& View, TArray<uint8>& OutLODs)
+void SelectLODs(const TArray<FLODSelectionInput>& Inputs, const FLODViewContext& Context, TArray<uint8>& OutLODs)
 {
     OutLODs.SetNum(Inputs.Num(), false);
-    if (View.Width == 0 || View.Height == 0)
+    if (Context.View.ViewSize.X == 0 || Context.View.ViewSize.Y == 0)
     {
         for (uint8& LOD : OutLODs) LOD = 0;
         return;
     }
-    if (View.bOrthographic) SelectBatch<true>(Inputs, View, OutLODs);
-    else SelectBatch<false>(Inputs, View, OutLODs);
+    if (Context.View.bIsOrthogonal) SelectBatch<true>(Inputs, Context, OutLODs);
+    else SelectBatch<false>(Inputs, Context, OutLODs);
 }

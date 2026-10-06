@@ -5,12 +5,11 @@
 
 #include "Core/EngineTimer.h"
 #include "Core/Stats/LightweightStats.h"
+#include "Camera/RenderView.h"
 
 #include "Engine/PrimitiveSceneProxy.h"
 
 #include "RenderCommand.h"
-
-#include "Camera/CameraComponent.h"
 
 #include <algorithm>
 #include <chrono>
@@ -125,9 +124,9 @@ void FRenderer::UploadPerObjectConstants()
 }
 
 // 카메라의 ViewProjection을 공통 렌더 경로로 전달한다.
-void FRenderer::RenderAll(FRenderQueue& InQueue, UCameraComponent* CameraComponent)
+void FRenderer::RenderAll(FRenderQueue& InQueue, const FRenderView& RenderView)
 {
-	RenderAll(InQueue, CameraComponent->GetViewProjectionMatrix());
+	RenderAll(InQueue, RenderView.ViewProjection);
 }
 
 // 불투명 우선·반투명 거리순으로 정렬해 View 행렬과 Section 범위로 그린다.
@@ -140,7 +139,6 @@ void FRenderer::RenderAll(FRenderQueue& InQueue, const FMatrix& ViewProjection)
 
 void FRenderer::RenderOpaque(const FMatrix& ViewProjection)
 {
-	DrawStaticGroups();
 	DrawPackets(0, FirstTranslucentIndex, ViewProjection);
 
 	if (RenderCommand::GetRasterizerState() != ERasterizerState::Wireframe)
@@ -155,49 +153,6 @@ void FRenderer::RenderTranslucent(const FMatrix& ViewProjection)
 	DrawPackets(FirstTranslucentIndex, SortEntries.Num(), ViewProjection);
 	RenderPackets.Reset();
 	FirstTranslucentIndex = 0;
-	StaticGroups.clear();   // 묶음 메모리는 World 것이므로 이번 프레임이 끝나면 놓는다
-}
-
-// 스태틱 메시 묶음을 정렬 키 순서로 그린다. 바인딩은 묶음마다 한 번, 항목마다는 칸 바인딩과 드로우만 한다.
-void FRenderer::DrawStaticGroups()
-{
-	if (StaticGroups.empty())
-		return;
-
-	SCOPE_CYCLE_COUNTER(STAT_DrawRenderPackets);
-	RenderCommand::BindConstantBuffer(0, ViewCB.get(), EShaderBindFlagBits::Vertex);
-
-	UMaterial* BoundMaterial = nullptr;
-	for (const FStaticDrawGroup* Group : StaticGroups)
-	{
-		RenderCommand::BindMesh(Group->Mesh, Group->LODIndex);
-		if (Group->Material != BoundMaterial)
-		{
-			BoundMaterial = Group->Material;
-			BindMaterial(BoundMaterial);
-			FRenderPacket MaterialOnly;           // 머티리얼 파라미터 갱신은 패킷을 받으므로 머티리얼만 채워 넘긴다
-			MaterialOnly.Material = BoundMaterial;
-			UpdateMaterialParams(MaterialOnly);
-		}
-
-		for (const FStaticDrawItem& Item : Group->Items)
-		{
-			if (bUsePerObjectSlots && Item.Slot != InvalidObjectSlot)
-			{
-				RenderCommand::BindConstantBufferRange(2, PerObjectSlotCB.get(), Item.Slot * PerObjectSlotConstants, PerObjectSlotConstants, EShaderBindFlagBits::Vertex);
-			}
-			else
-			{
-				RenderCommand::BindConstantBuffer(2, PerObjectCB.get(), EShaderBindFlagBits::Vertex);
-				UpdatePerObjectConstants(Item.Proxy->GetLocalToWorld());
-			}
-			RenderCommand::DrawIndexed(Item.IndexCount, Item.StartIndex);
-		}
-	}
-
-	// 뒤따르는 DrawPackets가 처음부터 다시 바인딩하도록 기록을 비운다.
-	LastMesh = nullptr;
-	LastMaterial = nullptr;
 }
 
 void FRenderer::RenderQueueSorting(FRenderQueue& InQueue, const FMatrix& ViewProjection)
@@ -227,11 +182,6 @@ void FRenderer::RenderQueueSorting(FRenderQueue& InQueue, const FMatrix& ViewPro
 		FirstTranslucentIndex = 0;
 		while (FirstTranslucentIndex < SortEntries.Num() && !(SortEntries[FirstTranslucentIndex].Key >> 63))
 			++FirstTranslucentIndex;
-
-		// ④ 스태틱 메시 묶음: 빈 묶음을 빼고 키 순으로 정렬한다. 조각마다 같은 키 묶음이 있으므로 정렬하면 서로 붙는다.
-		std::erase_if(StaticGroups, [](const FStaticDrawGroup* Group) { return Group->Items.empty(); });
-		std::sort(StaticGroups.begin(), StaticGroups.end(),
-			[](const FStaticDrawGroup* A, const FStaticDrawGroup* B) { return MakeGroupKey(*A) < MakeGroupKey(*B); });
 	}
 	// Gather uploads group and packet slots together. Other queues need an upload here.
 	if (!bObjectConstantsPrepared)
@@ -303,10 +253,10 @@ FOcclusionMeasureResult FRenderer::MeasureOpaqueOcclusion(const FMatrix& ViewPro
 		const FRenderPacket* Packet;
 	};
 	std::vector<FMeasureDraw> Draws;
-	for (const FStaticDrawGroup* Group : StaticGroups)
-		for (const FStaticDrawItem& Item : Group->Items)
-			Draws.push_back({ Group->Mesh, Group->Material, Group->LODIndex, Item.Slot, Item.StartIndex, Item.IndexCount,
-				&Item.Proxy->GetLocalToWorld(), Item.Proxy, Item.bOccludedByGpu != 0, nullptr });
+	//for (const FStaticDrawGroup* Group : StaticGroups)
+	//	for (const FStaticDrawItem& Item : Group->Items)
+	//		Draws.push_back({ Group->Mesh, Group->Material, Group->LODIndex, Item.Slot, Item.StartIndex, Item.IndexCount,
+	//			&Item.Proxy->GetLocalToWorld(), Item.Proxy, Item.bOccludedByGpu != 0, nullptr });
 	for (uint32 k = 0; k < FirstTranslucentIndex; ++k)
 	{
 		const FRenderPacket& Packet = RenderPackets[SortEntries[k].PacketIndex];

@@ -2,6 +2,7 @@
 #include "Editor/EditorUI/EditorPanel.h"
 
 #include "Editor/Gizmo/Gizmo.h"
+#include "GameFramework/Actor/CameraActor.h"
 
 #include "GameFramework/Actor/ParticleActor.h"
 #include "GameFramework/Actor/StaticMeshActor.h"
@@ -29,7 +30,7 @@ public:
 
 	int32 SelectedIndex = 0;
 
-	const char* Items[5] ={"StaticMesh","Particle","Text","Light","SphereGlow"};
+	const char* Items[6] ={"StaticMesh","Particle","Text","Light","SphereGlow","Camera"};
 
 	FGizmo* Gizmo = nullptr;
 	int32 GizmoSelectedIndex = 0;
@@ -45,6 +46,7 @@ public:
 		ATextRenderActor::StaticClass(),
 		ALightActor::StaticClass(),
 		ASphereGlowActor::StaticClass(), // @todo ALSphereGlowActor::StaticClass()
+		ACameraActor::StaticClass(),
 	};
 
     void SetViewportAdapter(FMultipleViewportsAdapter* InAdapter) { ViewportAdapter = InAdapter; }
