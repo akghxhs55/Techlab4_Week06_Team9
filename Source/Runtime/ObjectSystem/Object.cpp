@@ -168,6 +168,11 @@ void UObject::Serialize(json& Handle, bool bIsLoading)
 						break;
 					}
 
+					if (!Handle[Property.Name].is_string())
+					{
+						break;
+					}
+
 					const FString AssetPath = Handle[Property.Name].get<FString>();
 					URenderAsset* Asset = nullptr;
 
