@@ -53,46 +53,19 @@ void URotatingMovementComponent::TickComponent(float DeltaTime)
 
 	const bool bHasPivot = (PivotTranslation.X != 0.0f || PivotTranslation.Y != 0.0f || PivotTranslation.Z != 0.0f);
 
-	if (bRotationInLocalSpace)
+	const FVector OldLocation = UpdatedComponent->GetRelativeLocation();
+	const FQuat OldRotation = UpdatedComponent->GetRelativeRotation().Quaternion();
+
+	const FQuat NewRotation = bRotationInLocalSpace ? (OldRotation * DeltaQuat) : (DeltaQuat * OldRotation);
+
+	FVector DeltaLocation = FVector::ZeroVector;
+	if (bHasPivot)
 	{
-		if (!bHasPivot)
-		{
-			const FQuat CurrentQuat = UpdatedComponent->GetRelativeRotation().Quaternion();
-			const FQuat NewQuat = CurrentQuat * DeltaQuat;
-			UpdatedComponent->SetRelativeRotation(NewQuat.ToFRotator());
-		}
-		else
-		{
-			const FVector OldLocation = UpdatedComponent->GetRelativeLocation();
-			const FQuat OldRotation = UpdatedComponent->GetRelativeRotation().Quaternion();
-
-			const FVector Pivot = OldLocation + OldRotation.RotateVector(PivotTranslation);
-			const FQuat NewRotation = OldRotation * DeltaQuat;
-			const FVector NewLocation = Pivot + NewRotation.RotateVector(-PivotTranslation);
-
-			UpdatedComponent->SetRelativeLocation(NewLocation);
-			UpdatedComponent->SetRelativeRotation(NewRotation.ToFRotator());
-		}
+		const FVector OldPivot = OldRotation.RotateVector(PivotTranslation);
+		const FVector NewPivot = NewRotation.RotateVector(PivotTranslation);
+		DeltaLocation = OldPivot - NewPivot;
 	}
-	else
-	{
-		if (!bHasPivot)
-		{
-			const FQuat CurrentQuat = UpdatedComponent->GetRelativeRotation().Quaternion();
-			const FQuat NewQuat = DeltaQuat * CurrentQuat;
-			UpdatedComponent->SetRelativeRotation(NewQuat.ToFRotator());
-		}
-		else
-		{
-			const FVector OldLocation = UpdatedComponent->GetRelativeLocation();
-			const FQuat OldRotation = UpdatedComponent->GetRelativeRotation().Quaternion();
 
-			const FVector Pivot = OldLocation + PivotTranslation;
-			const FQuat NewRotation = DeltaQuat * OldRotation;
-			const FVector NewLocation = Pivot + DeltaQuat.RotateVector(OldLocation - Pivot);
-
-			UpdatedComponent->SetRelativeLocation(NewLocation);
-			UpdatedComponent->SetRelativeRotation(NewRotation.ToFRotator());
-		}
-	}
+	UpdatedComponent->SetRelativeLocation(OldLocation + DeltaLocation);
+	UpdatedComponent->SetRelativeRotation(NewRotation.ToFRotator());
 }
