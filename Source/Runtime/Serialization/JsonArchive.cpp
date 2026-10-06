@@ -25,38 +25,60 @@ namespace
 		return Default;
 	}
 
+	json SavePerspectiveCamera(const FViewCamera& Camera)
+	{
+		json Json;
+		Json["Location"] = Camera.Transform.Location;
+		
+		const FRotator Rotation = Camera.Transform.Rotation.ToFRotator();
+		Json["Rotation"] = {
+			FMath::DegreesToRadians(Rotation.Roll),
+			FMath::DegreesToRadians(Rotation.Pitch),
+			FMath::DegreesToRadians(Rotation.Yaw)
+		};
+		Json["FOV"] = Camera.Projection.FovDegrees;
+		Json["NearClip"] = Camera.Projection.NearClip;
+		Json["FarClip"] = Camera.Projection.FarClip;
+		return Json;
+	}
+
 	// 기본 씬 형식의 "PerspectiveCamera"를 메인 카메라에 적용한다.
 	// Rotation은 [Roll, Pitch, Yaw] 라디안이고, 엔진 FRotator는 도 단위다 (Pitch 양수 = 아래를 봄, 씬과 같은 방향).
-	void LoadPerspectiveCamera(UWorld* World, const json& CameraJson)
+	FViewCamera LoadPerspectiveCamera(const json& CameraJson)
 	{
-		return; // TODO
+		FViewCamera Result;
 
-		UCameraComponent* Camera = nullptr;
-		if (!Camera || !CameraJson.is_object())
-			return;
+		if (!CameraJson.is_object())
+		{
+			HTR_LOG(Warning, "Invalid camera data");
+			return {};
+		}
 
 		if (CameraJson.contains("Location"))
-			Camera->SetRelativeLocation(CameraJson["Location"].get<FVector>());
+			Result.Transform.Location = CameraJson["Location"].get<FVector>();
 
 		if (CameraJson.contains("Rotation") && CameraJson["Rotation"].is_array() && CameraJson["Rotation"].size() >= 3)
 		{
 			const json& R = CameraJson["Rotation"];
-			Camera->SetRelativeRotation(FRotator(
+			Result.Transform.Rotation = FRotator(
 				FMath::RadiansToDegrees(R[1].get<float>()),    // Pitch
 				FMath::RadiansToDegrees(R[2].get<float>()),    // Yaw
-				FMath::RadiansToDegrees(R[0].get<float>())));  // Roll
+				FMath::RadiansToDegrees(R[0].get<float>()))    // Roll
+			.Quaternion();
 		}
 
 		if (CameraJson.contains("FOV"))
-			Camera->SetFieldOfView(ReadScalar(CameraJson["FOV"], Camera->GetFieldOfView()));
+			Result.Projection.FovDegrees = ReadScalar(CameraJson["FOV"], Result.Projection.FovDegrees);
 		if (CameraJson.contains("NearClip"))
-			Camera->SetNearZ(ReadScalar(CameraJson["NearClip"], Camera->GetNearZ()));
+			Result.Projection.NearClip = ReadScalar(CameraJson["NearClip"], Result.Projection.NearClip);
 		if (CameraJson.contains("FarClip"))
-			Camera->SetFarZ(ReadScalar(CameraJson["FarClip"], Camera->GetFarZ()));
+			Result.Projection.FarClip = ReadScalar(CameraJson["FarClip"], Result.Projection.FarClip);
+
+		return Result;
 	}
 }
 
-bool FJsonArchive::SaveWorld(UWorld* World, const FString& Path)
+bool FJsonArchive::SaveWorld(UWorld* World, const FViewCamera* Camera, const FString& Path)
 {
 	if (!World)
 		return false;
@@ -103,6 +125,9 @@ bool FJsonArchive::SaveWorld(UWorld* World, const FString& Path)
 		Json["Actors"].push_back(ActorJson);
 	}
 
+	if (Camera)
+		Json["PerspectiveCamera"] = SavePerspectiveCamera(*Camera);
+
 	std::ofstream File(Path);
 
 	if (!File.is_open())
@@ -115,7 +140,7 @@ bool FJsonArchive::SaveWorld(UWorld* World, const FString& Path)
 	return !File.fail();
 }
 
-bool FJsonArchive::LoadWorld(UWorld* World, const FString& Path)
+bool FJsonArchive::LoadWorld(UWorld* World, FViewCamera* OutCamera, const FString& Path)
 {
 	if (!World)
 		return false;
@@ -159,8 +184,8 @@ bool FJsonArchive::LoadWorld(UWorld* World, const FString& Path)
 		}
 		World->GetScene().BuildBVH();
 
-		if (Json.contains("PerspectiveCamera"))
-			LoadPerspectiveCamera(World, Json["PerspectiveCamera"]);
+		if (OutCamera && Json.contains("PerspectiveCamera"))
+			*OutCamera = LoadPerspectiveCamera(Json["PerspectiveCamera"]);
 
 		return true;
 	}
@@ -400,6 +425,8 @@ bool FJsonArchive::LoadWorld(UWorld* World, const FString& Path)
 	//// SpawnActor하면서 증가했을 UUID를 저장 당시 값으로 복원
 	//FEngineStatics::NextUUID = SavedNextUUID;
 
+	if (OutCamera && Json.contains("PerspectiveCamera"))
+		*OutCamera = LoadPerspectiveCamera(Json["PerspectiveCamera"]);
 	World->GetScene().BuildBVH();
 
 	return true;

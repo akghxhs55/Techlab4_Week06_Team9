@@ -13,6 +13,7 @@ UActorComponent::~UActorComponent()
 UActorComponent::UActorComponent(const UActorComponent& Other)
 	: UObject(Other)
 	, PrimaryComponentTick(Other.PrimaryComponentTick)
+	, bEditorOnly(Other.bEditorOnly)
 {
 }
 

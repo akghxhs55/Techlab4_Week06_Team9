@@ -29,6 +29,16 @@ public:
 	// UE와 같이 기본값은 bCanEverTick = false. Tick이 필요한 컴포넌트만 생성자에서 켠다.
 	FActorComponentTickFunction PrimaryComponentTick;
 
+	void SetEditorOnly(bool InEditorOnly) { bEditorOnly = InEditorOnly; }
+	bool IsEditorOnly() const { return bEditorOnly; }
+
+	void SetHideInDetails(bool InHideInDetails) { bHideInDetails = InHideInDetails; }
+	bool IsHideInDetails() const { return bHideInDetails; }
+
+protected:
+	bool bEditorOnly = false;
+	bool bHideInDetails = false;
+
 private:
 	AActor* Owner = nullptr;
 };

@@ -4,29 +4,38 @@
 
 APointLightActor::APointLightActor()
 {
+	PointLightComponent = CreateDefaultSubobject<UPointLightComponent>("UPointLightComponent");
+	SetRootComponent(PointLightComponent);
+
 	BillboardComponent = CreateDefaultSubobject<UBillboardComponent>("UBillboardComponent");
-	SetRootComponent(BillboardComponent);
+	BillboardComponent->SetupAttachment(PointLightComponent);
 	if (UMaterial* IconMat = UAssetManager::GetAssetByPath<UMaterial>("PointlightIcon"))
 	{
 		BillboardComponent->SetMaterial(0, IconMat);
 	}
-
-	PointLightComponent = CreateDefaultSubobject<UPointLightComponent>("UPointLightComponent");
-	PointLightComponent->SetupAttachment(BillboardComponent);
+	BillboardComponent->SetEditorOnly(true);
+	BillboardComponent->SetHideInDetails(true);
 }
 
 void APointLightActor::DuplicateSubObjects()
 {
-	Super::DuplicateSubObjects();
-
-	BillboardComponent = Cast<UBillboardComponent>(RootComponent);
-	for (UActorComponent* Component : GetComponents())
+	int32 PointLightIndex = -1;
+	int32 BillboardIndex = -1;
+	for (int32 i = 0; i < GetComponents().Num(); ++i)
 	{
-		if (UPointLightComponent* PLC = Cast<UPointLightComponent>(Component))
+		if (GetComponents()[i] == PointLightComponent)
 		{
-			PointLightComponent = PLC;
-			break;
+			PointLightIndex = i;
+		}
+		else if (GetComponents()[i] == BillboardComponent)
+		{
+			BillboardIndex = i;
 		}
 	}
+
+	Super::DuplicateSubObjects();
+
+	PointLightComponent = PointLightIndex != -1 ? Cast<UPointLightComponent>(GetComponents()[PointLightIndex]) : nullptr;
+	BillboardComponent = BillboardIndex != -1 ? Cast<UBillboardComponent>(GetComponents()[BillboardIndex]) : nullptr;
 }
 

@@ -74,10 +74,13 @@ public:
 
 	virtual void OnTransformDirty() override;
 
+	bool IsPickable() const { return bPickable; }
+
 protected:
 	bool TraceMesh(const FRay& WorldRay, const FStaticMeshData& Mesh, const FMatrix& WorldMatrix, FHitResult& OutResult);
 	bool TraceMeshLocal(const FRay& LocalRay, const FStaticMeshData& Mesh, float& OutT);
 	bool bVisible = true;
+	bool bPickable = true;
 
 private:
 	friend class FScene;
