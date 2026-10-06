@@ -213,6 +213,12 @@ void UWorld::ClearWorld()
 		Level->ClearActors();
 		delete Level;
 	}
+	Levels.Reset();
+	// Spawn Actor로 카메라 생성하고 세팅하기
+	PersistentLevel = FObjectFactory::ConstructObject<ULevel>();
+	PersistentLevel->SetWorld(this);
+	Levels.Add(PersistentLevel);
+	CurrentLevel = PersistentLevel;
 	HTR_LOG(Info, "{} : ", PersistentLevel->GetActorNum());
 }
 
@@ -321,7 +327,7 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit, const FRe
 		{
 			if (UStaticMesh* Mesh = Proxy ? Proxy->GetMesh() : nullptr)
 			{
-				if (!Proxy->IsVisible())
+				if (!Proxy->IsPickable() || !Proxy->IsVisible())
 					return false;
 
 				const FMatrix& WorldToLocal = Proxy->GetWorldToLocal();

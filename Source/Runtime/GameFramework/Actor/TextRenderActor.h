@@ -14,8 +14,12 @@ public:
 	ATextRenderActor();
 	virtual ~ATextRenderActor();
 
-	inline UTextRenderComponent* GetTextRenderComponent() const { return TextRenderComponent; }
+	virtual void DuplicateSubObjects() override;
+
+	UTextRenderComponent* GetTextRenderComponent() const { return TextRenderComponent; }
+	UBillboardComponent* GetBillboardComponent() const { return BillboardComponent; }
 
 private:
 	UTextRenderComponent* TextRenderComponent;
+	UBillboardComponent* BillboardComponent;
 };

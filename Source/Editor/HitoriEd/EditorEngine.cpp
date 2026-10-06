@@ -164,11 +164,14 @@ bool UEditorEngine::Init()
 	OutlinerPanel = EditorUI->AddEditorPanel<FOutlinerPanel>();
 	OutlinerPanel->SetWorld(World);
 	OutlinerPanel->SetSelectionCallback(
-		[this](UPrimitiveComponent* Primitive)
+		[this](USceneComponent* Component)
 		{
-			Gizmo->SetTarget(Primitive);
-			Outline->SetTarget(Primitive);
-			DetailsPanel->SetTarget(Primitive);
+			Gizmo->SetTarget(Component);
+			if (UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Component))
+				Outline->SetTarget(Primitive);
+			else
+				Outline->SetTarget(nullptr);
+			DetailsPanel->SetTarget(Component);
 		}
 	);
 
@@ -712,8 +715,11 @@ void UEditorEngine::CreateNewScene()
 void UEditorEngine::OpenScene()
 {
 	UWorld* World = EditorWorldContextRef->World;
-	if (!FEditorFileUtils::LoadScene(World))
+	FViewCamera Camera;
+	if (!FEditorFileUtils::LoadScene(World, &Camera))
 		return;
+
+	MultipleViewportsAdapter.SetViewCamera(MultipleViewportsAdapter.GetEditorViewIndex(), Camera);
 
 	ResetSceneSelection();
 }
@@ -722,14 +728,16 @@ void UEditorEngine::OpenScene()
 void UEditorEngine::SaveCurrentScene()
 {
 	UWorld* World = EditorWorldContextRef->World;
-	FEditorFileUtils::SaveScene(World);
+	const FViewCamera* Camera = &MultipleViewportsAdapter.GetViewCamera(MultipleViewportsAdapter.GetEditorViewIndex());
+	FEditorFileUtils::SaveScene(World, Camera);
 }
 
 // 공통 파일 유틸리티로 새 경로에 씬을 저장한다.
 void UEditorEngine::SaveSceneAs()
 {
 	UWorld* World = EditorWorldContextRef->World;
-	FEditorFileUtils::SaveSceneAs(World);
+	const FViewCamera* Camera = &MultipleViewportsAdapter.GetViewCamera(MultipleViewportsAdapter.GetEditorViewIndex());
+	FEditorFileUtils::SaveSceneAs(World, Camera);
 }
 
 bool UEditorEngine::StartPIE(int32 ViewIndex)

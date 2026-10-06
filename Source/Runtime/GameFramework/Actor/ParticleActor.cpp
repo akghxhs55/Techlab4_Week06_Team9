@@ -1,7 +1,8 @@
 #include "EnginePCH.h"
 #include "ParticleActor.h"
 
-// Todo: subuv
+#include "Asset/AssetManager.h"
+
 AParticleActor::AParticleActor()
 {
 	ParticleComponent = CreateDefaultSubobject<UParticleSubUVComponent>("UParticleSubUVComponent");
@@ -9,31 +10,39 @@ AParticleActor::AParticleActor()
 
 	ParticleComponent->SetSubUVSize(8, 8);
 	ParticleComponent->SetFrameRate(12.0f);
+
+	BillboardComponent = CreateDefaultSubobject<UBillboardComponent>("UBillboardComponent");
+	BillboardComponent->SetupAttachment(ParticleComponent);
+	BillboardComponent->SetMaterial(0, UAssetManager::GetAssetByPath<UMaterial>("ParticleIcon"));
+	BillboardComponent->SetEditorOnly(true);
+	BillboardComponent->SetHideInDetails(true);
 }
 
 AParticleActor::AParticleActor(const AParticleActor& Other)
 	: AActor(Other)
 	, ParticleComponent(Other.ParticleComponent)
+	, BillboardComponent(Other.BillboardComponent)
 {
 }
 
 void AParticleActor::DuplicateSubObjects()
 {
-	Super::DuplicateSubObjects();
-
-	for (UActorComponent* Component : GetComponents())
+	int32 ParticleIndex = -1;
+	int32 BillboardIndex = -1;
+	for (int32 i = 0; i < GetComponents().Num(); ++i)
 	{
-		if (Component == ParticleComponent)
+		if (GetComponents()[i] == ParticleComponent)
 		{
-			ParticleComponent = static_cast<UParticleSubUVComponent*>(Component);
-			break;
+			ParticleIndex = i;
+		}
+		else if (GetComponents()[i] == BillboardComponent)
+		{
+			BillboardIndex = i;
 		}
 	}
+
+	Super::DuplicateSubObjects();
+
+	ParticleComponent = ParticleIndex != -1 ? Cast<UParticleSubUVComponent>(GetComponents()[ParticleIndex]) : nullptr;
+	BillboardComponent = BillboardIndex != -1 ? Cast<UBillboardComponent>(GetComponents()[BillboardIndex]) : nullptr;
 }
-
-UParticleSubUVComponent* AParticleActor::GetParticleComponent() const
-{
-	return static_cast<UParticleSubUVComponent*>(RootComponent);
-}
-
-

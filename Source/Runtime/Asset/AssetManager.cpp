@@ -339,6 +339,18 @@ void UAssetManager::CreateIconMaterials()
 	CameraIconMat->SamplerState = ESamplerState::NearestClamp;
 	RegisterAsset("CameraIcon", CameraIconMat);
 
+	UMaterial* ParticleIconMat = FObjectFactory::ConstructObject<UMaterial>();
+	ParticleIconMat->Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/DefaultShader.hlsl");
+	ParticleIconMat->Textures.Add(GetAssetByPath<UTexture2D>("Assets/Icons/S_Emitter.png"));
+	ParticleIconMat->SamplerState = ESamplerState::NearestClamp;
+	RegisterAsset("ParticleIcon", ParticleIconMat);
+
+	UMaterial* TextRenderIcon = FObjectFactory::ConstructObject<UMaterial>();
+	TextRenderIcon->Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/DefaultShader.hlsl");
+	TextRenderIcon->Textures.Add(GetAssetByPath<UTexture2D>("Assets/Icons/S_TextRenderActorIcon.png"));
+	TextRenderIcon->SamplerState = ESamplerState::NearestClamp;
+	RegisterAsset("TextRenderIcon", TextRenderIcon);
+
 	UMaterial* FogIconMat = FObjectFactory::ConstructObject<UMaterial>();
 	FogIconMat->Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/DefaultShader.hlsl");
 	FogIconMat->Textures.Add(GetAssetByPath<UTexture2D>("Assets/Icons/FogIcon.png"));
