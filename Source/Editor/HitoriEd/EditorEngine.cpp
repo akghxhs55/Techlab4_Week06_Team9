@@ -20,6 +20,7 @@
 #include "GameFramework/Actor/CameraActor.h"
 #include "Component/CameraComponent.h"
 #include "GameFramework/Actor/LightActor.h"
+#include "Component/PointLightComponent.h"
 
 #include "Asset/AssetManager.h"
 #include "Render/RenderResourceManager.h"
@@ -350,16 +351,16 @@ void UEditorEngine::RenderMultipleViewports()
 			ViewportsPanel->GetRenderingInfo(ViewIndex),
 			RenderView,
 			RenderQueue);
-		
+
 		// 원근일 때에, FScene 에 안개가 있다면 그린다.
 		// 그런데 어느 월드에 있는 FScene 에서 가져오지? 
 		// -> ViewIndex == PIEViewIndex 라면 PIE World에서, 아니라면, Editor World 에서 가져온다. 
-		
+
 		auto& info = ViewportsPanel->GetRenderingInfo(ViewIndex);
 		FWorldContext* WorldContext = PIEViewIndex == ViewIndex ? PIEWorldContextRef : EditorWorldContextRef;
 		ScreenQuadRenderer->Render(ViewIndex, ViewportsPanel, &MultipleViewportsAdapter, WorldContext);
-		
-	
+
+
 		RenderOverlay(
 			ViewIndex,
 			ViewportsPanel->GetRenderingInfo(ViewIndex),
@@ -464,12 +465,22 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 			CurrentWorld->GetPathTracker().OnRender(LineBatcher.get());
 		}
 
-		// 선택된 액터가 라이트면 원뿔을 같이 쌓는다
+		// 선택된 액터가 라이트 컴포넌트를 가지고 있으면 디버그 와이어프레임을 같이 쌓는다
 		if (Gizmo->GetTarget())
 		{
-			if (ALightActor* LightActor = Cast<ALightActor>(Gizmo->GetTarget()->GetOwner()))
+			if (AActor* TargetOwner = Gizmo->GetTarget()->GetOwner())
 			{
-				LightActor->GetSpotLightComponent()->DrawDebug(LineBatcher.get());
+				for (UActorComponent* Comp : TargetOwner->GetComponents())
+				{
+					if (UPointLightComponent* PointLight = Cast<UPointLightComponent>(Comp))
+					{
+						PointLight->DrawDebug(LineBatcher.get());
+					}
+					else if (USpotLightComponent* SpotLight = Cast<USpotLightComponent>(Comp))
+					{
+						SpotLight->DrawDebug(LineBatcher.get());
+					}
+				}
 			}
 		}
 
@@ -496,6 +507,7 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		RenderCommand::SetDepthStencilState(EDepthStencilState::Default);
 
 		RenderCommand::SetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		Renderer->UpdatePointLights(CurrentWorld);
 		// 반투명은 Grid 뒤에 합성되어야 하므로 불투명만 먼저 그린다.
 		Renderer->RenderQueueSorting(RenderQueue, RenderView.ViewProjection);
 		Renderer->RenderOpaque(RenderView.ViewProjection);
@@ -527,7 +539,7 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		);
 	}
 
-	
+
 
 
 	RenderCommand::EndRenderPass(ViewRenderingInfo);
@@ -623,13 +635,13 @@ void UEditorEngine::RenderOverlay(int32 ViewIndex, const FRenderingInfo& ViewRen
 	}
 
 
-	if (Outline->GetTarget() && !bIsPIEWorld 
+	if (Outline->GetTarget() && !bIsPIEWorld
 		&& Outline->GetTarget()->GetOwner()->GetWorld() == CurrentWorld)
 	{
 		OutlineRenderer->OnRender(*Outline, RenderView.ViewProjection, ViewRenderingInfo.ViewportSetting);
 	}
 
-	if (Gizmo->GetTarget() && !bIsPIEWorld 
+	if (Gizmo->GetTarget() && !bIsPIEWorld
 		&& Gizmo->GetTarget()->GetOwner()->GetWorld() == CurrentWorld)
 	{
 		GizmoRenderer->OnRender(
@@ -807,6 +819,19 @@ bool UEditorEngine::EndPIE()
 	MultipleViewportsAdapter.SetViewWorld(PIEViewIndex, *EditorWorldContextRef->World);
 	PIEViewIndex = InvalidViewIndex;
 	PIEWorldContextRef = nullptr;
+
+	// Clear Gizmo and Outline targets if they belong to the PIE world
+	// Gizmo, Outline, and DetailsPanel will share the same target.
+	if (Gizmo->GetTarget() && Gizmo->GetTarget()->GetOwner()->GetWorld() == PIEWorld)
+	{
+		Gizmo->SetTarget(nullptr);
+		Outline->SetTarget(nullptr);
+		DetailsPanel->SetTarget(nullptr);
+	}
+
+	// Clear world
+	PIEWorld->ClearWorld();
+	delete PIEWorld;
 
 	// Reset UI panels to use the Editor world
 	{

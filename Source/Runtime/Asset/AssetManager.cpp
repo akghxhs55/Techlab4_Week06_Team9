@@ -327,6 +327,12 @@ void UAssetManager::CreateIconMaterials()
 	SpotlightIconMat->SamplerState = ESamplerState::NearestClamp;
 	RegisterAsset("SpotlightIcon", SpotlightIconMat);
 
+	UMaterial* PointlightIconMat = FObjectFactory::ConstructObject<UMaterial>();
+	PointlightIconMat->Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/DefaultShader.hlsl");
+	PointlightIconMat->Textures.Add(GetAssetByPath<UTexture2D>("Assets/Icons/PointLight_64x.png"));
+	PointlightIconMat->BlendState = EBlendState::AlphaBlend;
+	RegisterAsset("PointlightIcon", PointlightIconMat);
+
 	UMaterial* CameraIconMat = FObjectFactory::ConstructObject<UMaterial>();
 	CameraIconMat->Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/DefaultShader.hlsl");
 	CameraIconMat->Textures.Add(GetAssetByPath<UTexture2D>("Assets/Icons/CameraActor_64x.png"));
