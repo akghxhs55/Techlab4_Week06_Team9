@@ -22,17 +22,17 @@ bool FEditorFileUtils::NewScene(UWorld* World)
 	return true;
 }
 
-bool FEditorFileUtils::SaveScene(UWorld* World)
+bool FEditorFileUtils::SaveScene(UWorld* World, const FViewCamera* Camera)
 {
 	if (!World)
 		return false;
 
 	if (CurrentScenePath.empty())
 	{
-		return SaveSceneAs(World);
+		return SaveSceneAs(World, Camera);
 	}
 
-	if (!FJsonArchive::SaveWorld(World, CurrentScenePath))
+	if (!FJsonArchive::SaveWorld(World, Camera, CurrentScenePath))
 	{
 		HTR_LOG(Error, "Failed to save scene: {}", CurrentScenePath);
 
@@ -49,7 +49,7 @@ bool FEditorFileUtils::SaveScene(UWorld* World)
 	return true;
 }
 
-bool FEditorFileUtils::SaveSceneAs(UWorld* World)
+bool FEditorFileUtils::SaveSceneAs(UWorld* World, const FViewCamera* Camera)
 {
 	if (!World)
 		return false;
@@ -61,7 +61,7 @@ bool FEditorFileUtils::SaveSceneAs(UWorld* World)
 
 	FilePath = std::filesystem::absolute(FilePath).lexically_normal().string();
 
-	if (!FJsonArchive::SaveWorld(World, FilePath))
+	if (!FJsonArchive::SaveWorld(World, Camera, FilePath))
 	{
 		HTR_LOG(Error, "Failed to save scene: {}", FilePath);
 
@@ -82,7 +82,7 @@ bool FEditorFileUtils::SaveSceneAs(UWorld* World)
 	return true;
 }
 
-bool FEditorFileUtils::LoadScene(UWorld* World)
+bool FEditorFileUtils::LoadScene(UWorld* World, FViewCamera* OutCamera)
 {
 	if (!World)
 		return false;
@@ -95,7 +95,7 @@ bool FEditorFileUtils::LoadScene(UWorld* World)
 
 	FilePath = std::filesystem::absolute(FilePath).lexically_normal().string();
 
-	if (!FJsonArchive::LoadWorld(World, FilePath))
+	if (!FJsonArchive::LoadWorld(World, OutCamera, FilePath))
 		return false;
 
 	// 이제 이 파일이 현재 Scene
