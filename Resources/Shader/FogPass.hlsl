@@ -23,8 +23,8 @@ SamplerState LinearSampler : register(s0);
 
 
 struct FVertexOutput {
-    float4 mPosition : SV_Position;
-    float2 mUv : TEXCOORD0;
+    float4 Position : SV_Position;
+    float2 Uv : TEXCOORD0;
 };
 
 
@@ -215,8 +215,8 @@ float ComputeExponentialHeightFog(float3 RayDirection, float SurfaceDistance) {
 // ------------------------------------------------------------
 static const float Epsilon = { 1e-6f };
 float4 mainPS(FVertexOutput Input) : SV_Target {
-    float4 SceneColor = { SceneColorTexture.Sample(LinearSampler, Input.mUv) };
-    float Depth = { SceneDepthTexture.Load(int3(Input.mPosition.xy, 0)) };
+    float4 SceneColor = { SceneColorTexture.Sample(LinearSampler, Input.Uv) };
+    float Depth = { SceneDepthTexture.Load(int3(Input.Position.xy, 0)) };
 
     bool IsSky = { Depth >= 1.0f };
     float ReconstructionDepth = { IsSky && FogMaxDistance > 0.0f ? 0.5f : Depth };
@@ -226,7 +226,7 @@ float4 mainPS(FVertexOutput Input) : SV_Target {
     // World Position 복원
     // --------------------------------------------------------
 
-    float3 WorldPosition = { ReconstructWorldPosition(Input.mUv, ReconstructionDepth) };
+    float3 WorldPosition = { ReconstructWorldPosition(Input.Uv, ReconstructionDepth) };
 
 
     // --------------------------------------------------------

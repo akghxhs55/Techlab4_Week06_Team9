@@ -9,6 +9,7 @@
 #include "ColorPostProcessPass.h"
 #include "DepthBufferRenderPass.h"
 #include "FogPostProcessPass.h"
+#include "FXAAPass.h"
 
 void FPostProcessor::Init() {
 	ColorPass = MakeUnique<FColorProcessPass>();
@@ -19,6 +20,9 @@ void FPostProcessor::Init() {
 
 	FogPass = MakeUnique<FFogRenderPass>();
 	FogPass->Init();
+
+	FXAAPass = MakeUnique<FFXAAPass>();	
+	FXAAPass->Init();
 }
 
 void FPostProcessor::Render(int32 ViewIndex, FViewportsPanel* viewPorts, FMultipleViewportsAdapter* adapter, FWorldContext* WorldContext) {
@@ -39,6 +43,12 @@ void FPostProcessor::Render(int32 ViewIndex, FViewportsPanel* viewPorts, FMultip
 		viewPorts->GetFinalRenderTarget(ViewIndex)->GetRTV() 
 	};
 
+	FTexture2D* Buffers[] = {
+		viewPorts->GetViewRenderTarget1(ViewIndex),
+		viewPorts->GetViewRenderTarget2(ViewIndex),
+		viewPorts->GetFinalRenderTarget(ViewIndex)
+	};
+
 
 	if (info.RenderBufferType == ERenderBuffer::Color) {
 		if (not Context.WorldContext->World->GetScene().ExpHeightFogs.empty()) {
@@ -47,14 +57,14 @@ void FPostProcessor::Render(int32 ViewIndex, FViewportsPanel* viewPorts, FMultip
 			ColorPass->Set(Context);
 			RenderCommand::Draw(3, 0);
 			
-			Context.ColorBuffer = viewPorts->GetViewRenderTarget1(ViewIndex);
+			Context.ColorBuffer = Buffers[0];
 
-			RenderCommand::GetContext()->OMSetRenderTargets(1, &rts[2], nullptr);
+			RenderCommand::GetContext()->OMSetRenderTargets(1, &rts[1], nullptr);
 			FogPass->Set(Context);
 			RenderCommand::Draw(3, 0);
 		}
 		else {
-			RenderCommand::GetContext()->OMSetRenderTargets(1, &rts[2], nullptr);
+			RenderCommand::GetContext()->OMSetRenderTargets(1, &rts[1], nullptr);
 			ColorPass->Set(Context);
 
 			RenderCommand::Draw(3, 0);
@@ -63,11 +73,17 @@ void FPostProcessor::Render(int32 ViewIndex, FViewportsPanel* viewPorts, FMultip
 		
 	}
 	else if (info.RenderBufferType == ERenderBuffer::Depth) {
-		RenderCommand::GetContext()->OMSetRenderTargets(1, &rts[2], nullptr);
+		RenderCommand::GetContext()->OMSetRenderTargets(1, &rts[1], nullptr);
 		DepthPass->Set(Context);
 
 		RenderCommand::Draw(3, 0);
 	}
+
+	Context.ColorBuffer = Buffers[1];
+	RenderCommand::GetContext()->OMSetRenderTargets(1, &rts[2], nullptr);
+	FXAAPass->Set(Context);
+	RenderCommand::Draw(3, 0);
+
 
 	ID3D11ShaderResourceView* NullSRV{ nullptr };
 	RenderCommand::GetContext()->PSSetShaderResources(0, 1, &NullSRV);

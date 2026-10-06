@@ -9,6 +9,7 @@
 
 #include "PostProcessContext.h"
 #include "PostProcessPass.h"
+#include "FXAAPass.h"
 
 // PostProcessor 에서 관리해 줄 것들
 // 렌더 타겟 ping-pong, Screen Triangle Draw Call, 모든 Pass 끝나고 깊이 버퍼 다시 되돌려주기
@@ -44,4 +45,5 @@ private:
 	TUniquePtr<IPostProcessPass> ColorPass;
 	TUniquePtr<IPostProcessPass> DepthPass;
 	TUniquePtr<IPostProcessPass> FogPass;
+	TUniquePtr<IPostProcessPass> FXAAPass;
 };
