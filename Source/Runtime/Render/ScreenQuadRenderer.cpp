@@ -35,22 +35,22 @@ void FPostProcessor::Render(int32 ViewIndex, FViewportsPanel* viewPorts, FMultip
 
 	ID3D11RenderTargetView* rts[] = { 
 		viewPorts->GetViewRenderTarget1(ViewIndex)->GetRTV(), 
-		viewPorts->GetViewRenderTarget2(ViewIndex)->GetRTV() , 
+		viewPorts->GetViewRenderTarget2(ViewIndex)->GetRTV(), 
 		viewPorts->GetFinalRenderTarget(ViewIndex)->GetRTV() 
 	};
 
 
 	if (info.RenderBufferType == ERenderBuffer::Color) {
 		if (not Context.WorldContext->World->GetScene().ExpHeightFogs.empty()) {
+
 			RenderCommand::GetContext()->OMSetRenderTargets(1, &rts[0], nullptr);
 			ColorPass->Set(Context);
-
 			RenderCommand::Draw(3, 0);
 			
 			Context.ColorBuffer = viewPorts->GetViewRenderTarget1(ViewIndex);
+
 			RenderCommand::GetContext()->OMSetRenderTargets(1, &rts[2], nullptr);
 			FogPass->Set(Context);
-
 			RenderCommand::Draw(3, 0);
 		}
 		else {

@@ -338,6 +338,14 @@ void UAssetManager::CreateIconMaterials()
 	CameraIconMat->Textures.Add(GetAssetByPath<UTexture2D>("Assets/Icons/CameraActor_64x.png"));
 	CameraIconMat->SamplerState = ESamplerState::NearestClamp;
 	RegisterAsset("CameraIcon", CameraIconMat);
+
+	UMaterial* FogIconMat = FObjectFactory::ConstructObject<UMaterial>();
+	FogIconMat->Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/DefaultShader.hlsl");
+	FogIconMat->Textures.Add(GetAssetByPath<UTexture2D>("Assets/Icons/FogIcon.png"));
+	FogIconMat->SamplerState = ESamplerState::NearestClamp;
+	RegisterAsset("FogIcon", FogIconMat);
+
+
 }
 
 void UAssetManager::Shutdown()
