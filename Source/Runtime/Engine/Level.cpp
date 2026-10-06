@@ -20,7 +20,7 @@ void ULevel::DuplicateSubObjects()
 	{
 		if (Actor)
 		{
-			Actor = Actor->Duplicate<AActor>();
+			Actor = Cast<AActor>(Actor->Duplicate(Actor->GetClass()));
 		}
 	}
 

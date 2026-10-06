@@ -1,4 +1,4 @@
-﻿#include "EnginePCH.h"
+#include "EnginePCH.h"
 #include "AssetManager.h"
 #include "Render/Buffer.h"
 #include "Render/Material.h"
@@ -326,6 +326,12 @@ void UAssetManager::CreateIconMaterials()
 	SpotlightIconMat->Textures.Add(GetAssetByPath<UTexture2D>("Assets/Icons/SpotLight_64x.png"));
 	SpotlightIconMat->SamplerState = ESamplerState::NearestClamp;
 	RegisterAsset("SpotlightIcon", SpotlightIconMat);
+
+	UMaterial* CameraIconMat = FObjectFactory::ConstructObject<UMaterial>();
+	CameraIconMat->Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/DefaultShader.hlsl");
+	CameraIconMat->Textures.Add(GetAssetByPath<UTexture2D>("Assets/Icons/CameraActor_64x.png"));
+	CameraIconMat->SamplerState = ESamplerState::NearestClamp;
+	RegisterAsset("CameraIcon", CameraIconMat);
 }
 
 void UAssetManager::Shutdown()

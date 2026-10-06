@@ -5,6 +5,7 @@
 #include "ObjectSystem/ObjectFactory.h"
 #include "Core/EngineStatics.h"
 #include "GameFramework/Actor/StaticMeshActor.h"
+#include "GameFramework/Actor/CameraActor.h"
 
 #include "Input/InputSystem.h"
 
@@ -16,6 +17,7 @@
 #include "Component/StaticMeshComponent.h"
 #include "Asset/LOD/StaticMeshLODSelector.h"
 #include "Camera/ViewInfo.h"
+#include "Component/CameraComponent.h"
 
 #include "Math/Frustum.h"
 
@@ -677,4 +679,21 @@ void UWorld::BeginPlay()
 
 void UWorld::EndPlay()
 {
+}
+
+bool UWorld::GetActiveCameraViewInfo(FViewInfo& Out, const FVector2& ViewSize) const
+{
+	for (AActor* Actor : PersistentLevel->GetActors())
+	{
+		if (ACameraActor* CameraActor = Cast<ACameraActor>(Actor))
+		{
+			if (CameraActor->bIsMainCamera)
+			{
+				Out = CameraActor->GetCameraComponent()->GetViewInfo(ViewSize);
+				return true;
+			}
+		}
+	}
+
+	return false;
 }

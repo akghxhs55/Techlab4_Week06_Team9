@@ -87,7 +87,7 @@ public:
 	FScene& GetScene() { return Scene; }
 	FTickTaskManager& GetTickTaskManager() { return TickTaskManager; }
 
-	bool GetActiveCameraViewInfo(FViewInfo& Out) const;
+	bool GetActiveCameraViewInfo(FViewInfo& Out, const FVector2& ViewSize) const;
 
 	const FRenderStats& GetRenderStats() const { return RenderStats; }
 

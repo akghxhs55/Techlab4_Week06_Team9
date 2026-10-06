@@ -659,5 +659,15 @@ FRenderView FMultipleViewportsAdapter::GetRenderView(int32 ViewIndex) const
 
 FViewInfo FMultipleViewportsAdapter::MakeViewInfo(int32 ViewIndex) const
 {
-	return Views.Cameras[ViewIndex].ToViewInfo({ ViewRects[ViewIndex].Width, ViewRects[ViewIndex].Height });
+	const FVector2 ViewSize{ ViewRects[ViewIndex].Width, ViewRects[ViewIndex].Height };
+
+	const UWorld* World = ViewWorlds[ViewIndex];
+    FViewInfo Info;
+    if (World && World->GetWorldType() == EWorldType::PIE &&
+    	World->GetActiveCameraViewInfo(Info, ViewSize))
+    {
+        return Info;
+    }
+
+	return Views.Cameras[ViewIndex].ToViewInfo(ViewSize);
 }

@@ -30,6 +30,8 @@ public:
 	float GetOrthoWidth() const { return OrthoWidth; }
 	void SetOrthoWidth(float InOrthoWidth) { OrthoWidth = InOrthoWidth; }
 
+	virtual void Serialize(json& Handle, bool bIsLoading) override;
+
 protected:
 	float FieldOfView = 60.0f;
 	float AspectRatio = 16.0f / 9.0f;

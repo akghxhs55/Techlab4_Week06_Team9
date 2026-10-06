@@ -178,3 +178,45 @@ FViewInfo UCameraComponent::GetViewInfo(const FVector2& ViewSize) const
 		.ViewSize = ViewSize
 	};
 }
+
+void UCameraComponent::Serialize(json& Handle, bool bIsLoading)
+{
+	Super::Serialize(Handle, bIsLoading);
+
+	if (bIsLoading)
+	{
+		if (Handle.contains("FieldOfView") && Handle["FieldOfView"].is_number_float())
+		{
+			FieldOfView = Handle["FieldOfView"];
+		}
+		if (Handle.contains("AspectRatio") && Handle["AspectRatio"].is_number_float())
+		{
+			AspectRatio = Handle["AspectRatio"];
+		}
+		if (Handle.contains("NearClipPlane") && Handle["NearClipPlane"].is_number_float())
+		{
+			NearClipPlane = Handle["NearClipPlane"];
+		}
+		if (Handle.contains("FarClipPlane") && Handle["FarClipPlane"].is_number_float())
+		{
+			FarClipPlane = Handle["FarClipPlane"];
+		}
+		if (Handle.contains("bIsOrthogonal") && Handle["bIsOrthogonal"].is_boolean())
+		{
+			bIsOrthogonal = Handle["bIsOrthogonal"];
+		}
+		if (Handle.contains("OrthoWidth") && Handle["OrthoWidth"].is_number_float())
+		{
+			OrthoWidth = Handle["OrthoWidth"];
+		}
+	}
+	else
+	{
+		Handle["FieldOfView"] = FieldOfView;
+		Handle["AspectRatio"] = AspectRatio;
+		Handle["NearClipPlane"] = NearClipPlane;
+		Handle["FarClipPlane"] = FarClipPlane;
+		Handle["bIsOrthogonal"] = bIsOrthogonal;
+		Handle["OrthoWidth"] = OrthoWidth;
+	}
+}
