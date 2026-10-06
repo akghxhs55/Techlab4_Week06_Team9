@@ -351,16 +351,16 @@ void UEditorEngine::RenderMultipleViewports()
 			ViewportsPanel->GetRenderingInfo(ViewIndex),
 			RenderView,
 			RenderQueue);
-		
+
 		// 원근일 때에, FScene 에 안개가 있다면 그린다.
 		// 그런데 어느 월드에 있는 FScene 에서 가져오지? 
 		// -> ViewIndex == PIEViewIndex 라면 PIE World에서, 아니라면, Editor World 에서 가져온다. 
-		
+
 		auto& info = ViewportsPanel->GetRenderingInfo(ViewIndex);
 		FWorldContext* WorldContext = PIEViewIndex == ViewIndex ? PIEWorldContextRef : EditorWorldContextRef;
 		ScreenQuadRenderer->Render(ViewIndex, ViewportsPanel, &MultipleViewportsAdapter, WorldContext);
-		
-	
+
+
 		RenderOverlay(
 			ViewIndex,
 			ViewportsPanel->GetRenderingInfo(ViewIndex),
@@ -546,7 +546,7 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		);
 	}
 
-	
+
 
 
 	RenderCommand::EndRenderPass(ViewRenderingInfo);
@@ -628,13 +628,13 @@ void UEditorEngine::RenderOverlay(int32 ViewIndex, const FRenderingInfo& ViewRen
 	}
 
 
-	if (Outline->GetTarget() && !bIsPIEWorld 
+	if (Outline->GetTarget() && !bIsPIEWorld
 		&& Outline->GetTarget()->GetOwner()->GetWorld() == CurrentWorld)
 	{
 		OutlineRenderer->OnRender(*Outline, RenderView.ViewProjection, ViewRenderingInfo.ViewportSetting);
 	}
 
-	if (Gizmo->GetTarget() && !bIsPIEWorld 
+	if (Gizmo->GetTarget() && !bIsPIEWorld
 		&& Gizmo->GetTarget()->GetOwner()->GetWorld() == CurrentWorld)
 	{
 		GizmoRenderer->OnRender(
@@ -812,6 +812,19 @@ bool UEditorEngine::EndPIE()
 	MultipleViewportsAdapter.SetViewWorld(PIEViewIndex, *EditorWorldContextRef->World);
 	PIEViewIndex = InvalidViewIndex;
 	PIEWorldContextRef = nullptr;
+
+	// Clear Gizmo and Outline targets if they belong to the PIE world
+	// Gizmo, Outline, and DetailsPanel will share the same target.
+	if (Gizmo->GetTarget() && Gizmo->GetTarget()->GetOwner()->GetWorld() == PIEWorld)
+	{
+		Gizmo->SetTarget(nullptr);
+		Outline->SetTarget(nullptr);
+		DetailsPanel->SetTarget(nullptr);
+	}
+
+	// Clear world
+	PIEWorld->ClearWorld();
+	delete PIEWorld;
 
 	// Reset UI panels to use the Editor world
 	{
