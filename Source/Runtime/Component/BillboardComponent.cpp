@@ -91,12 +91,29 @@ void UBillboardComponent::Serialize(json& Handle, bool bIsLoading)
 	if (bIsLoading)
 	{
 		// 예전 파일은 "Material"이 문자열(경로)이라 형식을 확인하고 읽는다
-		if (Handle.contains("Material") && Handle["Material"].is_object())
+		if (!Handle.contains("Material"))
 		{
-			if (UMaterial* Loaded = UMaterial::LoadMaterial(Handle["Material"]))
+			return;
+		}
+
+		const json& MaterialJson = Handle["Material"];
+
+		if (MaterialJson.is_object())
+		{
+			UMaterial* LoadedMaterial = UMaterial::LoadMaterial(MaterialJson);
+
+			if (LoadedMaterial)
 			{
-				Material = Loaded;   // 못 만들었으면 생성자 기본값 유지
+				SetMaterial(0, LoadedMaterial);
 			}
+			else
+			{
+				HTR_LOG(Warning, "Load: failed to restore material for {}", GetName());
+			}
+		}
+		else
+		{
+			HTR_LOG(Warning, "Load: invalid material data for {}, expected object but got {}", GetName(), MaterialJson.type_name());
 		}
 	}
 	else
