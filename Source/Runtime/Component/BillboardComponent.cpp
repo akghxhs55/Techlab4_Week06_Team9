@@ -33,6 +33,13 @@ void UBillboardComponent::TickComponent(float DeltaTime)
 	Super::TickComponent(DeltaTime);
 }
 
+FBox UBillboardComponent::CalcLocalBounds() const
+{
+	const FVector Scale = GetWorldScale3D();
+	const float Radius = 0.5f * std::sqrt(Scale.Y * Scale.Y + Scale.Z * Scale.Z);
+	return FBox(FVector(-Radius), FVector(Radius));
+}
+
 // View별 Billboard 행렬과 Material을 렌더 패킷에 담는다.
 void UBillboardComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue, const FMatrix& BillboardWorldMatrix)
 {
