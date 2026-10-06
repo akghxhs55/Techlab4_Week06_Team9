@@ -186,80 +186,6 @@
             "RootComponentUUID": 83
         },
         {
-            "Class": "AStaticMeshActor",
-            "Components": [
-                {
-                    "Class": "UStaticMeshComponent",
-                    "Name": "UStaticMeshComponent_0",
-                    "ParentUUID": null,
-                    "Properties": {
-                        "ObjectUUID": 85,
-                        "OverrideMaterials": [],
-                        "StaticMesh": "Cube",
-                        "Transform": {
-                            "Location": [
-                                0.0,
-                                0.0,
-                                4.7669782638549805
-                            ],
-                            "Rotation": [
-                                0.0,
-                                0.0,
-                                0.0
-                            ],
-                            "Scale": [
-                                1.0,
-                                1.0,
-                                1.0
-                            ]
-                        },
-                        "bVisible": true
-                    }
-                },
-                {
-                    "Class": "UExpHeightFogComponent",
-                    "Name": "UExpHeightFogComponent_0",
-                    "ParentUUID": 85,
-                    "Properties": {
-                        "FogParam.EndDistance": 1000.0,
-                        "FogParam.FogCutOffDistance": 1000.0,
-                        "FogParam.FogDensity": 0.3199999928474426,
-                        "FogParam.FogHeightFalloff": 0.20000000298023224,
-                        "FogParam.FogInscatteringLuminance": [
-                            0.18550555408000946,
-                            0.3644638955593109,
-                            0.9460784196853638,
-                            1.0
-                        ],
-                        "FogParam.FogMaxOpacity": 1.0,
-                        "FogParam.StartDistance": 0.0,
-                        "ObjectUUID": 86,
-                        "Transform": {
-                            "Location": [
-                                0.0,
-                                0.0,
-                                0.0
-                            ],
-                            "Rotation": [
-                                0.0,
-                                0.0,
-                                0.0
-                            ],
-                            "Scale": [
-                                1.0,
-                                1.0,
-                                1.0
-                            ]
-                        }
-                    }
-                }
-            ],
-            "Properties": {
-                "ObjectUUID": 84
-            },
-            "RootComponentUUID": 85
-        },
-        {
             "Class": "ASphereGlowActor",
             "Components": [
                 {
@@ -323,6 +249,7 @@
                                 ],
                                 "BlendState": "Opaque",
                                 "SamplerState": "LinearClamp",
+                                "Shininess": 32.0,
                                 "Textures": [
                                     "WhiteTexture"
                                 ],
@@ -338,7 +265,45 @@
                             "Location": [
                                 0.0,
                                 -0.7779779434204102,
-                                7.318138599395752
+                                26.35270881652832
+                            ],
+                            "Rotation": [
+                                18.925384521484375,
+                                -8.83747673034668,
+                                -25.611785888671875
+                            ],
+                            "Scale": [
+                                1.0,
+                                3.7322328090667725,
+                                1.0
+                            ]
+                        },
+                        "bVisible": true
+                    }
+                }
+            ],
+            "Properties": {
+                "ObjectUUID": 91
+            },
+            "RootComponentUUID": 92
+        },
+        {
+            "Class": "AFogActor",
+            "Components": [
+                {
+                    "Class": "UBillboardComponent",
+                    "Name": "UBillboardComponent_0",
+                    "ParentUUID": null,
+                    "Properties": {
+                        "Material": {
+                            "Asset": "FogIcon"
+                        },
+                        "ObjectUUID": 103,
+                        "Transform": {
+                            "Location": [
+                                0.0,
+                                0.0,
+                                4.240814208984375
                             ],
                             "Rotation": [
                                 0.0,
@@ -353,13 +318,65 @@
                         },
                         "bVisible": true
                     }
+                },
+                {
+                    "Class": "UExpHeightFogComponent",
+                    "Name": "UExpHeightFogComponent_0",
+                    "ParentUUID": 103,
+                    "Properties": {
+                        "FogParam.EndDistance": 1000.0,
+                        "FogParam.FogCutOffDistance": 1000.0,
+                        "FogParam.FogDensity": 0.019999999552965164,
+                        "FogParam.FogHeightFalloff": 0.20000000298023224,
+                        "FogParam.FogInscatteringLuminance": [
+                            0.5,
+                            0.5,
+                            0.5,
+                            1.0
+                        ],
+                        "FogParam.FogMaxOpacity": 1.0,
+                        "FogParam.StartDistance": 0.0,
+                        "ObjectUUID": 104,
+                        "Transform": {
+                            "Location": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ]
+                        }
+                    }
                 }
             ],
             "Properties": {
-                "ObjectUUID": 91
+                "ObjectUUID": 102
             },
-            "RootComponentUUID": 92
+            "RootComponentUUID": 103
         }
     ],
+    "PerspectiveCamera": {
+        "FOV": 60.0,
+        "FarClip": 10000.0,
+        "Location": [
+            0.38157641887664795,
+            -2.7427868843078613,
+            27.539186477661133
+        ],
+        "NearClip": 0.10000000149011612,
+        "Rotation": [
+            0.0,
+            0.13962562382221222,
+            1.919858694076538
+        ]
+    },
     "Version": 2
 }

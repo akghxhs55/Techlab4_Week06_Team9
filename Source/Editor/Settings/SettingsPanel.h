@@ -21,7 +21,7 @@ struct FEditorSettings
 	bool bShowUUID = false;
 	bool bDrawBatchLine = true;
 	bool bDrawPSGrid = false;
-
+	bool bAA = true; 
 	// Values
 	float CameraSpeed = 1.0f;
 	float MouseSensitivity = 1.0f;

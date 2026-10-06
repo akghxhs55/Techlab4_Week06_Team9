@@ -10,6 +10,8 @@ UExpHeightFogComponent::~UExpHeightFogComponent()
 }
 
 FogData& UExpHeightFogComponent::GetFogData() {
+
+	
     auto m = GetWorldMatrix();
 
     FVector4 worldLocation = m.GetOrigin();
