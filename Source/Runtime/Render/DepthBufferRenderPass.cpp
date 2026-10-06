@@ -25,7 +25,7 @@ void FDepthBufferRenderPass::Set(PostProcessContext& Context) {
 	RenderCommand::BindPipelineState(DepthPS);
 
 	auto view = Context.ViewportAdapter->GetRenderView(Context.ViewIndex);
-	DepthBufferData.InverseProj = view.ViewProjection.Inverse();
+	DepthBufferData.InverseProj = view.Projection.Inverse();
 
 	std::memcpy(RenderCommand::MapWriteDiscard(DepthCB.get()), &DepthBufferData, sizeof(DepthBufferCB));
 	RenderCommand::BindConstantBuffer(0, DepthCB.get(), EShaderBindFlagBits::Vertex | EShaderBindFlagBits::Pixel);

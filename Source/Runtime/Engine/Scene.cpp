@@ -152,5 +152,15 @@ void FScene::MarkRenderStateDirty(FPrimitiveSceneProxy* Proxy)
 void FScene::AddFog(UExpHeightFogComponent* Fog) {
 	if (not Fog) return;
 
-	ExpHeightFogs.Add(Fog);
+	ExpHeightFogs.push_back(Fog);
+}
+
+void FScene::RemoveFog(UExpHeightFogComponent* Fog) {
+	if (not Fog) return;
+
+	
+	std::erase_if(ExpHeightFogs, [Fog](UExpHeightFogComponent* ExistingFog) {
+			return ExistingFog == Fog;
+		}
+	);
 }

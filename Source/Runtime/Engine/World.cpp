@@ -94,6 +94,9 @@ void UWorld::DuplicateSubObjects()
 					{
 						if (UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Component))
 							Scene.AddPrimitive(Primitive);
+
+						if (UExpHeightFogComponent* Fog = Cast<UExpHeightFogComponent>(Component))
+							Scene.AddFog(Fog);
 					}
 				}
 			}
@@ -284,7 +287,17 @@ bool UWorld::DestroyActor(AActor* Actor)
 		{
 			Scene.RemovePrimitive(Primitive);
 		}
+
+
+		if (UExpHeightFogComponent* Fog = Cast<UExpHeightFogComponent>(Component))
+		{
+			Scene.RemoveFog(Fog);
+		}
+
 	}
+
+
+	
 
 	Actor->RegisterAllActorTickFunctions(false);
 
