@@ -75,6 +75,7 @@ public:
 	UObject();
 	UObject(bool bRegister);
 	virtual ~UObject();
+	UObject(const UObject& Other);
 
 	static UClass* StaticClass();
 	UClass* GetClass() const { return ClassPrivate; }
@@ -94,7 +95,7 @@ public:
 
 	void SetName(const FName& InName) { Name = FName(InName); }
 
-	inline static void RegisterProperties(UClass* InClass) {};
+	static void RegisterProperties(UClass* InClass);
 
 	inline void SetFlags(EObjectFlags NewFlags) { Flags |= NewFlags; }
 	inline void ClearFlags(EObjectFlags FlagsToClear) { Flags &= ~FlagsToClear; }

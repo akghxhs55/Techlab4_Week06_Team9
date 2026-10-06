@@ -676,6 +676,10 @@ namespace
 			{
 				continue;
 			}
+			if (Class == UObject::StaticClass())
+			{
+				continue; // UObject의 프로퍼티는 표시하지 않음
+			}
 
 			ImGui::PushID(Class->Name.c_str());
 			if (ImGui::CollapsingHeader(Class->Name.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
