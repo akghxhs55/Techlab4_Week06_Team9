@@ -620,22 +620,24 @@ void UEditorEngine::RenderOverlay(int32 ViewIndex, const FRenderingInfo& ViewRen
 			if (!Actor)
 				continue;
 
-			UPrimitiveComponent* Primitive =
-				Cast<UPrimitiveComponent>(Actor->GetRootComponent());
-
-			if (!Primitive)
-				continue;
-
-			FBox Box =
-				Primitive->CalcBounds();
-
 			FVector UUIDLocation;
-			UUIDLocation.X = (Box.Min.X + Box.Max.X) * 0.5f;
-			UUIDLocation.Y = (Box.Min.Y + Box.Max.Y) * 0.5f;
-			UUIDLocation.Z = Box.Max.Z + 0.5f;
+			if (UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Actor->GetRootComponent()))
+			{
+				const FBox Box = Primitive->CalcBounds();
+				UUIDLocation.X = (Box.Min.X + Box.Max.X) * 0.5f;
+				UUIDLocation.Y = (Box.Min.Y + Box.Max.Y) * 0.5f;
+				UUIDLocation.Z = Box.Max.Z + 0.5f;
+			}
+			else if (USceneComponent* SceneComp = Actor->GetRootComponent())
+			{
+				UUIDLocation = SceneComp->GetWorldLocation() + FVector(0.0f, 0.0f, 0.5f);
+			}
+			else
+			{
+				continue;
+			}
 
-			FString Text =
-				"UUID : " + std::to_string(Actor->GetUUID());
+			FString Text = "UUID : " + std::to_string(Actor->GetUUID());
 
 			TextRenderer->BuildTextMesh(
 				Text,
