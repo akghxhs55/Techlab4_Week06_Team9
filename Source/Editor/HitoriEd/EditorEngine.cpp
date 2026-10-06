@@ -135,7 +135,7 @@ bool UEditorEngine::Init()
 	TextRenderer = MakeUnique<FTextRenderer>();
 	TextRenderer->Init();
 
-	ScreenQuadRenderer = MakeUnique<FScreenQuadRenderer>();
+	ScreenQuadRenderer = MakeUnique<FPostProcessor>();
 	ScreenQuadRenderer->Init();
 
 	// TODO: Iterate WorldContext to set each world
@@ -350,17 +350,16 @@ void UEditorEngine::RenderMultipleViewports()
 			ViewportsPanel->GetRenderingInfo(ViewIndex),
 			RenderView,
 			RenderQueue);
-
-
-		// 지금까지 그린 결과를 Screen Quad 로 그리는 과정 추가... 
-		// 1. 현재 RT 는 어디에 -> Renderer 에 있다. 
-		// 1-1. Renderer 에 Screen Quad 를 그려야 하나?	
-		// RT 를 BackBuffer 에 그리는 것이 아니라, 화면 크기와 동일한 Texture 에 그리고, 모든 렌더링이 끝난 이후에 Screen Quad 를 그려서 BackBuffer 에 그린다.
-
-
+		
+		// 원근일 때에, FScene 에 안개가 있다면 그린다.
+		// 그런데 어느 월드에 있는 FScene 에서 가져오지? 
+		// -> ViewIndex == PIEViewIndex 라면 PIE World에서, 아니라면, Editor World 에서 가져온다. 
+		
 		auto& info = ViewportsPanel->GetRenderingInfo(ViewIndex);
-		ScreenQuadRenderer->Render(ViewportsPanel->GetViewRenderTarget(ViewIndex), info, RenderView.Projection);
-
+		FWorldContext* WorldContext = PIEViewIndex == ViewIndex ? PIEWorldContextRef : EditorWorldContextRef;
+		ScreenQuadRenderer->Render(ViewIndex, ViewportsPanel, &MultipleViewportsAdapter, WorldContext);
+		
+	
 		RenderOverlay(
 			ViewIndex,
 			ViewportsPanel->GetRenderingInfo(ViewIndex),
@@ -535,42 +534,7 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		);
 	}
 
-	if (SettingsPanel->GetSettings().bShowUUID)
-	{
-
-		for (AActor* Actor : CurrentWorld->GetPersistentLevel()->GetActors())
-		{
-			if (!Actor)
-				continue;
-
-			UPrimitiveComponent* Primitive =
-				Cast<UPrimitiveComponent>(Actor->GetRootComponent());
-
-			if (!Primitive)
-				continue;
-
-			FBox Box =
-				Primitive->CalcBounds();
-
-			FVector UUIDLocation;
-			UUIDLocation.X = (Box.Min.X + Box.Max.X) * 0.5f;
-			UUIDLocation.Y = (Box.Min.Y + Box.Max.Y) * 0.5f;
-			UUIDLocation.Z = Box.Max.Z + 0.5f;
-
-			FString Text =
-				"UUID : " + std::to_string(Actor->GetUUID());
-
-			TextRenderer->BuildTextMesh(
-				Text,
-				0.5f,
-				*SystemFont
-			);
-
-			const FMatrix BillboardWorld = RenderView.BuildBillboardMatrix(UUIDLocation, 1.0f, 1.0f);
-			TextRenderer->OnRender(Text, BillboardWorld, 0.5f, *SystemFont, RenderView.ViewProjection);
-		}
-	}
-
+	
 
 
 	RenderCommand::EndRenderPass(ViewRenderingInfo);
@@ -611,6 +575,46 @@ void UEditorEngine::RenderOverlay(int32 ViewIndex, const FRenderingInfo& ViewRen
 			}
 		}
 	}
+
+
+	if (SettingsPanel->GetSettings().bShowUUID and not bIsPIEWorld)
+	{
+
+		for (AActor* Actor : CurrentWorld->GetPersistentLevel()->GetActors())
+		{
+			if (!Actor)
+				continue;
+
+			UPrimitiveComponent* Primitive =
+				Cast<UPrimitiveComponent>(Actor->GetRootComponent());
+
+			if (!Primitive)
+				continue;
+
+			FBox Box =
+				Primitive->CalcBounds();
+
+			FVector UUIDLocation;
+			UUIDLocation.X = (Box.Min.X + Box.Max.X) * 0.5f;
+			UUIDLocation.Y = (Box.Min.Y + Box.Max.Y) * 0.5f;
+			UUIDLocation.Z = Box.Max.Z + 0.5f;
+
+			FString Text =
+				"UUID : " + std::to_string(Actor->GetUUID());
+
+			TextRenderer->BuildTextMesh(
+				Text,
+				0.5f,
+				*SystemFont
+			);
+
+			auto view = MultipleViewportsAdapter.GetRenderView(ViewIndex);
+			const FMatrix BillboardWorld = view.BuildBillboardMatrix(UUIDLocation, 1.0f, 1.0f);
+			TextRenderer->OnRender(Text, BillboardWorld, 0.5f, *SystemFont, view.ViewProjection);
+
+		}
+	}
+
 
 	if (Outline->GetTarget() && !bIsPIEWorld 
 		&& Outline->GetTarget()->GetOwner()->GetWorld() == CurrentWorld)

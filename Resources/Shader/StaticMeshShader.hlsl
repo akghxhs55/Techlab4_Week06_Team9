@@ -47,7 +47,7 @@ PS_INPUT mainVS(VS_INPUT input)
 
     output.position = mul(mul(float4(input.p, 1.0f),World), VP);
     // w=0으로 이동 성분을 빼고 월드 공간으로 보낸다. 비균등 스케일이면 역전치가 필요하다.
-    // output.normal = mul(float4(input.n, 0.0f), World).xyz;
+    output.normal = mul(float4(input.n, 0.0f), World).xyz;
     output.color = input.c;
     output.uv = input.t;
     return output;
@@ -55,7 +55,7 @@ PS_INPUT mainVS(VS_INPUT input)
 
 float4 mainPS(PS_INPUT input) : SV_TARGET
 {
-    return g_txColor.Sample(g_Sample, input.uv + UVOffset); // 라이팅 적용 시 제거
+   //  return g_txColor.Sample(g_Sample, input.uv + UVOffset); // 라이팅 적용 시 제거
     float4 texColor = g_txColor.Sample(g_Sample, input.uv + UVOffset);
     float4 albedo = texColor * BaseColor;
 

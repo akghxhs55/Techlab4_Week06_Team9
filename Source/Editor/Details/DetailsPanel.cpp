@@ -9,6 +9,7 @@
 #include "Asset/AssetManager.h"
 #include "Component/SphereGlowComponent.h"
 #include "Component/SpotLightComponent.h"
+#include "Component/UExpHeightFogComponent.h"
 #include "Render/Material.h"
 #include "Render/Texture2D.h"
 #include "Text/Font.h"
@@ -765,7 +766,8 @@ void FDetailsPanel::DrawComponentSection(AActor* Actor)
 			UTextRenderComponent::StaticClass(),
 			UBillboardComponent::StaticClass(),
 			USpotLightComponent::StaticClass(),
-			USphereGlowComponent::StaticClass()
+			USphereGlowComponent::StaticClass(),
+			UExpHeightFogComponent::StaticClass(),
 		};
 		for (UClass* Type : AddableComponentTypes)
 		{
