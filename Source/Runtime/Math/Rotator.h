@@ -39,6 +39,20 @@ struct FRotator
 
 		return *this;
 	}
+
+	FRotator operator*(float Scalar) const
+	{
+		return FRotator(Pitch * Scalar, Yaw * Scalar, Roll * Scalar);
+	}
+
+	FRotator& operator*=(float Scalar)
+	{
+		Pitch *= Scalar;
+		Yaw *= Scalar;
+		Roll *= Scalar;
+
+		return *this;
+	}
 };
 
 FRotator operator+(FRotator Rot, const FVector& Vec);

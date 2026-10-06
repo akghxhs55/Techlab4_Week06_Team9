@@ -9,7 +9,7 @@
 #include "Occlusion/GPUOcclusion.h"
 
 constexpr uint32 ObjectSlotBytes = 256;
-constexpr uint32 MAX_POINT_LIGHTS = 4;
+constexpr uint32 MAX_POINT_LIGHTS = 10;
 
 struct alignas(16) FPointLightShaderData
 {
@@ -27,6 +27,13 @@ struct alignas(16) FPointLightBuffer
 	FPointLightShaderData PointLights[MAX_POINT_LIGHTS];
 	int32 NumPointLights = 0;
 	float Padding[3] = { 0.0f, 0.0f, 0.0f };
+};
+
+struct alignas(16) FViewConstants
+{
+	FMatrix ViewProjection;
+	FVector CameraPosition = FVector(0.0f, 0.0f, 0.0f);
+	float Padding = 0.0f;
 };
 
 struct FPerObjectConstants
@@ -81,7 +88,7 @@ public:
 	void RenderTranslucent(const FMatrix& ViewProjection);
 
 	// 큐를 Material, Opaque, Mesh에 따라 정렬한다
-	void RenderQueueSorting(FRenderQueue& InQueue, const FMatrix& ViewProjection);
+	void RenderQueueSorting(FRenderQueue& InQueue, const FMatrix& ViewProjection, const FVector& CameraLocation = FVector(0.0f, 0.0f, 0.0f));
 
 	// [측정 전용] RenderOpaque 직후에 호출한다. 불투명 패킷을 깊이 LESS_EQUAL·색 쓰기 없이 다시 그리며
 	// 패킷마다 오클루전 쿼리를 걸어, 최종 화면에 실제로 픽셀을 남긴 물체 수를 센다.

@@ -66,7 +66,7 @@ bool FRenderer::Init()
 {
 	bUsePerObjectSlots = RenderCommand::SupportsConstantBufferOffsets();
 	PerObjectCB = RenderCommand::CreateConstantBuffer(sizeof(FPerObjectConstants));
-	ViewCB = RenderCommand::CreateConstantBuffer(sizeof(FMatrix));
+	ViewCB = RenderCommand::CreateConstantBuffer(sizeof(FViewConstants));
 	PointLightCB = RenderCommand::CreateConstantBuffer(sizeof(FPointLightBuffer));
 
 	FPointLightBuffer InitialLightBuffer{};
@@ -137,13 +137,15 @@ void FRenderer::UploadPerObjectConstants()
 // 카메라의 ViewProjection을 공통 렌더 경로로 전달한다.
 void FRenderer::RenderAll(FRenderQueue& InQueue, const FRenderView& RenderView)
 {
-	RenderAll(InQueue, RenderView.ViewProjection);
+	RenderQueueSorting(InQueue, RenderView.ViewProjection, RenderView.CameraLocation);
+	RenderOpaque(RenderView.ViewProjection);
+	RenderTranslucent(RenderView.ViewProjection);
 }
 
 // 불투명 우선·반투명 거리순으로 정렬해 View 행렬과 Section 범위로 그린다.
 void FRenderer::RenderAll(FRenderQueue& InQueue, const FMatrix& ViewProjection)
 {
-	RenderQueueSorting(InQueue, ViewProjection);
+	RenderQueueSorting(InQueue, ViewProjection, FVector(0.0f, 0.0f, 0.0f));
 	RenderOpaque(ViewProjection);
 	RenderTranslucent(ViewProjection);
 }
@@ -166,9 +168,12 @@ void FRenderer::RenderTranslucent(const FMatrix& ViewProjection)
 	FirstTranslucentIndex = 0;
 }
 
-void FRenderer::RenderQueueSorting(FRenderQueue& InQueue, const FMatrix& ViewProjection)
+void FRenderer::RenderQueueSorting(FRenderQueue& InQueue, const FMatrix& ViewProjection, const FVector& CameraLocation)
 {
-	RenderCommand::UpdateBufferData(ViewCB.get(), &ViewProjection);
+	FViewConstants ViewConstants{};
+	ViewConstants.ViewProjection = ViewProjection;
+	ViewConstants.CameraPosition = CameraLocation;
+	RenderCommand::UpdateBufferData(ViewCB.get(), &ViewConstants, sizeof(FViewConstants));
 	{
 		SCOPE_CYCLE_COUNTER(STAT_RenderQueueSorting);
 
@@ -457,6 +462,7 @@ void FRenderer::UpdateMaterialParams(const FRenderPacket& RenderPacket)
 		Params.BaseColor = RenderPacket.Material->BaseColor;
 		Params.UVOffset = RenderPacket.Material->UVScrollSpeed * TotalTime;
 		Params.bOpaque = RenderPacket.Material->BlendState == EBlendState::Opaque ? 1.0f : 0.0f;
+		Params.Shininess = RenderPacket.Material->Shininess;
 
 		RenderCommand::UpdateBufferData(RenderPacket.Material->ParamBuffer.get(), &Params, sizeof(FStaticMeshMaterialParams));
 		RenderCommand::BindConstantBuffer(1, RenderPacket.Material->ParamBuffer.get(), EShaderBindFlagBits::Pixel);
