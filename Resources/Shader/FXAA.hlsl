@@ -45,7 +45,7 @@ float4 FXAA(float2 uv)
     
     
     //========================================================
-    // 1. ÇöÀç ÇÈ¼¿ + »óÇÏÁÂ¿ì »ùÇÃ
+    // 1. í˜„ì¬ í”½ì…€ + ìƒí•˜ì¢Œìš° ìƒ˜í”Œ
     //
     //        N
     //
@@ -61,10 +61,10 @@ float4 FXAA(float2 uv)
     
     
     //========================================================
-    // 2. Contrast °Ë»ç
+    // 2. Contrast ê²€ì‚¬
     //
-    // contrast°¡ ÃæºĞÈ÷ Å©Áö ¾ÊÀ¸¸é
-    // AA°¡ ÇÊ¿ä ¾ø´Â ÇÈ¼¿ÀÌ¶ó°í ÆÇ´ÜÇÏ°í ¹Ù·Î Á¾·áÇÑ´Ù.
+    // contrastê°€ ì¶©ë¶„íˆ í¬ì§€ ì•Šìœ¼ë©´
+    // AAê°€ í•„ìš” ì—†ëŠ” í”½ì…€ì´ë¼ê³  íŒë‹¨í•˜ê³  ë°”ë¡œ ì¢…ë£Œí•œë‹¤.
     //========================================================
     float LuminanceMin = min(LuminanceM, min(min(LuminanceN, LuminanceS), min(LuminanceW, LuminanceE)));
     float LuminanceMax = max(LuminanceM, max(max(LuminanceN, LuminanceS), max(LuminanceW, LuminanceE)));
@@ -84,7 +84,7 @@ float4 FXAA(float2 uv)
     
     
     //========================================================
-    // 3. ´ë°¢¼±±îÁö Ãß°¡ »ùÇÃ
+    // 3. ëŒ€ê°ì„ ê¹Œì§€ ì¶”ê°€ ìƒ˜í”Œ
     //
     //    NW   N   NE
     //
@@ -101,26 +101,26 @@ float4 FXAA(float2 uv)
     
     
     //========================================================
-    // 4. Edge ¹æÇâ ÆÇÁ¤
+    // 4. Edge ë°©í–¥ íŒì •
     //
-    // Edge°¡ °¡·Î·Î ³õ¿´´ÂÁö ¼¼·Î·Î ³õ¿´´ÂÁö¸¦ ÆÇ´ÜÇÑ´Ù.
+    // Edgeê°€ ê°€ë¡œë¡œ ë†“ì˜€ëŠ”ì§€ ì„¸ë¡œë¡œ ë†“ì˜€ëŠ”ì§€ë¥¼ íŒë‹¨í•œë‹¤.
     //
-    // ¿©±â¼­ ÁÖÀÇÇÒ Á¡:
+    // ì—¬ê¸°ì„œ ì£¼ì˜í•  ì :
     //
-    // EdgeHorizontal°¡ Å©´Ù
-    //      -> edge ÀÚÃ¼°¡ ¼öÆò
-    //      -> gradient´Â ¼öÁ÷ ¹æÇâÀ¸·Î °­ÇÏ´Ù.
+    // EdgeHorizontalê°€ í¬ë‹¤
+    //      -> edge ìì²´ê°€ ìˆ˜í‰
+    //      -> gradientëŠ” ìˆ˜ì§ ë°©í–¥ìœ¼ë¡œ ê°•í•˜ë‹¤.
     //
     //
-    //       ¹àÀ½
+    //       ë°ìŒ
     //  -------------
-    //       ¾îµÎ¿ò
+    //       ì–´ë‘ì›€
     //
-    //       ¡è gradient
-    //       ¦¢
-    //       ¦¢
+    //       â†‘ gradient
+    //       â”‚
+    //       â”‚
     //
-    // edge ÁøÇà ¹æÇâÀº ¡ç ¡æ
+    // edge ì§„í–‰ ë°©í–¥ì€ â† â†’
     //========================================================
     float EdgeHorizontal = abs(-2.0f * LuminanceM + LuminanceN + LuminanceS) * 2.f + abs(-2.0f * LuminanceE + LuminanceNE + LuminanceSE) + abs(-2.0f * LuminanceW + LuminanceNW + LuminanceSW);
     float EdgeVertical = abs(-2.0f * LuminanceM + LuminanceE + LuminanceW) * 2.f + abs(-2.0f * LuminanceN + LuminanceNE + LuminanceNW) + abs(-2.0f * LuminanceS + LuminanceSE + LuminanceSW);
@@ -131,20 +131,20 @@ float4 FXAA(float2 uv)
     
     
     //========================================================
-    // 5. EdgeÀÇ ¾î´À ÂÊ¿¡ ÇöÀç ÇÈ¼¿ÀÌ ÀÖ´ÂÁö °áÁ¤
+    // 5. Edgeì˜ ì–´ëŠ ìª½ì— í˜„ì¬ í”½ì…€ì´ ìˆëŠ”ì§€ ê²°ì •
     //
-    // ¼öÆò edge:
+    // ìˆ˜í‰ edge:
     //
     //       N
-    //       ¦¢
+    //       â”‚
     //       M
-    //       ¦¢
+    //       â”‚
     //       S
     //
-    // N-M gradient¿Í M-S gradient Áß
-    // ´õ °­ÇÑ ÂÊÀ» °í¸¥´Ù.
+    // N-M gradientì™€ M-S gradient ì¤‘
+    // ë” ê°•í•œ ìª½ì„ ê³ ë¥¸ë‹¤.
     //
-    // ¼¼·Î edge¶ó¸é W/E¸¦ ºñ±³ÇÑ´Ù.
+    // ì„¸ë¡œ edgeë¼ë©´ W/Eë¥¼ ë¹„êµí•œë‹¤.
     //========================================================
     float luma1 = IsHorizontal ? LuminanceN : LuminanceW;
     float luma2 = IsHorizontal ? LuminanceS : LuminanceE;
@@ -157,15 +157,15 @@ float4 FXAA(float2 uv)
     float Gradient = max(Gradient1, Gradient2);
     
     
-    // Edge¿¡ ¼öÁ÷ÀÎ ¹æÇâ
+    // Edgeì— ìˆ˜ì§ì¸ ë°©í–¥
     //
-    // Horizontal Edge -> YÃà ÀÌµ¿
-    // Vertical Edge   -> XÃà ÀÌµ¿
+    // Horizontal Edge -> Yì¶• ì´ë™
+    // Vertical Edge   -> Xì¶• ì´ë™
     float2 PixelStep = IsHorizontal ? float2(0.0f, InverseScreenSize.y) : float2(InverseScreenSize.x, 0.0f);
 
     float LumaLocalAvg; 
     
-    // N ¶Ç´Â W ÂÊ Gradient ¿ì¼¼ 
+    // N ë˜ëŠ” W ìª½ Gradient ìš°ì„¸ 
     if (Is1Steepest)
     {
         PixelStep = -PixelStep;
@@ -179,17 +179,17 @@ float4 FXAA(float2 uv)
     
     
     //========================================================
-    // ÇöÀç ÇÈ¼¿¿¡¼­ gradient ¹æÇâÀ¸·Î Àı¹İ ÀÌµ¿
+    // í˜„ì¬ í”½ì…€ì—ì„œ gradient ë°©í–¥ìœ¼ë¡œ ì ˆë°˜ ì´ë™
     //
     //
     // Pixel center
-    //       ¡Ü
-    //       ¦¢
-    //       ¦¢ 0.5 pixel
-    //       ¡é
-    // ------X------ edge Áß½É
+    //       â—
+    //       â”‚
+    //       â”‚ 0.5 pixel
+    //       â†“
+    // ------X------ edge ì¤‘ì‹¬
     //
-    // ÀÌ À§Ä¡ºÎÅÍ edge¸¦ µû¶ó ¾ç¹æÇâ Å½»öÇÑ´Ù.
+    // ì´ ìœ„ì¹˜ë¶€í„° edgeë¥¼ ë”°ë¼ ì–‘ë°©í–¥ íƒìƒ‰í•œë‹¤.
     //========================================================
     float2 EdgeCenterUv = uv + 0.5f * PixelStep;
     
@@ -198,7 +198,7 @@ float4 FXAA(float2 uv)
     
     
     //========================================================
-    // 6. Endpoint Å½»ö
+    // 6. Endpoint íƒìƒ‰
     //========================================================
     float GradientTreshold = Gradient * 0.25f;
     
@@ -233,7 +233,7 @@ float4 FXAA(float2 uv)
     {
         float SearchDistance = SearchDistances[i];
         
-        // Edge ÁøÇà ¹æÇâÀÇ ¾çÂÊÀ» Å½»ö
+        // Edge ì§„í–‰ ë°©í–¥ì˜ ì–‘ìª½ì„ íƒìƒ‰
         float2 CandidateUVNegative = EdgeCenterUv - SearchDistance * EdgeDir;
         float2 CandidateUVPositive = EdgeCenterUv + SearchDistance * EdgeDir;
         
@@ -245,8 +245,8 @@ float4 FXAA(float2 uv)
             
             DeltaNegative = LumaNegative - LumaLocalAvg;
             
-            // ½ÃÀÛ ÁöÁ¡°ú ÃæºĞÈ÷ ´Ş¶óÁ³´Ù¸é
-            // edge°¡ º¯È­ÇÑ ÁöÁ¡À¸·Î ÆÇ´ÜÇÑ´Ù.
+            // ì‹œì‘ ì§€ì ê³¼ ì¶©ë¶„íˆ ë‹¬ë¼ì¡Œë‹¤ë©´
+            // edgeê°€ ë³€í™”í•œ ì§€ì ìœ¼ë¡œ íŒë‹¨í•œë‹¤.
             ReachedNegativeEnd = (abs(DeltaNegative) >= GradientTreshold);
         }
         
@@ -269,7 +269,7 @@ float4 FXAA(float2 uv)
     
     
     //========================================================
-    // 7. ÇöÀç ÇÈ¼¿°ú ¾çÂÊ endpointÀÇ °Å¸®
+    // 7. í˜„ì¬ í”½ì…€ê³¼ ì–‘ìª½ endpointì˜ ê±°ë¦¬
     //
     //
     // endpoint A           endpoint B
@@ -278,7 +278,7 @@ float4 FXAA(float2 uv)
     //              ^
     //              M
     //
-    // ¾î´À endpoint°¡ ÇöÀç ÇÈ¼¿¿¡ °¡±î¿îÁö °è»êÇÑ´Ù.
+    // ì–´ëŠ endpointê°€ í˜„ì¬ í”½ì…€ì— ê°€ê¹Œìš´ì§€ ê³„ì‚°í•œë‹¤.
     //========================================================
     float DistanceNegative; 
     float DistancePositive; 
@@ -301,17 +301,17 @@ float4 FXAA(float2 uv)
     
     
     //========================================================
-    // 8. Edge ±â¹İ pixel offset °è»ê
+    // 8. Edge ê¸°ë°˜ pixel offset ê³„ì‚°
     //
-    // endpoint »çÀÌ¿¡¼­ ÇöÀç ÇÈ¼¿ÀÌ ¾î´À Á¤µµ
-    // Ä¡¿ìÃÄ ÀÖ´ÂÁö °è»êÇÑ´Ù.
+    // endpoint ì‚¬ì´ì—ì„œ í˜„ì¬ í”½ì…€ì´ ì–´ëŠ ì •ë„
+    // ì¹˜ìš°ì³ ìˆëŠ”ì§€ ê³„ì‚°í•œë‹¤.
     //
     //
     // endpoint         M                    endpoint
     //    |-------------|-----------------------|
     //
-    // MÀÌ endpoint¿¡ °¡±î¿ï¼ö·Ï
-    // ´õ Å« AA offsetÀÌ ÇÊ¿äÇÏ´Ù.
+    // Mì´ endpointì— ê°€ê¹Œìš¸ìˆ˜ë¡
+    // ë” í° AA offsetì´ í•„ìš”í•˜ë‹¤.
     //========================================================
     float EdgePixelOffset = 0.f;
     
@@ -319,7 +319,7 @@ float4 FXAA(float2 uv)
     {
         float PixelOffset = 0.5f - DistanceFinal / EdgeLength;
         
-        // °¡±î¿î endpointÀÇ luminance º¯È­ ¹æÇâ
+        // ê°€ê¹Œìš´ endpointì˜ luminance ë³€í™” ë°©í–¥
         float EndPointDelta = IsNegativeNearest ? DeltaNegative : DeltaPositive;
         
         EdgePixelOffset = PixelOffset;
@@ -327,10 +327,10 @@ float4 FXAA(float2 uv)
     
     
     //========================================================
-    // 9. Subpixel Alias Á¦°Å
+    // 9. Subpixel Alias ì œê±°
     //
-    // ±ä edge°¡ ¾Æ´Ï¶ó,
-    // ÇÑµÎ ÇÈ¼¿ ¼öÁØÀÇ ÀÛÀº aliasing¿¡µµ ´ëÀÀÇÑ´Ù.
+    // ê¸´ edgeê°€ ì•„ë‹ˆë¼,
+    // í•œë‘ í”½ì…€ ìˆ˜ì¤€ì˜ ì‘ì€ aliasingì—ë„ ëŒ€ì‘í•œë‹¤.
     //========================================================
     float LumaAvg = (2.f * (LuminanceN + LuminanceS + LuminanceW + LuminanceE) + LuminanceNW + LuminanceNE + LuminanceSW + LuminanceSE) / 12.f;
     float SubPixelOffset = saturate(abs(LumaAvg - LuminanceM) / max(LuminanceRange, 1e-6f));
@@ -339,24 +339,24 @@ float4 FXAA(float2 uv)
     
     
     //========================================================
-    // 10. Edge AA¿Í Subpixel AA Áß ´õ °­ÇÑ °ÍÀ» ¼±ÅÃ
+    // 10. Edge AAì™€ Subpixel AA ì¤‘ ë” ê°•í•œ ê²ƒì„ ì„ íƒ
     //========================================================
     float2 FinalOffset = max(EdgePixelOffset, SubPixelOffset);
     
     //========================================================
-    // 11. ÃÖÁ¾ UV
+    // 11. ìµœì¢… UV
     //
-    // Áß¿äÇÑ ºÎºĞ:
+    // ì¤‘ìš”í•œ ë¶€ë¶„:
     //
-    // edge¸¦ µû¶ó ÀÌµ¿ÇÏ´Â °Ô ¾Æ´Ï´Ù.
+    // edgeë¥¼ ë”°ë¼ ì´ë™í•˜ëŠ” ê²Œ ì•„ë‹ˆë‹¤.
     //
-    // edge endpoint¸¦ Ã£±â À§ÇØ¼­´Â edge ¹æÇâÀ¸·Î Å½»öÇßÁö¸¸,
+    // edge endpointë¥¼ ì°¾ê¸° ìœ„í•´ì„œëŠ” edge ë°©í–¥ìœ¼ë¡œ íƒìƒ‰í–ˆì§€ë§Œ,
     //
-    // ÃÖÁ¾ AA samplingÀº
+    // ìµœì¢… AA samplingì€
     //
-    //        edge¿Í "¼öÁ÷"
+    //        edgeì™€ "ìˆ˜ì§"
     //
-    // ÀÎ ¹æÇâÀ¸·Î ÀÌµ¿ÇÑ´Ù.
+    // ì¸ ë°©í–¥ìœ¼ë¡œ ì´ë™í•œë‹¤.
     //========================================================
     float2 FinalUV = uv + FinalOffset * PixelStep;
     
