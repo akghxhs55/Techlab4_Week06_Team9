@@ -101,6 +101,8 @@ void UWorld::DuplicateSubObjects()
 						if (UExpHeightFogComponent* Fog = Cast<UExpHeightFogComponent>(Component))
 							Scene.AddFog(Fog);
 					}
+
+					Actor->RegisterAllActorTickFunctions(true);
 				}
 			}
 		}
@@ -152,15 +154,21 @@ AActor* UWorld::SpawnActor(UClass* Class, FName InName, const FTransform* Transf
 	// 5. PlayList에 추가
 	BeginPlayList.Enqueue(NewActor);
 
+	NewActor->RegisterAllActorTickFunctions(true);
+
 	return NewActor;
 }
 
 void UWorld::Tick(float DeltaTime)
 {
-	while (!BeginPlayList.IsEmpty())
+	// Only run BeginPlay for PIE or Game worlds.
+	if (WorldType == EWorldType::PIE)
 	{
-		BeginPlayList.Peek()->BeginPlay();
-		BeginPlayList.Dequeue();
+		while (!BeginPlayList.IsEmpty())
+		{
+			BeginPlayList.Peek()->BeginPlay();
+			BeginPlayList.Dequeue();
+		}
 	}
 
 	{
@@ -308,7 +316,7 @@ bool UWorld::DestroyActor(AActor* Actor)
 	}
 
 
-	
+
 
 	Actor->RegisterAllActorTickFunctions(false);
 
