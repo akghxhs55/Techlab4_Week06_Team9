@@ -797,6 +797,19 @@ bool UEditorEngine::StartPIE(int32 ViewIndex)
 	MultipleViewportsAdapter.SetViewWorld(ViewIndex, *PIEWorld);
 	PIEViewIndex = ViewIndex;
 
+	// Set Camera component if the PIE world has a camera actor
+	{
+		ACameraActor* CameraActor = PIEWorld->GetActiveCameraActor();
+		if (CameraActor)
+		{
+			UCameraComponent* CameraComponent = CameraActor->GetCameraComponent();
+			if (CameraComponent)
+			{
+				MultipleViewportsAdapter.PossessCamera(CameraActor);
+			}
+		}
+	}
+
 	// Set UI panels to use the PIE world
 	{
 		OutlinerPanel->SetWorld(PIEWorld);
@@ -855,6 +868,9 @@ bool UEditorEngine::EndPIE()
 	// Clear world
 	PIEWorld->ClearWorld();
 	delete PIEWorld;
+
+	// Reset Camera possession to the Editor world
+	MultipleViewportsAdapter.EjectCamera();
 
 	// Reset UI panels to use the Editor world
 	{

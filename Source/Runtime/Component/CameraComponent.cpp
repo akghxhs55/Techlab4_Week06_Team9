@@ -161,6 +161,23 @@
 //    return GetViewMatrix() * GetProjectionMatrix();
 //}
 
+FViewCamera UCameraComponent::ToViewCamera() const
+{
+	return {
+		.Transform = {
+			.Location = GetWorldLocation(),
+			.Rotation = GetWorldRotation().Quaternion()
+		},
+		.Projection = {
+			.Mode = bIsOrthogonal ? EProjectionMode::Orthographic : EProjectionMode::Perspective,
+			.FovDegrees = FieldOfView,
+			.OrthoWidth = OrthoWidth,
+			.NearClip = NearClipPlane,
+			.FarClip = FarClipPlane
+		}
+	};
+}
+
 FViewInfo UCameraComponent::GetViewInfo(const FVector2& ViewSize) const
 {
 	return {
