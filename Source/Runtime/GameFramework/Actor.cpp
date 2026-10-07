@@ -132,6 +132,13 @@ UActorComponent* AActor::AddComponentByClass(UClass* Class, bool bManualAttachme
 				SceneComponent->SetupAttachment(RootComponent);
 			}
 		}
+
+		// TODO: Find the better way
+		RegisterAllActorTickFunctions(true);
+		if (World->GetWorldType() == EWorldType::PIE)
+		{
+			Component->BeginPlay();
+		}
 	}
 
 	return Component;
