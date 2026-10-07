@@ -289,6 +289,11 @@ void UEditorEngine::UpdateMultipleViewportState(const float DeltaTime)
 		}
 	}
 
+	if (ViewportsPanel->ConsumeSimuationRequest())
+	{
+		MultipleViewportsAdapter.ToggleSimulation();
+	}
+
 	MultipleViewportsAdapter.UpdateInput(
 		DeltaTime,
 		LocalMousePosition,
@@ -395,7 +400,7 @@ void UEditorEngine::RenderMultipleViewports()
 		MultipleViewportsAdapter.GetLayoutMode(),
 		MultipleViewportsAdapter.GetSingleViewIndex(),
 		CameraPresets,
-		bPIEPaused, IsPIERunning());
+		bPIEPaused, IsPIERunning(), IsSimulated());
 }
 
 // 화면을 표시하고 UI 변경 후 View 설정을 보관한다.

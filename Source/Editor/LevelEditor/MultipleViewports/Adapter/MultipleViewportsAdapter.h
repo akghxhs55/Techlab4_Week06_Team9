@@ -102,7 +102,8 @@ public:
     /* PIE camera control */
     void PossessCamera(ACameraActor* PlayerCamera);
 	void EjectCamera();
-	bool IsSimulated() const { return bIsSimulated; }
+    bool IsSimulated() const { return bIsSimulated; }
+    void ToggleSimulation();
 
 private:
     FViewInfo MakeViewInfo(int32 ViewIndex) const;
@@ -148,5 +149,4 @@ private:
     bool bIsSimulated = false;
 	void StartSimulation();
 	void StopSimulation();
-    void ToggleSimulation();
 };

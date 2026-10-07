@@ -36,13 +36,14 @@ public:
 	void SetControlState(
 		ELayoutMode LayoutMode, int32 SingleViewIndex, 
 		const EMultipleViewportsCameraPreset CameraPresets[4],
-		bool bPIEPaused, bool bPIERunning);
+		bool bPIEPaused, bool bPIERunning, bool bIsSimulated);
 	// UI에서 발생한 Layout 변경 요청을 한 번 소비하도록 반환한다.
 	bool ConsumeLayoutRequest(ELayoutMode& OutMode, int32& OutSingleViewIndex);
 	// UI에서 발생한 View별 Camera Preset 요청을 한 번 소비하도록 반환한다.
 	bool ConsumeCameraPresetRequest(int32& OutViewIndex, EMultipleViewportsCameraPreset& OutPreset);
 	// UI에서 발생한 PIE 요청을 한 번 소비하도록 반환한다.
 	bool ConsumePIERequest(int32& OutViewIndex, EPIECommand& OutCommand);
+	bool ConsumeSimuationRequest();
 
 	FTexture2D* GetViewRenderTarget1(int32 ViewIndex) const;
 	FTexture2D* GetViewRenderTarget2(int32 ViewIndex) const;
@@ -105,4 +106,7 @@ private:
 	int32 RequestedPIEViewIndex = InvalidViewIndex;
 	EPIECommand RequestedPIECommand = EPIECommand::None;
 	bool bHasPIERequest = false;
+
+	bool bIsSimulatedInEditor = false;
+	bool bHasSimulationRequest = false;
 };

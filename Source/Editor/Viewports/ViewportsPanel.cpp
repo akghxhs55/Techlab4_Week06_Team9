@@ -106,7 +106,7 @@ float FViewportsPanel::ConsumeVerticalDrag()
 void FViewportsPanel::SetControlState(
 	const ELayoutMode LayoutMode, const int32 SingleViewIndex, 
 	const EMultipleViewportsCameraPreset CameraPresets[4], 
-	bool bPIEPaused, bool bPIERunning)
+	bool bPIEPaused, bool bPIERunning, bool bIsSimulated)
 {
 	CurrentLayoutMode = LayoutMode;
 	CurrentSingleViewIndex = SingleViewIndex;
@@ -115,6 +115,7 @@ void FViewportsPanel::SetControlState(
 	
 	bCurrentPIEPaused = bPIEPaused;
 	bCurrentPIERunning = bPIERunning;
+	bIsSimulatedInEditor = bIsSimulated;
 }
 
 // 대기 Layout 요청을 한 번 반환하고 플래그를 지운다.
@@ -155,6 +156,14 @@ bool FViewportsPanel::ConsumePIERequest(int32& OutViewIndex, EPIECommand& OutCom
 	RequestedPIECommand = EPIECommand::None;
 	bHasPIERequest = false;
 
+	return true;
+}
+
+bool FViewportsPanel::ConsumeSimuationRequest()
+{
+	if (!bHasSimulationRequest)
+		return false;
+	bHasSimulationRequest = false;
 	return true;
 }
 
@@ -216,6 +225,16 @@ void FViewportsPanel::OnRender()
 			RequestedPIEViewIndex = ViewIndex;
 			RequestedPIECommand = EPIECommand::Stop;
 			bHasPIERequest = true;
+		}
+		ImGui::EndDisabled();
+
+		ImGui::SameLine();
+
+		ImGui::BeginDisabled(!bCurrentPIERunning);
+		const char* SimulateLabel = bIsSimulatedInEditor ? "Attach into camera" : "Detach from camera";
+		if (ImGui::SmallButton(SimulateLabel))
+		{
+			bHasSimulationRequest = true;
 		}
 		ImGui::EndDisabled();
 	}
