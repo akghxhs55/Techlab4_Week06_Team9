@@ -1,0 +1,487 @@
+{
+    "Actors": [
+        {
+            "Class": "AStaticMeshActor",
+            "Components": [
+                {
+                    "Class": "UStaticMeshComponent",
+                    "Name": "UStaticMeshComponent_0",
+                    "ParentUUID": null,
+                    "Properties": {
+                        "ObjectUUID": 84,
+                        "OverrideMaterials": [
+                            {
+                                "Base": "DefaultMaterial",
+                                "BaseColor": [
+                                    0.3333333134651184,
+                                    0.3333333134651184,
+                                    0.3333333134651184,
+                                    1.0
+                                ],
+                                "BlendState": "Opaque",
+                                "SamplerState": "LinearClamp",
+                                "Shininess": 32.0,
+                                "Textures": [
+                                    "WhiteTexture"
+                                ],
+                                "UVScrollSpeed": [
+                                    0.0,
+                                    0.0
+                                ],
+                                "bTwoSided": false
+                            }
+                        ],
+                        "StaticMesh": "Cube",
+                        "Transform": {
+                            "Location": [
+                                0.0,
+                                0.0,
+                                -3.14703369140625
+                            ],
+                            "Rotation": [
+                                0.0,
+                                -0.398200124502182,
+                                0.0
+                            ],
+                            "Scale": [
+                                870.774169921875,
+                                132.614013671875,
+                                1.0
+                            ]
+                        },
+                        "bVisible": true
+                    }
+                }
+            ],
+            "Properties": {
+                "ObjectUUID": 83
+            },
+            "RootComponentUUID": 84
+        },
+        {
+            "Class": "AMurasakiActor",
+            "Components": [
+                {
+                    "Class": "USceneComponent",
+                    "Name": "SceneRoot_0",
+                    "ParentUUID": null,
+                    "Properties": {
+                        "ObjectUUID": 86,
+                        "Transform": {
+                            "Location": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ]
+                        }
+                    }
+                },
+                {
+                    "Class": "USphereGlowComponent",
+                    "Name": "AkaComponent_0",
+                    "ParentUUID": 86,
+                    "Properties": {
+                        "Color": [
+                            1.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "Intensity": 10.399999618530273,
+                        "ObjectUUID": 87,
+                        "Radius": 1.0,
+                        "RadiusFallOff": 1.2000000476837158,
+                        "Transform": {
+                            "Location": [
+                                -10.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ]
+                        },
+                        "bVisible": true
+                    }
+                },
+                {
+                    "Class": "UPointLightComponent",
+                    "Name": "AkaPointLight_0",
+                    "ParentUUID": 87,
+                    "Properties": {
+                        "AttenuationRadius": 30.0,
+                        "Falloff": 2.0,
+                        "Intensity": 85.0,
+                        "LightColor": [
+                            1.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "ObjectUUID": 88,
+                        "Transform": {
+                            "Location": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ]
+                        },
+                        "bVisible": true
+                    }
+                },
+                {
+                    "Class": "USphereGlowComponent",
+                    "Name": "AoComponent_0",
+                    "ParentUUID": 86,
+                    "Properties": {
+                        "Color": [
+                            0.0,
+                            0.0,
+                            1.0,
+                            1.0
+                        ],
+                        "Intensity": 10.399999618530273,
+                        "ObjectUUID": 89,
+                        "Radius": 1.0,
+                        "RadiusFallOff": 1.2000000476837158,
+                        "Transform": {
+                            "Location": [
+                                10.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ]
+                        },
+                        "bVisible": true
+                    }
+                },
+                {
+                    "Class": "UPointLightComponent",
+                    "Name": "AoPointLight_0",
+                    "ParentUUID": 89,
+                    "Properties": {
+                        "AttenuationRadius": 30.0,
+                        "Falloff": 2.0,
+                        "Intensity": 85.0,
+                        "LightColor": [
+                            0.0,
+                            0.20000000298023224,
+                            1.0,
+                            1.0
+                        ],
+                        "ObjectUUID": 90,
+                        "Transform": {
+                            "Location": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ]
+                        },
+                        "bVisible": true
+                    }
+                },
+                {
+                    "Class": "USphereGlowComponent",
+                    "Name": "MurasakiComponent_0",
+                    "ParentUUID": 86,
+                    "Properties": {
+                        "Color": [
+                            0.800000011920929,
+                            0.0,
+                            1.0,
+                            1.0
+                        ],
+                        "Intensity": 0.0,
+                        "ObjectUUID": 91,
+                        "Radius": 1.0,
+                        "RadiusFallOff": 1.2000000476837158,
+                        "Transform": {
+                            "Location": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ]
+                        },
+                        "bVisible": true
+                    }
+                },
+                {
+                    "Class": "UPointLightComponent",
+                    "Name": "MurasakiPointLight_0",
+                    "ParentUUID": 86,
+                    "Properties": {
+                        "AttenuationRadius": 0.0,
+                        "Falloff": 2.0,
+                        "Intensity": 0.0,
+                        "LightColor": [
+                            0.800000011920929,
+                            0.0,
+                            1.0,
+                            1.0
+                        ],
+                        "ObjectUUID": 92,
+                        "Transform": {
+                            "Location": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ]
+                        },
+                        "bVisible": true
+                    }
+                },
+                {
+                    "Class": "UProjectileMovementComponent",
+                    "Name": "ProjectileMovementComponent_0",
+                    "Properties": {
+                        "InitialSpeed": 0.0,
+                        "MaxSpeed": 300.0,
+                        "ObjectUUID": 93,
+                        "ProjectileGravityScale": 0.0
+                    }
+                }
+            ],
+            "Properties": {
+                "ConvergeDuration": 5.0,
+                "LaunchSpeed": 85.0,
+                "MergeBloomDuration": 3.0,
+                "MurasakiIntensity": 80.0,
+                "MurasakiRadius": 2.5,
+                "MurasakiRadiusFallOff": 3.5,
+                "ObjectUUID": 85,
+                "PointLightIntensity": 85.0,
+                "PointLightRadius": 30.0,
+                "StartPivotDistance": 10.0
+            },
+            "RootComponentUUID": 86
+        },
+        {
+            "Class": "AFogActor",
+            "Components": [
+                {
+                    "Class": "UExpHeightFogComponent",
+                    "Name": "UExpHeightFogComponent_0",
+                    "ParentUUID": null,
+                    "Properties": {
+                        "FogParam.EndDistance": 1000.0,
+                        "FogParam.FogCutOffDistance": 1000.0,
+                        "FogParam.FogDensity": 0.004999999888241291,
+                        "FogParam.FogHeightFalloff": 0.20000000298023224,
+                        "FogParam.FogInscatteringLuminance": [
+                            0.5,
+                            0.5,
+                            0.5,
+                            1.0
+                        ],
+                        "FogParam.FogMaxOpacity": 1.0,
+                        "FogParam.StartDistance": 0.0,
+                        "ObjectUUID": 151,
+                        "Transform": {
+                            "Location": [
+                                0.0,
+                                10.228129386901855,
+                                -5.245609760284424
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ]
+                        }
+                    }
+                },
+                {
+                    "Class": "UBillboardComponent",
+                    "Name": "UBillboardComponent_0",
+                    "ParentUUID": 151,
+                    "Properties": {
+                        "Material": {
+                            "Asset": "FogIcon"
+                        },
+                        "ObjectUUID": 152,
+                        "Transform": {
+                            "Location": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ]
+                        },
+                        "bVisible": true
+                    }
+                }
+            ],
+            "Properties": {
+                "ObjectUUID": 150
+            },
+            "RootComponentUUID": 151
+        },
+        {
+            "Class": "ACameraActor",
+            "Components": [
+                {
+                    "Class": "UCameraComponent",
+                    "Name": "CameraComponent_0",
+                    "ParentUUID": null,
+                    "Properties": {
+                        "AspectRatio": 1.7777777910232544,
+                        "FarClipPlane": 10000.0,
+                        "FieldOfView": 60.0,
+                        "NearClipPlane": 0.10000000149011612,
+                        "ObjectUUID": 1141,
+                        "OrthoWidth": 16.0,
+                        "Transform": {
+                            "Location": [
+                                -14.550753593444824,
+                                0.0450439453125,
+                                4.270370006561279
+                            ],
+                            "Rotation": [
+                                24.249608993530273,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ]
+                        },
+                        "bIsOrthogonal": false
+                    }
+                },
+                {
+                    "Class": "UBillboardComponent",
+                    "Name": "UBillboardComponent_0",
+                    "ParentUUID": 1141,
+                    "Properties": {
+                        "Material": {
+                            "Asset": "CameraIcon"
+                        },
+                        "ObjectUUID": 1142,
+                        "Transform": {
+                            "Location": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ]
+                        },
+                        "bVisible": true
+                    }
+                }
+            ],
+            "Properties": {
+                "ObjectUUID": 1140,
+                "bIsMainCamera": true
+            },
+            "RootComponentUUID": 1141
+        }
+    ],
+    "NextUUID": 1183,
+    "PerspectiveCamera": {
+        "FOV": 60.0,
+        "FarClip": 10000.0,
+        "Location": [
+            -21.563709259033203,
+            -11.887802124023438,
+            12.155144691467285
+        ],
+        "NearClip": 0.10000000149011612,
+        "Rotation": [
+            0.0,
+            0.5089780688285828,
+            0.6300540566444397
+        ]
+    },
+    "Version": 2
+}

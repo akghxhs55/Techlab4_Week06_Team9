@@ -1,0 +1,129 @@
+{
+    "Actors": [
+        {
+            "Class": "AStaticMeshActor",
+            "Components": [
+                {
+                    "Class": "UStaticMeshComponent",
+                    "Name": "UStaticMeshComponent_0",
+                    "ParentUUID": null,
+                    "Properties": {
+                        "ObjectUUID": 76,
+                        "OverrideMaterials": [],
+                        "StaticMesh": "Cube",
+                        "Transform": {
+                            "Location": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ]
+                        },
+                        "bVisible": true
+                    }
+                },
+                {
+                    "Class": "URotatingMovementComponent",
+                    "Name": "URotatingMovementComponent_0",
+                    "Properties": {
+                        "ObjectUUID": 77,
+                        "PivotTranslation": [
+                            0.0,
+                            12.0,
+                            0.0
+                        ],
+                        "RotationRate": [
+                            0.0,
+                            90.0,
+                            0.0
+                        ],
+                        "bRotationInLocalSpace": true
+                    }
+                },
+                {
+                    "Class": "URotatingMovementComponent",
+                    "Name": "URotatingMovementComponent_1",
+                    "Properties": {
+                        "ObjectUUID": 88,
+                        "PivotTranslation": [
+                            7.900000095367432,
+                            0.0,
+                            0.0
+                        ],
+                        "RotationRate": [
+                            0.0,
+                            90.0,
+                            0.0
+                        ],
+                        "bRotationInLocalSpace": false
+                    }
+                },
+                {
+                    "Class": "URotatingMovementComponent",
+                    "Name": "URotatingMovementComponent_2",
+                    "Properties": {
+                        "ObjectUUID": 101,
+                        "PivotTranslation": [
+                            0.0,
+                            0.0,
+                            8.5
+                        ],
+                        "RotationRate": [
+                            22.700000762939453,
+                            90.0,
+                            0.0
+                        ],
+                        "bRotationInLocalSpace": true
+                    }
+                },
+                {
+                    "Class": "URotatingMovementComponent",
+                    "Name": "URotatingMovementComponent_3",
+                    "Properties": {
+                        "ObjectUUID": 144,
+                        "PivotTranslation": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "RotationRate": [
+                            0.0,
+                            66.30000305175781,
+                            25.700000762939453
+                        ],
+                        "bRotationInLocalSpace": true
+                    }
+                }
+            ],
+            "Properties": {
+                "ObjectUUID": 75
+            },
+            "RootComponentUUID": 76
+        }
+    ],
+    "PerspectiveCamera": {
+        "FOV": 60.0,
+        "FarClip": 10000.0,
+        "Location": [
+            -1.9058575630187988,
+            -8.456365585327148,
+            4.243391990661621
+        ],
+        "NearClip": 0.10000000149011612,
+        "Rotation": [
+            0.0,
+            -0.07068638503551483,
+            1.6257731914520264
+        ]
+    },
+    "Version": 2
+}
