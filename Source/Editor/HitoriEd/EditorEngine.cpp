@@ -361,6 +361,8 @@ void UEditorEngine::RenderMultipleViewports()
 
 		auto& info = ViewportsPanel->GetRenderingInfo(ViewIndex);
 		FWorldContext* WorldContext = PIEViewIndex == ViewIndex ? PIEWorldContextRef : EditorWorldContextRef;
+		auto& setting = SettingsPanel->GetSettings();
+		ScreenQuadRenderer->SetAAEnabled(setting.bAA);
 		ScreenQuadRenderer->Render(ViewIndex, ViewportsPanel, &MultipleViewportsAdapter, WorldContext);
 
 
