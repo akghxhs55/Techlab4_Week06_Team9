@@ -365,6 +365,14 @@ void UEditorEngine::RenderMultipleViewports()
 		ScreenQuadRenderer->SetAAEnabled(setting.bAA);
 		ScreenQuadRenderer->Render(ViewIndex, ViewportsPanel, &MultipleViewportsAdapter, WorldContext);
 
+		// 반투명 객체는 깊이가 없다. 따라서 깊이 시각화 중일 때에는 그리지 않는다. 
+		if (info.RenderBufferType != ERenderBuffer::Depth) {
+			RenderTranslucent(
+				ViewIndex,
+				ViewportsPanel->GetRenderingInfo(ViewIndex),
+				RenderView,
+				RenderQueue);
+		}
 
 		RenderOverlay(
 			ViewIndex,
@@ -550,12 +558,7 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 	RenderCommand::EndRenderPass(ViewRenderingInfo);
 }
 
-void UEditorEngine::RenderOverlay(int32 ViewIndex, const FRenderingInfo& ViewRenderingInfo, const FRenderView& RenderView, FRenderQueue& RenderQueue)
-{
-	UWorld* CurrentWorld = MultipleViewportsAdapter.GetViewWorld(ViewIndex);
-	assert(CurrentWorld);
-	bool bIsPIEWorld = CurrentWorld->GetWorldType() == EWorldType::PIE;
-
+void UEditorEngine::RenderTranslucent(int32 ViewIndex, const FRenderingInfo& ViewRenderingInfo, const FRenderView& RenderView, FRenderQueue& RenderQueue) {
 	const bool bDrawPrimitives = SettingsPanel->GetSettings().bDrawPrimitives;
 	// 삼각형 연결은 유지하고 View별 Fill Mode만 선택한다.
 	const ERasterizerState SceneRasterizerState = MultipleViewportsAdapter.IsViewWireframe(ViewIndex) ? ERasterizerState::Wireframe : ERasterizerState::SolidBack;
@@ -568,7 +571,15 @@ void UEditorEngine::RenderOverlay(int32 ViewIndex, const FRenderingInfo& ViewRen
 		Renderer->RenderTranslucent(RenderView.ViewProjection);
 		RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
 	}
+}
 
+
+
+void UEditorEngine::RenderOverlay(int32 ViewIndex, const FRenderingInfo& ViewRenderingInfo, const FRenderView& RenderView, FRenderQueue& RenderQueue)
+{
+	UWorld* CurrentWorld = MultipleViewportsAdapter.GetViewWorld(ViewIndex);
+	assert(CurrentWorld);
+	bool bIsPIEWorld = CurrentWorld->GetWorldType() == EWorldType::PIE;
 
 	// 직교일 때애는 무조건 그리고, 직교가 아니라면, 깊이 렌더링이 아닐 때 그린다. 
 	if (RenderView.bIsOrthogonal or ViewRenderingInfo.RenderBufferType != ERenderBuffer::Depth) {
