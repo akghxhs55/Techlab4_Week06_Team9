@@ -316,10 +316,9 @@ void UEditorEngine::TickWorldAndEditor(const float DeltaTime)
 			assert(World);
 
 			// Skip ticking PIE worlds if paused
-			if (Context->WorldType == EWorldType::PIE && bPIEPaused)
-				continue;
+			bool bIsWorldPaused = Context->WorldType == EWorldType::PIE && bPIEPaused;
 
-			World->Tick(DeltaTime);
+			World->Tick(DeltaTime, bIsWorldPaused);
 		}
 	}
 	{

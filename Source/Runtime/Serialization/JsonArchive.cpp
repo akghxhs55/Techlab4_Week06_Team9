@@ -92,6 +92,7 @@ bool FJsonArchive::SaveWorld(UWorld* World, const FViewCamera* Camera, const FSt
 
 	Json["Version"] = 2;
 	Json["Actors"] = json::array();
+	Json["NextUUID"] = FEngineStatics::NextUUID;
 
 	for (AActor* Actor : Level->GetActors())
 	{
@@ -166,6 +167,12 @@ bool FJsonArchive::LoadWorld(UWorld* World, FViewCamera* OutCamera, const FStrin
 	{
 		return false;
 	}
+
+	if (!Json.contains("NextUUID"))
+		return false;
+
+	uint64 SavedNextUUID = Json["NextUUID"].get<uint64>();
+	FEngineStatics::NextUUID = SavedNextUUID;
 
 	// 임시 DefaultScene.Scene 로딩용
 	if (Json.contains("Primitives"))
@@ -360,15 +367,9 @@ bool FJsonArchive::LoadWorld(UWorld* World, FViewCamera* OutCamera, const FStrin
 		}
 	}
 
-	//if (!Json.contains("NextUUID"))
-	//	return false;
-
-	//// 파일 검증이 끝난 뒤 Clear
-	//uint64 SavedNextUUID = Json["NextUUID"].get<uint64>();
+	// 파일 검증이 끝난 뒤 Clear
 
 	//World->ClearScene();
-
-	//FEngineStatics::NextUUID = SavedNextUUID;
 
 	//if (!Json.contains("Primitives"))
 	//{

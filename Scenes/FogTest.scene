@@ -291,35 +291,6 @@
             "Class": "AFogActor",
             "Components": [
                 {
-                    "Class": "UBillboardComponent",
-                    "Name": "UBillboardComponent_0",
-                    "ParentUUID": null,
-                    "Properties": {
-                        "Material": {
-                            "Asset": "FogIcon"
-                        },
-                        "ObjectUUID": 103,
-                        "Transform": {
-                            "Location": [
-                                0.0,
-                                0.0,
-                                4.240814208984375
-                            ],
-                            "Rotation": [
-                                0.0,
-                                0.0,
-                                0.0
-                            ],
-                            "Scale": [
-                                1.0,
-                                1.0,
-                                1.0
-                            ]
-                        },
-                        "bVisible": true
-                    }
-                },
-                {
                     "Class": "UExpHeightFogComponent",
                     "Name": "UExpHeightFogComponent_0",
                     "ParentUUID": 103,
@@ -355,6 +326,35 @@
                             ]
                         }
                     }
+                },
+                {
+                    "Class": "UBillboardComponent",
+                    "Name": "UBillboardComponent_0",
+                    "ParentUUID": null,
+                    "Properties": {
+                        "Material": {
+                            "Asset": "FogIcon"
+                        },
+                        "ObjectUUID": 103,
+                        "Transform": {
+                            "Location": [
+                                0.0,
+                                0.0,
+                                4.240814208984375
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ]
+                        },
+                        "bVisible": true
+                    }
                 }
             ],
             "Properties": {
@@ -363,19 +363,20 @@
             "RootComponentUUID": 103
         }
     ],
+    "NextUUID": 124,
     "PerspectiveCamera": {
         "FOV": 60.0,
         "FarClip": 10000.0,
         "Location": [
-            -30.774307250976563,
-            -3.7658424377441406,
-            14.830568313598633
+            -27.756887435913086,
+            -4.122946739196777,
+            17.18234634399414
         ],
         "NearClip": 0.10000000149011612,
         "Rotation": [
-            -1.1643308539532882e-10,
-            0.017465740442276,
-            -0.17451101541519165
+            0.0,
+            0.21294240653514862,
+            -0.0034679051022976637
         ]
     },
     "Version": 2
