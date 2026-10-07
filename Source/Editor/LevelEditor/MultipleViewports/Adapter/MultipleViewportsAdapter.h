@@ -102,6 +102,7 @@ public:
     /* PIE camera control */
     void PossessCamera(ACameraActor* PlayerCamera);
 	void EjectCamera();
+	bool IsSimulated() const { return PossessedCameraRef != nullptr && bIsSimulated; }
 
 private:
     FViewInfo MakeViewInfo(int32 ViewIndex) const;

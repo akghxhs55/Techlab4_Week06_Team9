@@ -361,6 +361,13 @@ void FMultipleViewportsAdapter::UpdateInput(
 	if (!IsViewActive(ActiveViewIndex)) return;
 
 	const bool bIsPIEWorld = ViewWorlds[ActiveViewIndex] && ViewWorlds[ActiveViewIndex]->GetWorldType() == EWorldType::PIE;
+	// Start Simulation or End
+	if (FInputSystem::IsKeyPressed(EKeyCode::F8))
+	{
+		if (bIsPIEWorld)
+			bIsSimulated = !bIsSimulated;
+	}
+
 	const bool bIsPIE = PossessedCameraRef && bIsPIEWorld && !bIsSimulated;
 	const bool bIsSIE = PossessedCameraRef && bIsPIEWorld && bIsSimulated;
 
