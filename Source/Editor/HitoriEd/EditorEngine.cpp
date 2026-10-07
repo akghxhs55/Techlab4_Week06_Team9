@@ -289,6 +289,11 @@ void UEditorEngine::UpdateMultipleViewportState(const float DeltaTime)
 		}
 	}
 
+	if (ViewportsPanel->ConsumeSimuationRequest())
+	{
+		MultipleViewportsAdapter.ToggleSimulation();
+	}
+
 	MultipleViewportsAdapter.UpdateInput(
 		DeltaTime,
 		LocalMousePosition,
@@ -395,7 +400,7 @@ void UEditorEngine::RenderMultipleViewports()
 		MultipleViewportsAdapter.GetLayoutMode(),
 		MultipleViewportsAdapter.GetSingleViewIndex(),
 		CameraPresets,
-		bPIEPaused, IsPIERunning());
+		bPIEPaused, IsPIERunning(), IsSimulated());
 }
 
 // 화면을 표시하고 UI 변경 후 View 설정을 보관한다.
@@ -416,11 +421,11 @@ void UEditorEngine::UpdateGizmoAndPicking()
 	if (ViewIndex == InvalidViewIndex || !ViewportsPanel->IsHovered())
 		return;
 
-	// Do not pick gizmo if the current world of the active view is not the editor world.
+	// Do not pick gizmo if the current world of the active view is in PIE mode and not simulated
 	{
 		const UWorld* ActiveViewWorld = MultipleViewportsAdapter.GetViewWorld(ViewIndex);
 		assert(ActiveViewWorld);
-		if (ActiveViewWorld->GetWorldType() != EWorldType::Editor)
+		if (ActiveViewWorld->GetWorldType() != EWorldType::Editor && !IsSimulated())
 			return;
 	}
 
@@ -579,7 +584,8 @@ void UEditorEngine::RenderOverlay(int32 ViewIndex, const FRenderingInfo& ViewRen
 {
 	UWorld* CurrentWorld = MultipleViewportsAdapter.GetViewWorld(ViewIndex);
 	assert(CurrentWorld);
-	bool bIsPIEWorld = CurrentWorld->GetWorldType() == EWorldType::PIE;
+	const bool bIsPIEWorld = CurrentWorld->GetWorldType() == EWorldType::PIE;
+	const bool bIsPIEnotSIE = bIsPIEWorld && !MultipleViewportsAdapter.IsSimulated();
 
 	// 직교일 때애는 무조건 그리고, 직교가 아니라면, 깊이 렌더링이 아닐 때 그린다. 
 	if (RenderView.bIsOrthogonal or ViewRenderingInfo.RenderBufferType != ERenderBuffer::Depth) {
@@ -620,22 +626,24 @@ void UEditorEngine::RenderOverlay(int32 ViewIndex, const FRenderingInfo& ViewRen
 			if (!Actor)
 				continue;
 
-			UPrimitiveComponent* Primitive =
-				Cast<UPrimitiveComponent>(Actor->GetRootComponent());
-
-			if (!Primitive)
-				continue;
-
-			FBox Box =
-				Primitive->CalcBounds();
-
 			FVector UUIDLocation;
-			UUIDLocation.X = (Box.Min.X + Box.Max.X) * 0.5f;
-			UUIDLocation.Y = (Box.Min.Y + Box.Max.Y) * 0.5f;
-			UUIDLocation.Z = Box.Max.Z + 0.5f;
+			if (UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Actor->GetRootComponent()))
+			{
+				const FBox Box = Primitive->CalcBounds();
+				UUIDLocation.X = (Box.Min.X + Box.Max.X) * 0.5f;
+				UUIDLocation.Y = (Box.Min.Y + Box.Max.Y) * 0.5f;
+				UUIDLocation.Z = Box.Max.Z + 0.5f;
+			}
+			else if (USceneComponent* SceneComp = Actor->GetRootComponent())
+			{
+				UUIDLocation = SceneComp->GetWorldLocation() + FVector(0.0f, 0.0f, 0.5f);
+			}
+			else
+			{
+				continue;
+			}
 
-			FString Text =
-				"UUID : " + std::to_string(Actor->GetUUID());
+			FString Text = "UUID : " + std::to_string(Actor->GetUUID());
 
 			TextRenderer->BuildTextMesh(
 				Text,
@@ -650,14 +658,14 @@ void UEditorEngine::RenderOverlay(int32 ViewIndex, const FRenderingInfo& ViewRen
 		}
 	}
 
-
-	if (Outline->GetTarget() && !bIsPIEWorld
+	// Do not render gizmo or outline if the current view world is played in editor but not simulated.
+	if (Outline->GetTarget() && !bIsPIEnotSIE
 		&& Outline->GetTarget()->GetOwner()->GetWorld() == CurrentWorld)
 	{
 		OutlineRenderer->OnRender(*Outline, RenderView.ViewProjection, ViewRenderingInfo.ViewportSetting);
 	}
 
-	if (Gizmo->GetTarget() && !bIsPIEWorld
+	if (Gizmo->GetTarget() && !bIsPIEnotSIE
 		&& Gizmo->GetTarget()->GetOwner()->GetWorld() == CurrentWorld)
 	{
 		GizmoRenderer->OnRender(
@@ -795,6 +803,24 @@ bool UEditorEngine::StartPIE(int32 ViewIndex)
 	MultipleViewportsAdapter.SetViewWorld(ViewIndex, *PIEWorld);
 	PIEViewIndex = ViewIndex;
 
+	// Set Camera component if the PIE world has a camera actor
+	{
+		ACameraActor* CameraActor = PIEWorld->GetActiveCameraActor();
+		if (CameraActor)
+		{
+			UCameraComponent* CameraComponent = CameraActor->GetCameraComponent();
+			if (CameraComponent)
+			{
+				MultipleViewportsAdapter.PossessCamera(CameraActor);
+			}
+		}
+		else
+		{
+			// Start simulation without possessing a camera if no camera component is found
+			MultipleViewportsAdapter.EjectCamera();
+		}
+	}
+
 	// Set UI panels to use the PIE world
 	{
 		OutlinerPanel->SetWorld(PIEWorld);
@@ -853,6 +879,9 @@ bool UEditorEngine::EndPIE()
 	// Clear world
 	PIEWorld->ClearWorld();
 	delete PIEWorld;
+
+	// Reset Camera possession to the Editor world
+	MultipleViewportsAdapter.EjectCamera();
 
 	// Reset UI panels to use the Editor world
 	{

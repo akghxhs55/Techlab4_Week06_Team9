@@ -9,6 +9,7 @@ class UCameraComponent : public USceneComponent
 	DECLARE_CLASS(UCameraComponent, USceneComponent)
 
 public:
+	FViewCamera ToViewCamera() const;
 	FViewInfo GetViewInfo(const FVector2& ViewSize) const;
 
 	// Get & Set

@@ -5,7 +5,7 @@ float3 ACESFitted(float3 color)
     const float3x3 ACESInputMat =
     {
         { 0.59719, 0.35458, 0.04823 },
-        { 0.07600, 0.90834, 0.01566 },
+        { 0.07600, 0.87577, 0.04823 },
         { 0.02840, 0.13383, 0.83777 }
     };
     const float3x3 ACESOutputMat =
@@ -110,44 +110,38 @@ PS_INPUT mainVS(VS_INPUT input)
     return output;
 }
 
-// 픽셀 시선 레이(Ray)와 구체 중심 간의 수직 거리를 계산하여 감쇠를 적용
+// 픽셀 시선 레이와 구체 중심 간의 수직 거리를 계산하여 감쇠를 적용
 float4 mainPS(PS_INPUT input) : SV_TARGET
 {
     float distance = 0.0f;
     
     if (input.isPerspective > 0.5f)
     {
-        // 원근 투영: 각 픽셀마다 카메라 위치에서 픽셀 월드 좌표로 향하는 실제 시선 레이(Ray) 계산
+        // 원근 투영
         float3 camPos = input.camPosOrDir;
         float3 toPixel = input.worldPos - camPos;
         float len = length(toPixel);
         float3 rayDir = (len > 0.0001f) ? (toPixel / len) : float3(0.0f, 0.0f, 1.0f);
         
         float3 toCenter = Center - camPos;
-        // 시선 레이를 따라 구체 중심을 투영 (카메라 뒤쪽으로 투영되지 않도록 t >= 0 제한)
         float t = max(dot(toCenter, rayDir), 0.0f);
         
-        // 레이 상에서 구체 중심과 가장 가까운 지점까지의 수직 거리 계산
         float3 closestPoint = camPos + t * rayDir;
         distance = length(Center - closestPoint);
     }
     else
     {
-        // 직교 투영: 모든 시선이 평행하므로 카메라 전방 축과의 수직 거리 계산
+        // 직교 투영
         float3 viewForward = input.camPosOrDir;
         float3 offset = input.worldPos - Center;
         float3 perp = offset - dot(offset, viewForward) * viewForward;
         distance = length(perp);
     }
     
-    // 감쇠 계산: 중심(distance = 0)에서 최대, 가장자리(distance = Radius) 부근에서 RadiusFallOff 두께로 부드럽게 감쇠
     float attenuation = saturate((Radius - distance) / max(RadiusFallOff, 0.001f));
-    // 지수 감쇠: 중심 코어는 단단하고 쨍하게 유지하고, 외곽은 가파르게 옅어지도록 처리
     attenuation = pow(attenuation, 2.5f);
 
-    // 1. 순수 고광도(HDR) 색상 계산
     float3 hdrColor = Color.rgb * Intensity * attenuation;
-    // 2. 필름 톤매핑 통과 -> 강한 중심부는 자동으로 눈부신 백색으로, 외곽은 원색으로!
     float3 tonemappedColor = ACESFitted(hdrColor);
     return float4(tonemappedColor, Color.a * attenuation);
 }

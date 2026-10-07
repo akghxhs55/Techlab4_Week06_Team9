@@ -16,7 +16,7 @@ float3 ACESFitted(float3 color)
     const float3x3 ACESInputMat =
     {
         { 0.59719, 0.35458, 0.04823 },
-        { 0.07600, 0.90834, 0.01566 },
+        { 0.07600, 0.87577, 0.04823 },
         { 0.02840, 0.13383, 0.83777 }
     };
     const float3x3 ACESOutputMat =
@@ -95,8 +95,8 @@ SamplerState g_Sample : register(s0);
 
 // 기본 방향성 라이트 및 주변광
 static const float3 LightDir = normalize(float3(0.5f, 0.5f, -1.0f));
-static const float3 LightColor = float3(0.4f, 0.4f, 0.4f);
-static const float3 AmbientColor = float3(0.3f, 0.3f, 0.3f);
+static const float3 LightColor = float3(0.2f, 0.2f, 0.2f);
+static const float3 AmbientColor = float3(0.1f, 0.1f, 0.1f);
 
 PS_INPUT mainVS(VS_INPUT input)
 {
@@ -134,7 +134,8 @@ float4 mainPS(PS_INPUT input) : SV_TARGET
     {
         float3 dirH = normalize(dirL + V);
         float dirNdotH = saturate(dot(N, dirH));
-        float dirSpec = pow(dirNdotH, specPower);
+        float energyNorm = (specPower + 8.0f) / 8.0f;
+        float dirSpec = pow(dirNdotH, specPower) * energyNorm;
 
         totalDiffuse += LightColor * dirNdotL;
         totalSpecular += LightColor * dirSpec;
@@ -157,8 +158,9 @@ float4 mainPS(PS_INPUT input) : SV_TARGET
             float3 L = toLight / dist;
             float NdotL = saturate(dot(N, L));
 
-            float att = saturate(1.0f - (dist / radius));
-            att = pow(att, max(PointLights[i].Falloff, 0.01f));
+            // 언리얼 물리 기반 역제곱 감쇠
+            float num = saturate(1.0f - pow(dist / radius, 4.0f));
+            float att = (num * num) / (dist * dist + 1.0f);
 
             float3 lightColor = PointLights[i].Color.rgb * PointLights[i].Intensity;
 
@@ -171,7 +173,8 @@ float4 mainPS(PS_INPUT input) : SV_TARGET
             {
                 float3 H = normalize(L + V);
                 float NdotH = saturate(dot(N, H));
-                specular = lightColor * pow(NdotH, specPower);
+                float energyNorm = (specPower + 8.0f) / 8.0f;
+                specular = lightColor * pow(NdotH, specPower) * energyNorm;
             }
 
             totalDiffuse += diffuse * att;

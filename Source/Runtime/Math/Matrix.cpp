@@ -45,7 +45,7 @@ FMatrix FMatrix::ApplyScale(float Scale) const
 	);
 }
 
-FVector4 FMatrix::GetOrigin()
+FVector4 FMatrix::GetOrigin() const
 {
 	return FVector4(M[3][0], M[3][1], M[3][2], M[3][3]);
 }
