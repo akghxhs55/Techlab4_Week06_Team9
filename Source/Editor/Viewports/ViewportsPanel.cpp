@@ -231,7 +231,7 @@ void FViewportsPanel::OnRender()
 		ImGui::SameLine();
 
 		ImGui::BeginDisabled(!bCurrentPIERunning);
-		const char* SimulateLabel = bIsSimulatedInEditor ? "Attach into camera" : "Detach from camera";
+		const char* SimulateLabel = bIsSimulatedInEditor ? "Attach to camera" : "Detach from camera";
 		if (ImGui::SmallButton(SimulateLabel))
 		{
 			bHasSimulationRequest = true;
