@@ -40,11 +40,13 @@ namespace
 		return Packet.Model ? *Packet.Model : FMatrix::Identity;
 	}
 
-	uint64 MakeSortKey(const FRenderPacket& Packet)
+	uint64 MakeSortKey(const FRenderPacket& Packet, const FVector& CameraLocation)
 	{
 		if (Packet.Material->BlendState != EBlendState::Opaque)
 		{
-			const uint32 DistanceBits = std::bit_cast<uint32>(Packet.CameraToParticleDistance);
+			const FVector4 Location = GetPacketWorld(Packet).GetOrigin();
+			const float Distance = (Location - FVector4(CameraLocation, 1.0f)).Length();
+			const uint32 DistanceBits = std::bit_cast<uint32>(Distance);
 			return (1ull << 63) | static_cast<uint64>(~DistanceBits);
 		}
 
@@ -187,7 +189,7 @@ void FRenderer::RenderQueueSorting(FRenderQueue& InQueue, const FMatrix& ViewPro
 		{
 			const FRenderPacket& P = RenderPackets[i];
 			if (!P.Mesh || !P.Material) continue;
-			SortEntries.Add({ MakeSortKey(P), i });
+			SortEntries.Add({ MakeSortKey(P, CameraLocation), i });
 		}
 
 		// ② 16B 항목만 정렬
@@ -198,6 +200,9 @@ void FRenderer::RenderQueueSorting(FRenderQueue& InQueue, const FMatrix& ViewPro
 		FirstTranslucentIndex = 0;
 		while (FirstTranslucentIndex < SortEntries.Num() && !(SortEntries[FirstTranslucentIndex].Key >> 63))
 			++FirstTranslucentIndex;
+
+		std::sort(SortEntries.begin() + FirstTranslucentIndex, SortEntries.end(),
+			[](const FSortEntry& A, const FSortEntry& B) { return A.Key < B.Key; });
 	}
 	// Gather uploads group and packet slots together. Other queues need an upload here.
 	if (!bObjectConstantsPrepared)
