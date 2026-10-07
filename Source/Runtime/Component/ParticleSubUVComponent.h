@@ -39,6 +39,7 @@ class UParticleSubUVComponent : public UBillboardComponent
 		PROPERTY(ColSize)
 		PROPERTY(RowSize)
 		PROPERTY(FrameRate)
+		PROPERTY(bPlayInEditor)
 	REFLECT_END()
 
 public:
@@ -60,6 +61,8 @@ public:
 	void SetSubUVSize(uint32 Cols, uint32 Rows);
 	void SetFrameRate(float InFrameRate);
 
+	void SetPlayInEditor(bool bInPlayInEditor);
+
 private:
 	void RespawnParticle(FParticle& Particle);
 
@@ -70,6 +73,8 @@ private:
 
 private:
 	static const float MAX_NORMALIZED_VALUE;
+
+	bool bPlayInEditor = false;
 
 	// ---- 튜닝 값 ----
 	// 방출은 수명이 끝난 파티클이 무작위 시점에 리스폰되는 방식이다.

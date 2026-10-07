@@ -32,6 +32,7 @@ void UParticleSubUVComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
+	Particles.Reset();
 	Particles.Reserve(ParticleCount);
 	for (int32 i = 0; i < ParticleCount; ++i)
 	{
@@ -64,6 +65,12 @@ void UParticleSubUVComponent::SetSubUVSize(uint32 NewColSize, uint32 NewRowSize)
 void UParticleSubUVComponent::SetFrameRate(float InFrameRate)
 {
 	FrameRate = (InFrameRate > 0.0f) ? InFrameRate : 1.0f;
+}
+
+void UParticleSubUVComponent::SetPlayInEditor(bool bInPlayInEditor)
+{
+	bPlayInEditor = bInPlayInEditor;
+	PrimaryComponentTick.bTickInEditor = bPlayInEditor;
 }
 
 // DeltaTime으로 이동·수명·Atlas 프레임을 갱신한다.

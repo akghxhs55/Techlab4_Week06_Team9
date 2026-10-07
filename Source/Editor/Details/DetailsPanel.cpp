@@ -13,6 +13,7 @@
 #include "Component/PointLightComponent.h"
 #include "Component/ProjectileMovementComponent.h"
 #include "Component/RotatingMovementComponent.h"
+#include "Component/ParticleSubUVComponent.h"
 #include "Render/Material.h"
 #include "Render/Texture2D.h"
 #include "Text/Font.h"
@@ -576,9 +577,26 @@ namespace
 			break;
 
 		case EPropertyType::Bool:
-			ImGui::Checkbox(Label.c_str(), static_cast<bool*>(ValuePtr));
-			break;
+		{
+			bool* Value = static_cast<bool*>(ValuePtr);
+			bool EditedValue = *Value;
+			bool bHasChanged;
 
+			bHasChanged = ImGui::Checkbox(Label.c_str(), &EditedValue);
+
+			if (bHasChanged)
+			{
+				if (UParticleSubUVComponent* ParticleComp = Cast<UParticleSubUVComponent>(Object))
+				{
+					ParticleComp->SetPlayInEditor(EditedValue);
+				}
+				else
+				{
+					*Value = EditedValue;
+				}
+			}
+			break;
+		}
 		case EPropertyType::Vector:
 		{
 			FVector* Value = static_cast<FVector*>(ValuePtr);
