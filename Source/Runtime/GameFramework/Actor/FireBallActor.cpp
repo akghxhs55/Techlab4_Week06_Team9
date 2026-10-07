@@ -10,9 +10,9 @@ AFireBallActor::AFireBallActor()
 	// 2. Child: PointLightComponent (Attached to Root)
 	PointLightComponent = CreateDefaultSubobject<UPointLightComponent>("UPointLightComponent");
 	PointLightComponent->SetupAttachment(SphereGlowComponent);
-	PointLightComponent->SetLightColor(FVector4(1.0f, 0.4f, 0.1f, 1.0f));
-	PointLightComponent->SetIntensity(2.0f);
-	PointLightComponent->SetAttenuationRadius(15.0f);
+	PointLightComponent->SetLightColor(FVector4(1.0f, 0.0f, 0.0f, 1.0f));
+	PointLightComponent->SetIntensity(83.0f);
+	PointLightComponent->SetAttenuationRadius(25.0f);
 
 	// 3. Logic: ProjectileMovementComponent
 	ProjectileMovementComponent = CreateDefaultSubobject<UProjectileMovementComponent>("UProjectileMovementComponent");

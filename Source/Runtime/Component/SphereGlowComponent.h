@@ -7,8 +7,8 @@ struct alignas(16) FSphereGlowConstants
     FVector Center;          
     float Radius = 1.0f;    
     FVector4 Color = FVector4(1.0f, 0.0f, 0.0f, 1.0f);           
-    float Intensity = 1.0f;
-    float RadiusFallOff = 2.0f;
+    float Intensity = 10.4f;
+    float RadiusFallOff = 1.2f;
     float Padding[2] = { 0, 0 };
 };
 
@@ -33,8 +33,8 @@ public:
 protected:
     // 에디터/인스펙터 노출 속성
     float Radius = 1.0f;
-    float Intensity = 1.0f;
-    float RadiusFallOff = 2.0f;
+    float Intensity = 10.4f;
+    float RadiusFallOff = 1.2f;
     FVector4 Color = FVector4(1.0f, 0.0f, 0.0f, 1.0f);
 
     float LastRadius = -1.0f;
