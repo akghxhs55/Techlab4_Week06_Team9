@@ -49,9 +49,9 @@ void FPostProcessor::Render(int32 ViewIndex, FViewportsPanel* viewPorts, FMultip
 		viewPorts->GetFinalRenderTarget(ViewIndex)
 	};
 
-
+	
 	if (info.RenderBufferType == ERenderBuffer::Color) {
-		if (not Context.WorldContext->World->GetScene().ExpHeightFogs.empty()) {
+		if (not Context.WorldContext->World->GetScene().ExpHeightFogs.empty() and not adapter->GetRenderView(ViewIndex).bIsOrthogonal) {
 
 			RenderCommand::GetContext()->OMSetRenderTargets(1, &rts[0], nullptr);
 			ColorPass->Set(Context);
@@ -62,6 +62,7 @@ void FPostProcessor::Render(int32 ViewIndex, FViewportsPanel* viewPorts, FMultip
 			RenderCommand::GetContext()->OMSetRenderTargets(1, &rts[1], nullptr);
 			FogPass->Set(Context);
 			RenderCommand::Draw(3, 0);
+
 		}
 		else {
 			RenderCommand::GetContext()->OMSetRenderTargets(1, &rts[1], nullptr);
