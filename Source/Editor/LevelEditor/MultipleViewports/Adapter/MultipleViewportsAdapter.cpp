@@ -724,6 +724,18 @@ void FMultipleViewportsAdapter::EjectCamera()
 void FMultipleViewportsAdapter::StartSimulation()
 {
 	bIsSimulated = true;
+
+	if (PossessedCameraRef == nullptr)
+	{
+		return;
+	}
+
+	// Reset the camera to the possessed camera's transform when stopping simulation.
+	uint32 ActiveViewIndex = GetActiveViewIndex();
+	if (ActiveViewIndex != InvalidViewIndex)
+	{
+		Views.Cameras[ActiveViewIndex] = PossessedCameraRef->GetCameraComponent()->ToViewCamera();
+	}
 }
 
 void FMultipleViewportsAdapter::StopSimulation()
@@ -737,11 +749,12 @@ void FMultipleViewportsAdapter::StopSimulation()
 }
 void FMultipleViewportsAdapter::ToggleSimulation()
 {
-	if (PossessedCameraRef == nullptr)
+	if (bIsSimulated)
 	{
-		bIsSimulated = true;
-		return;
+		StopSimulation();
 	}
-
-	bIsSimulated = !bIsSimulated;
+	else
+	{
+		StartSimulation();
+	}
 }
