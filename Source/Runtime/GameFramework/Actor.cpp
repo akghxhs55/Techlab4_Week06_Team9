@@ -80,8 +80,6 @@ void AActor::DuplicateSubObjects()
 	PrimaryActorTick.Target = this;
 
 	// World and Level are set by the caller (UWorld::DuplicateSubObjects)
-
-	RegisterAllActorTickFunctions(true);
 }
 
 void AActor::BeginPlay()
@@ -96,7 +94,7 @@ void AActor::BeginPlay()
 		Component->BeginPlay();
 	}
 
-	RegisterAllActorTickFunctions(true);
+	//RegisterAllActorTickFunctions(true);
 }
 
 UActorComponent* AActor::AddComponentByClass(UClass* Class, bool bManualAttachment)

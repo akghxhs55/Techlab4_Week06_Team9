@@ -64,6 +64,7 @@ public:
 	void SetPlayInEditor(bool bInPlayInEditor);
 
 private:
+	void SpawnParticles();
 	void RespawnParticle(FParticle& Particle);
 
 	// Todo: Move to util class

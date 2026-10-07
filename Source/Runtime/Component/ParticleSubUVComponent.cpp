@@ -33,23 +33,6 @@ void UParticleSubUVComponent::BeginPlay()
 	Super::BeginPlay();
 
 	Particles.Reset();
-	Particles.Reserve(ParticleCount);
-	for (int32 i = 0; i < ParticleCount; ++i)
-	{
-		FParticle Particle;
-		RespawnParticle(Particle);
-
-		Particle.Age = GetRandomNumberBetween(0.0f, Particle.LifeTime);
-		Particle.Location.Z += Particle.Velocity.Z * Particle.Age;
-
-		const float LifeRatio = Particle.Age / Particle.LifeTime;
-		Particle.Scale = Lerp(StartScale, EndScale, LifeRatio);
-
-		const float ElapsedFrames = Particle.Age * FrameRate;
-		Particle.SubUVFrame = static_cast<uint32>(ElapsedFrames) % (ColSize * RowSize);
-
-		Particles.Add(Particle);
-	}
 }
 
 // 열·행 개수가 양수인지 검사해 SubUV 분할 수를 설정한다.
@@ -77,6 +60,13 @@ void UParticleSubUVComponent::SetPlayInEditor(bool bInPlayInEditor)
 void UParticleSubUVComponent::TickComponent(float DeltaTime)
 {
 	Super::TickComponent(DeltaTime);
+
+	// Spawn particles if not spawned yet
+	if (Particles.Num() == 0)
+	{
+		SpawnParticles();
+	}
+
 	const uint32 TotalFrames = ColSize * RowSize;
 
 	for (FParticle& Particle : Particles)
@@ -115,6 +105,28 @@ void UParticleSubUVComponent::TickComponent(float DeltaTime)
 			++Particle.SubUVFrame;
 			Particle.SubUVFrame %= TotalFrames;
 		}
+	}
+}
+
+void UParticleSubUVComponent::SpawnParticles()
+{
+	Particles.Reset();
+	Particles.Reserve(ParticleCount);
+	for (int32 i = 0; i < ParticleCount; ++i)
+	{
+		FParticle Particle;
+		RespawnParticle(Particle);
+
+		Particle.Age = GetRandomNumberBetween(0.0f, Particle.LifeTime);
+		Particle.Location.Z += Particle.Velocity.Z * Particle.Age;
+
+		const float LifeRatio = Particle.Age / Particle.LifeTime;
+		Particle.Scale = Lerp(StartScale, EndScale, LifeRatio);
+
+		const float ElapsedFrames = Particle.Age * FrameRate;
+		Particle.SubUVFrame = static_cast<uint32>(ElapsedFrames) % (ColSize * RowSize);
+
+		Particles.Add(Particle);
 	}
 }
 
