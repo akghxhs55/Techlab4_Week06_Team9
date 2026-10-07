@@ -159,42 +159,46 @@ AActor* UWorld::SpawnActor(UClass* Class, FName InName, const FTransform* Transf
 	return NewActor;
 }
 
-void UWorld::Tick(float DeltaTime)
+void UWorld::Tick(float DeltaTime, bool bIsPaused)
 {
-	// Only run BeginPlay for PIE or Game worlds.
-	if (WorldType == EWorldType::PIE)
+	if (!bIsPaused)
 	{
-		while (!BeginPlayList.IsEmpty())
+		// Only run BeginPlay for PIE or Game worlds.
+		if (WorldType == EWorldType::PIE)
 		{
-			BeginPlayList.Peek()->BeginPlay();
-			BeginPlayList.Dequeue();
+			while (!BeginPlayList.IsEmpty())
+			{
+				BeginPlayList.Peek()->BeginPlay();
+				BeginPlayList.Dequeue();
+			}
+		}
+
+		{
+			SCOPE_CYCLE_COUNTER(STAT_ActorTick);
+			// 모든 Actor를 도는 대신 등록된 Tick 함수(메인 카메라 포함)만 실행한다.
+
+			ELevelTick LevelTick;
+
+			switch (WorldType)
+			{
+			case EWorldType::Editor:
+				LevelTick = ELevelTick::ViewportsOnly;
+				break;
+			case EWorldType::PIE:
+				LevelTick = ELevelTick::All;
+				break;
+			}
+
+			TickTaskManager.RunAllTickGroups(DeltaTime, LevelTick);
+
+			for (ULevel* Level : Levels)
+			{
+				PathTracker.Tick(Level->GetActors(), DeltaTime);
+			}
 		}
 	}
 
-	{
-		SCOPE_CYCLE_COUNTER(STAT_ActorTick);
-		// 모든 Actor를 도는 대신 등록된 Tick 함수(메인 카메라 포함)만 실행한다.
-
-		ELevelTick LevelTick;
-
-		switch (WorldType)
-		{
-		case EWorldType::Editor:
-			LevelTick = ELevelTick::ViewportsOnly;
-			break;
-		case EWorldType::PIE:
-			LevelTick = ELevelTick::All;
-			break;
-		}
-
-		TickTaskManager.RunAllTickGroups(DeltaTime, LevelTick);
-
-		for (ULevel* Level : Levels)
-		{
-			PathTracker.Tick(Level->GetActors(), DeltaTime);
-		}
-	}
-
+	// Update transform even if paused, because the editor can move actors around while paused.
 	{
 		SCOPE_CYCLE_COUNTER(STAT_UpdateAllTransforms);
 		Scene.UpdateAllTransforms();

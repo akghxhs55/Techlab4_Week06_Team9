@@ -45,7 +45,7 @@ public:
 		return CastChecked<T>(SpawnActor(T::StaticClass(), InName, Transform));
 	}
 
-	void Tick(float DeltaTime);
+	void Tick(float DeltaTime, bool bIsPaused = false);
 
 	void ClearWorld();
 
