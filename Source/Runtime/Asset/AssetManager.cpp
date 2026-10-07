@@ -318,43 +318,50 @@ void UAssetManager::CreateIconMaterials()
 	UMaterial* BillboardIconMat = FObjectFactory::ConstructObject<UMaterial>();
 	BillboardIconMat->Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/DefaultShader.hlsl");
 	BillboardIconMat->Textures.Add(GetAssetByPath<UTexture2D>("Assets/Icons/S_Actor.png"));
-	BillboardIconMat->SamplerState = ESamplerState::NearestClamp;
+	BillboardIconMat->BlendState = EBlendState::AlphaBlend;
+	BillboardIconMat->DepthStencilState = EDepthStencilState::ReadOnly;
 	RegisterAsset("BillboardIcon", BillboardIconMat);
 
 	UMaterial* SpotlightIconMat = FObjectFactory::ConstructObject<UMaterial>();
 	SpotlightIconMat->Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/DefaultShader.hlsl");
 	SpotlightIconMat->Textures.Add(GetAssetByPath<UTexture2D>("Assets/Icons/SpotLight_64x.png"));
-	SpotlightIconMat->SamplerState = ESamplerState::NearestClamp;
+	SpotlightIconMat->BlendState = EBlendState::AlphaBlend;
+	SpotlightIconMat->DepthStencilState = EDepthStencilState::ReadOnly;
 	RegisterAsset("SpotlightIcon", SpotlightIconMat);
 
 	UMaterial* PointlightIconMat = FObjectFactory::ConstructObject<UMaterial>();
 	PointlightIconMat->Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/DefaultShader.hlsl");
 	PointlightIconMat->Textures.Add(GetAssetByPath<UTexture2D>("Assets/Icons/PointLight_64x.png"));
 	PointlightIconMat->BlendState = EBlendState::AlphaBlend;
+	PointlightIconMat->DepthStencilState = EDepthStencilState::ReadOnly;
 	RegisterAsset("PointlightIcon", PointlightIconMat);
 
 	UMaterial* CameraIconMat = FObjectFactory::ConstructObject<UMaterial>();
 	CameraIconMat->Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/DefaultShader.hlsl");
 	CameraIconMat->Textures.Add(GetAssetByPath<UTexture2D>("Assets/Icons/CameraActor_64x.png"));
-	CameraIconMat->SamplerState = ESamplerState::NearestClamp;
+	CameraIconMat->BlendState = EBlendState::AlphaBlend;
+	CameraIconMat->DepthStencilState = EDepthStencilState::ReadOnly;
 	RegisterAsset("CameraIcon", CameraIconMat);
 
 	UMaterial* ParticleIconMat = FObjectFactory::ConstructObject<UMaterial>();
 	ParticleIconMat->Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/DefaultShader.hlsl");
 	ParticleIconMat->Textures.Add(GetAssetByPath<UTexture2D>("Assets/Icons/S_Emitter.png"));
-	ParticleIconMat->SamplerState = ESamplerState::NearestClamp;
+	ParticleIconMat->BlendState = EBlendState::AlphaBlend;
+	ParticleIconMat->DepthStencilState = EDepthStencilState::ReadOnly;
 	RegisterAsset("ParticleIcon", ParticleIconMat);
 
 	UMaterial* TextRenderIcon = FObjectFactory::ConstructObject<UMaterial>();
 	TextRenderIcon->Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/DefaultShader.hlsl");
 	TextRenderIcon->Textures.Add(GetAssetByPath<UTexture2D>("Assets/Icons/S_TextRenderActorIcon.png"));
-	TextRenderIcon->SamplerState = ESamplerState::NearestClamp;
+	TextRenderIcon->BlendState = EBlendState::AlphaBlend;
+	TextRenderIcon->DepthStencilState = EDepthStencilState::ReadOnly;
 	RegisterAsset("TextRenderIcon", TextRenderIcon);
 
 	UMaterial* FogIconMat = FObjectFactory::ConstructObject<UMaterial>();
 	FogIconMat->Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/DefaultShader.hlsl");
-	FogIconMat->Textures.Add(GetAssetByPath<UTexture2D>("Assets/Icons/FogIcon.png"));
-	FogIconMat->SamplerState = ESamplerState::NearestClamp;
+	FogIconMat->Textures.Add(GetAssetByPath<UTexture2D>("Assets/Icons/S_ExpoHeightFog.png"));
+	FogIconMat->BlendState = EBlendState::AlphaBlend;
+	FogIconMat->DepthStencilState = EDepthStencilState::ReadOnly;
 	RegisterAsset("FogIcon", FogIconMat);
 
 
