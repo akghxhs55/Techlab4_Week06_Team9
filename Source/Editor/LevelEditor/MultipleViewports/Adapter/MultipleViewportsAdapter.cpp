@@ -365,7 +365,7 @@ void FMultipleViewportsAdapter::UpdateInput(
 	if (FInputSystem::IsKeyPressed(EKeyCode::F8))
 	{
 		if (bIsPIEWorld)
-			bIsSimulated = !bIsSimulated;
+			ToggleSimulation();
 	}
 
 	const bool bIsPIE = PossessedCameraRef && bIsPIEWorld && !bIsSimulated;
@@ -709,12 +709,16 @@ FViewInfo FMultipleViewportsAdapter::MakeViewInfo(int32 ViewIndex) const
 
 void FMultipleViewportsAdapter::PossessCamera(ACameraActor* PlayerCamera)
 {
+	assert(PlayerCamera != nullptr);
+
 	PossessedCameraRef = PlayerCamera;
+	StopSimulation();
 }
 
 void FMultipleViewportsAdapter::EjectCamera()
 {
 	PossessedCameraRef = nullptr;
+	StartSimulation();
 }
 
 void FMultipleViewportsAdapter::StartSimulation()
@@ -724,5 +728,20 @@ void FMultipleViewportsAdapter::StartSimulation()
 
 void FMultipleViewportsAdapter::StopSimulation()
 {
+	// If there is no possessed camera, simulation can not be stopped.
+	if (PossessedCameraRef == nullptr)
+	{
+		return;
+	}
 	bIsSimulated = false;
+}
+void FMultipleViewportsAdapter::ToggleSimulation()
+{
+	if (PossessedCameraRef == nullptr)
+	{
+		bIsSimulated = true;
+		return;
+	}
+
+	bIsSimulated = !bIsSimulated;
 }

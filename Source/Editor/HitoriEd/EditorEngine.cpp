@@ -416,11 +416,11 @@ void UEditorEngine::UpdateGizmoAndPicking()
 	if (ViewIndex == InvalidViewIndex || !ViewportsPanel->IsHovered())
 		return;
 
-	// Do not pick gizmo if the current world of the active view is not the editor world.
+	// Do not pick gizmo if the current world of the active view is in PIE mode and not simulated
 	{
 		const UWorld* ActiveViewWorld = MultipleViewportsAdapter.GetViewWorld(ViewIndex);
 		assert(ActiveViewWorld);
-		if (ActiveViewWorld->GetWorldType() != EWorldType::Editor)
+		if (ActiveViewWorld->GetWorldType() != EWorldType::Editor && !IsSimulated())
 			return;
 	}
 
@@ -579,7 +579,8 @@ void UEditorEngine::RenderOverlay(int32 ViewIndex, const FRenderingInfo& ViewRen
 {
 	UWorld* CurrentWorld = MultipleViewportsAdapter.GetViewWorld(ViewIndex);
 	assert(CurrentWorld);
-	bool bIsPIEWorld = CurrentWorld->GetWorldType() == EWorldType::PIE;
+	const bool bIsPIEWorld = CurrentWorld->GetWorldType() == EWorldType::PIE;
+	const bool bIsPIEnotSIE = bIsPIEWorld && !MultipleViewportsAdapter.IsSimulated();
 
 	// 직교일 때애는 무조건 그리고, 직교가 아니라면, 깊이 렌더링이 아닐 때 그린다. 
 	if (RenderView.bIsOrthogonal or ViewRenderingInfo.RenderBufferType != ERenderBuffer::Depth) {
@@ -652,14 +653,14 @@ void UEditorEngine::RenderOverlay(int32 ViewIndex, const FRenderingInfo& ViewRen
 		}
 	}
 
-
-	if (Outline->GetTarget() && !bIsPIEWorld
+	// Do not render gizmo or outline if the current view world is played in editor but not simulated.
+	if (Outline->GetTarget() && !bIsPIEnotSIE
 		&& Outline->GetTarget()->GetOwner()->GetWorld() == CurrentWorld)
 	{
 		OutlineRenderer->OnRender(*Outline, RenderView.ViewProjection, ViewRenderingInfo.ViewportSetting);
 	}
 
-	if (Gizmo->GetTarget() && !bIsPIEWorld
+	if (Gizmo->GetTarget() && !bIsPIEnotSIE
 		&& Gizmo->GetTarget()->GetOwner()->GetWorld() == CurrentWorld)
 	{
 		GizmoRenderer->OnRender(
@@ -807,6 +808,11 @@ bool UEditorEngine::StartPIE(int32 ViewIndex)
 			{
 				MultipleViewportsAdapter.PossessCamera(CameraActor);
 			}
+		}
+		else
+		{
+			// Start simulation without possessing a camera if no camera component is found
+			MultipleViewportsAdapter.EjectCamera();
 		}
 	}
 
