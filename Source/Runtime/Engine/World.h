@@ -15,6 +15,7 @@
 struct FViewInfo;
 class ULevel;
 class UBillboardComponent;
+class ACameraActor;
 
 enum class EWorldType : uint8
 {
@@ -70,7 +71,7 @@ public:
 	FScene& GetScene() { return Scene; }
 	FTickTaskManager& GetTickTaskManager() { return TickTaskManager; }
 
-	bool GetActiveCameraViewInfo(FViewInfo& Out, const FVector2& ViewSize) const;
+	ACameraActor* GetActiveCameraActor() const;
 
 	inline EWorldType GetWorldType() const { return WorldType; }
 	inline void SetWorldType(EWorldType InWorldType) { WorldType = InWorldType; }

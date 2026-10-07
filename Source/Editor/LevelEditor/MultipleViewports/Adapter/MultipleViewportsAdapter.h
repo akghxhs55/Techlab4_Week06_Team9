@@ -15,6 +15,7 @@ class FOutlinerPanel;
 class UPrimitiveComponent;
 class UStaticMeshComponent;
 class UWorld;
+class ACameraActor;
 
 // 팀 엔진 데이터와 MultipleViewports Core API 사이의 상태·변환·렌더 연결을 맡는다.
 class FMultipleViewportsAdapter
@@ -98,6 +99,12 @@ public:
 
     FRenderView GetRenderView(int32 ViewIndex) const;
 
+    /* PIE camera control */
+    void PossessCamera(ACameraActor* PlayerCamera);
+	void EjectCamera();
+    bool IsSimulated() const { return bIsSimulated; }
+    void ToggleSimulation();
+
 private:
     FViewInfo MakeViewInfo(int32 ViewIndex) const;
 
@@ -136,4 +143,10 @@ private:
     TArray<uint8> SelectedLODs;
     bool bCapturedBillboard[4] = { false };
     bool bCapturedParticle[4] = { false };
+
+    /* PIE camera control */
+    ACameraActor* PossessedCameraRef = nullptr;
+    bool bIsSimulated = false;
+	void StartSimulation();
+	void StopSimulation();
 };

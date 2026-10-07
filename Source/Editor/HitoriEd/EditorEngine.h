@@ -119,6 +119,7 @@ private:
 	void PausePIE(bool bPause) { bPIEPaused = bPause; }
 	bool IsPIEPaused() const { return bPIEPaused; }
 	bool IsPIERunning() const { return PIEWorldContextRef != nullptr; }
+	bool IsSimulated() const { return MultipleViewportsAdapter.IsSimulated(); }
 	bool StartPIE(int32 ViewIndex);
 	bool EndPIE();
 };

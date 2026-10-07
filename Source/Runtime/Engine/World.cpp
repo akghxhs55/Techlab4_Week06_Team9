@@ -417,7 +417,7 @@ void UWorld::EndPlay()
 {
 }
 
-bool UWorld::GetActiveCameraViewInfo(FViewInfo& Out, const FVector2& ViewSize) const
+ACameraActor* UWorld::GetActiveCameraActor() const
 {
 	for (AActor* Actor : PersistentLevel->GetActors())
 	{
@@ -425,11 +425,9 @@ bool UWorld::GetActiveCameraViewInfo(FViewInfo& Out, const FVector2& ViewSize) c
 		{
 			if (CameraActor->bIsMainCamera)
 			{
-				Out = CameraActor->GetCameraComponent()->GetViewInfo(ViewSize);
-				return true;
+				return CameraActor;
 			}
 		}
 	}
-
-	return false;
+	return nullptr;
 }
