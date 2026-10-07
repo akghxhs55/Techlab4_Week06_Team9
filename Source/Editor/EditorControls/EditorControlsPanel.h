@@ -12,6 +12,9 @@
 #include "GameFramework/Actor/SphereGlowActor.h"
 #include "GameFramework/Actor/FogActor.h"
 #include "GameFramework/Actor/FireBallActor.h"
+#include "GameFramework/Actor/AkaActor.h"
+#include "GameFramework/Actor/AoActor.h"
+#include "GameFramework/Actor/MurasakiActor.h"
 
 class FMultipleViewportsAdapter;
 
@@ -33,7 +36,7 @@ public:
 
 	int32 SelectedIndex = 0;
 
-	const char* Items[9] = {"StaticMesh", "Particle", "Text", "SpotLight", "PointLight", "SphereGlow", "FireBall", "Camera", "Fog"};
+	const char* Items[12] = {"StaticMesh", "Particle", "Text", "SpotLight", "PointLight", "SphereGlow", "FireBall", "Camera", "Fog", "Aka", "Ao", "Murasaki"};
 
 	FGizmo* Gizmo = nullptr;
 	int32 GizmoSelectedIndex = 0;
@@ -52,7 +55,10 @@ public:
 		ASphereGlowActor::StaticClass(), // @todo ALSphereGlowActor::StaticClass()
 		AFireBallActor::StaticClass(),
 		ACameraActor::StaticClass(),
-		AFogActor::StaticClass()
+		AFogActor::StaticClass(),
+		AAkaActor::StaticClass(),
+		AAoActor::StaticClass(),
+		AMurasakiActor::StaticClass()
 	};
 
     void SetViewportAdapter(FMultipleViewportsAdapter* InAdapter) { ViewportAdapter = InAdapter; }

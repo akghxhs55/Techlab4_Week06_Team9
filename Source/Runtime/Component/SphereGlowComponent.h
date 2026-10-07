@@ -30,6 +30,18 @@ public:
     virtual const FStaticMeshData* GetMeshData() const override;
     virtual FBox CalcLocalBounds() const override;
 
+    float GetRadius() const { return Radius; }
+    void SetRadius(float InRadius) { Radius = InRadius; }
+
+    float GetIntensity() const { return Intensity; }
+    void SetIntensity(float InIntensity) { Intensity = InIntensity; }
+
+    float GetRadiusFallOff() const { return RadiusFallOff; }
+    void SetRadiusFallOff(float InFallOff) { RadiusFallOff = InFallOff; }
+
+    const FVector4& GetColor() const { return Color; }
+    void SetColor(const FVector4& InColor) { Color = InColor; }
+
 protected:
     // 에디터/인스펙터 노출 속성
     float Radius = 1.0f;

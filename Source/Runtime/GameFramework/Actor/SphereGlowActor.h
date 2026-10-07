@@ -10,7 +10,9 @@ public:
     ASphereGlowActor();
     USphereGlowComponent* GetSphereGlowComponent() const;
 
-private:
+    virtual void DuplicateSubObjects() override;
+
+protected:
     USphereGlowComponent* SphereGlowComponent = nullptr;
 };
 
