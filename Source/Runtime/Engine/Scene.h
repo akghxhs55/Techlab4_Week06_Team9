@@ -24,6 +24,7 @@ public:
 
 	void AddFog(UExpHeightFogComponent* Fog);
 	void RemoveFog(UExpHeightFogComponent* Fog);
+	void RemoveAllFogs();
 
 	TArray<FPrimitiveSceneProxy*> Proxies;
 	TArray<FPrimitiveSceneProxy*> DirtyProxies;

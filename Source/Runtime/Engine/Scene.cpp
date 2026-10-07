@@ -164,3 +164,8 @@ void FScene::RemoveFog(UExpHeightFogComponent* Fog) {
 		}
 	);
 }
+
+void FScene::RemoveAllFogs()
+{
+	ExpHeightFogs.clear();
+}
